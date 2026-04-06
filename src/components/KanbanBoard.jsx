@@ -33,19 +33,16 @@ function isOverdue(date) {
 }
 
 /* ── Card ── */
-function KanbanCard({ task, onDelete, onClickTask, overlay = false }) {
+function KanbanCard({ task, onDelete, onClickTask, wasDraggingRef, overlay = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
   const p = PRIORITY_CONFIG[task.priority]
-  const didDrag = useRef(false)
 
   return (
     <div
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      onPointerDown={() => { didDrag.current = false }}
-      onPointerMove={() => { didDrag.current = true }}
-      onClick={() => { if (!overlay && !didDrag.current) onClickTask?.(task) }}
+      onClick={() => { if (!overlay && !wasDraggingRef?.current) onClickTask?.(task) }}
       className="group rounded-xl p-3.5 select-none"
       style={{
         transform: CSS.Transform.toString(transform),
@@ -96,7 +93,7 @@ function KanbanCard({ task, onDelete, onClickTask, overlay = false }) {
 }
 
 /* ── Column ── */
-function KanbanColumn({ column, tasks, onDelete, onAddTask, onClickTask }) {
+function KanbanColumn({ column, tasks, onDelete, onAddTask, onClickTask, wasDraggingRef }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
 
   return (
@@ -135,7 +132,7 @@ function KanbanColumn({ column, tasks, onDelete, onAddTask, onClickTask }) {
       >
         <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map(task => (
-            <KanbanCard key={task.id} task={task} onDelete={onDelete} onClickTask={onClickTask} />
+            <KanbanCard key={task.id} task={task} onDelete={onDelete} onClickTask={onClickTask} wasDraggingRef={wasDraggingRef} />
           ))}
         </SortableContext>
 
@@ -152,6 +149,7 @@ function KanbanColumn({ column, tasks, onDelete, onAddTask, onClickTask }) {
 /* ── Board ── */
 export default function KanbanBoard({ tasks, onUpdateStatus, onDelete, onAddTask, onClickTask }) {
   const [activeTask, setActiveTask] = useState(null)
+  const wasDraggingRef = useRef(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -164,11 +162,13 @@ export default function KanbanBoard({ tasks, onUpdateStatus, onDelete, onAddTask
   }
 
   function handleDragStart({ active }) {
+    wasDraggingRef.current = true
     setActiveTask(tasks.find(t => t.id === active.id) || null)
   }
 
   function handleDragEnd({ active, over }) {
     setActiveTask(null)
+    setTimeout(() => { wasDraggingRef.current = false }, 0)
     if (!over) return
 
     const task = tasks.find(t => t.id === active.id)
@@ -206,6 +206,7 @@ export default function KanbanBoard({ tasks, onUpdateStatus, onDelete, onAddTask
             onDelete={onDelete}
             onAddTask={onAddTask}
             onClickTask={onClickTask}
+            wasDraggingRef={wasDraggingRef}
           />
         ))}
       </div>
