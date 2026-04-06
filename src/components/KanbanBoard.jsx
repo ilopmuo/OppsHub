@@ -37,32 +37,28 @@ function KanbanCard({ task, onDelete, overlay = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
   const p = PRIORITY_CONFIG[task.priority]
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.35 : 1,
-    cursor: overlay ? 'grabbing' : 'grab',
-  }
-
   return (
     <div
       ref={setNodeRef}
-      style={style}
       {...attributes}
       {...listeners}
       className="group rounded-xl p-3.5 select-none"
-      onPointerDown={e => e.stopPropagation()}
-      onClick={e => e.stopPropagation()}
       style={{
-        ...style,
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.35 : 1,
+        cursor: overlay ? 'grabbing' : 'grab',
         backgroundColor: overlay ? '#222' : '#1a1a1a',
         border: `1px solid ${overlay ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.07)'}`,
         boxShadow: overlay ? '0 12px 40px rgba(0,0,0,0.6)' : 'none',
+        touchAction: 'none',
       }}
     >
       <div className="flex items-start justify-between gap-2 mb-2.5">
-        <p className="text-sm leading-snug" style={{ color: task.status === 'done' ? '#6e6e73' : '#f5f5f7',
-          textDecoration: task.status === 'done' ? 'line-through' : 'none' }}>
+        <p className="text-sm leading-snug" style={{
+          color: task.status === 'done' ? '#6e6e73' : '#f5f5f7',
+          textDecoration: task.status === 'done' ? 'line-through' : 'none',
+        }}>
           {task.title}
         </p>
         {!overlay && (
