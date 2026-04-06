@@ -44,19 +44,19 @@ function AppContent() {
         position="top-right"
         toastOptions={{
           style: {
-            background: '#1b263b',
-            color: '#e0e1dd',
-            border: '1px solid rgba(65,90,119,0.5)',
-            borderRadius: '12px',
+            background: '#1a1a1a',
+            color: '#f5f5f7',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '14px',
             fontSize: '13px',
             fontFamily: 'Inter, system-ui, sans-serif',
-            boxShadow: '0 8px 32px rgba(13,27,42,0.6)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
           },
           success: {
-            iconTheme: { primary: '#34d399', secondary: '#1b263b' },
+            iconTheme: { primary: '#30d158', secondary: '#1a1a1a' },
           },
           error: {
-            iconTheme: { primary: '#f87171', secondary: '#1b263b' },
+            iconTheme: { primary: '#ff453a', secondary: '#1a1a1a' },
           },
         }}
       />

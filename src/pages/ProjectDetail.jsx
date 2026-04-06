@@ -8,27 +8,27 @@ import NewTaskModal from '../components/NewTaskModal'
 import StatusBadge from '../components/StatusBadge'
 import { useAuth } from '../contexts/AuthContext'
 
-const C = {
-  bg: '#0d1b2a',
-  surface: '#1b263b',
-  border: '#415a77',
-  muted: '#778da9',
-  text: '#e0e1dd',
-}
-
 const STATUS_OPTIONS = [
   { value: 'on_track', label: 'On track' },
   { value: 'at_risk', label: 'At risk' },
   { value: 'blocked', label: 'Blocked' },
 ]
 
-const inputClass = "w-full rounded-xl px-4 py-2.5 text-sm transition-all outline-none"
-const inputStyle = { backgroundColor: C.bg, border: `1px solid ${C.border}50`, color: C.text }
+const inputStyle = {
+  backgroundColor: '#111111',
+  border: '1px solid rgba(255,255,255,0.08)',
+  color: '#f5f5f7',
+  borderRadius: 12,
+  padding: '10px 14px',
+  fontSize: 14,
+  width: '100%',
+  outline: 'none',
+  transition: 'border-color 0.15s',
+}
 
 export default function ProjectDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
 
   const [project, setProject] = useState(null)
   const [tasks, setTasks] = useState([])
@@ -36,7 +36,6 @@ export default function ProjectDetail() {
   const [saving, setSaving] = useState(false)
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [filter, setFilter] = useState('pending')
-
   const [name, setName] = useState('')
   const [status, setStatus] = useState('on_track')
   const [deadline, setDeadline] = useState('')
@@ -49,10 +48,7 @@ export default function ProjectDetail() {
     const { data, error } = await supabase.from('projects').select('*').eq('id', id).single()
     if (error || !data) { toast.error('Proyecto no encontrado'); navigate('/'); return }
     setProject(data)
-    setName(data.name)
-    setStatus(data.status)
-    setDeadline(data.deadline || '')
-    setDescription(data.description || '')
+    setName(data.name); setStatus(data.status); setDeadline(data.deadline || ''); setDescription(data.description || '')
     await fetchTasks()
     setLoading(false)
   }
@@ -66,16 +62,15 @@ export default function ProjectDetail() {
     setSaving(true)
     const { error } = await supabase.from('projects').update({ name, status, deadline: deadline || null, description }).eq('id', id)
     if (error) { toast.error('Error al guardar') } else {
-      toast.success('Proyecto actualizado')
-      setProject(p => ({ ...p, name, status, deadline, description }))
+      toast.success('Guardado'); setProject(p => ({ ...p, name, status, deadline, description }))
     }
     setSaving(false)
   }
 
   async function handleDelete() {
-    if (!confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)) return
+    if (!confirm(`¿Eliminar "${name}"?`)) return
     const { error } = await supabase.from('projects').delete().eq('id', id)
-    if (error) { toast.error('Error al eliminar') } else { toast.success('Proyecto eliminado'); navigate('/') }
+    if (error) { toast.error('Error al eliminar') } else { toast.success('Eliminado'); navigate('/') }
   }
 
   async function handleToggleTask(taskId, done) {
@@ -89,9 +84,7 @@ export default function ProjectDetail() {
   }
 
   function onTaskCreated(task) {
-    setTasks(prev => [...prev, task])
-    setShowTaskModal(false)
-    toast.success('Tarea creada')
+    setTasks(prev => [...prev, task]); setShowTaskModal(false); toast.success('Tarea creada')
   }
 
   const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
@@ -101,14 +94,13 @@ export default function ProjectDetail() {
       if (a.done !== b.done) return a.done ? 1 : -1
       const pa = PRIORITY_ORDER[a.priority] ?? 1, pb = PRIORITY_ORDER[b.priority] ?? 1
       if (pa !== pb) return pa - pb
-      if (a.due_date && b.due_date) return new Date(a.due_date) - new Date(b.due_date)
-      return a.due_date ? -1 : b.due_date ? 1 : 0
+      return a.due_date && b.due_date ? new Date(a.due_date) - new Date(b.due_date) : a.due_date ? -1 : 1
     })
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: C.bg }}>
-        <Loader2 className="w-5 h-5 animate-spin" style={{ color: C.muted }} />
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#000000' }}>
+        <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#6e6e73' }} />
       </div>
     )
   }
@@ -116,157 +108,162 @@ export default function ProjectDetail() {
   const isDirty = name !== project.name || status !== project.status || deadline !== (project.deadline || '') || description !== (project.description || '')
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#000000' }}>
       {/* Header */}
       <header
-        className="sticky top-0 z-10 backdrop-blur-md"
-        style={{ backgroundColor: `${C.surface}cc`, borderBottom: `1px solid ${C.border}30` }}
+        className="sticky top-0 z-10"
+        style={{
+          backgroundColor: 'rgba(0,0,0,0.72)',
+          backdropFilter: 'saturate(180%) blur(20px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
+        }}
       >
-        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm">
             <button
               onClick={() => navigate('/')}
-              className="flex items-center gap-2 text-sm transition-all py-1.5 px-3 rounded-lg"
-              style={{ color: C.muted }}
-              onMouseEnter={e => { e.currentTarget.style.color = C.text; e.currentTarget.style.backgroundColor = `${C.border}20` }}
-              onMouseLeave={e => { e.currentTarget.style.color = C.muted; e.currentTarget.style.backgroundColor = 'transparent' }}
+              className="flex items-center gap-1.5 transition-colors"
+              style={{ color: '#6e6e73' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
+              onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Proyectos</span>
+              Proyectos
             </button>
-            <span style={{ color: `${C.border}60` }}>/</span>
-            <span className="text-sm font-medium truncate max-w-[160px]" style={{ color: C.text }}>{name}</span>
+            <span style={{ color: '#3a3a3a' }}>/</span>
+            <span className="font-medium truncate max-w-[160px]" style={{ color: '#f5f5f7' }}>{name}</span>
           </div>
           <button
-            onClick={async () => { await supabase.auth.signOut() }}
-            className="flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg transition-all"
-            style={{ color: C.muted, border: `1px solid ${C.border}30` }}
-            onMouseEnter={e => { e.currentTarget.style.color = C.text; e.currentTarget.style.borderColor = C.border }}
-            onMouseLeave={e => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = `${C.border}30` }}
+            onClick={async () => await supabase.auth.signOut()}
+            className="transition-colors"
+            style={{ color: '#6e6e73' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
+            onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}
           >
-            <LogOut className="w-3.5 h-3.5" />
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-10 space-y-8">
-        {/* Project form card */}
-        <div className="rounded-2xl p-6" style={{ backgroundColor: C.surface, border: `1px solid ${C.border}30` }}>
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-widest mb-1" style={{ color: C.border }}>Proyecto</p>
-              <h1 className="text-xl font-bold" style={{ color: C.text }}>{project.name}</h1>
-            </div>
+      <main className="max-w-3xl mx-auto px-6 py-12 space-y-10">
+        {/* Project form */}
+        <div>
+          <div className="flex items-start justify-between mb-6">
+            <h1 className="text-3xl font-bold tracking-tight" style={{ color: '#f5f5f7', letterSpacing: '-0.02em' }}>
+              {project.name}
+            </h1>
             <StatusBadge status={project.status} />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium uppercase tracking-wider mb-2" style={{ color: C.muted }}>
-                Nombre del proyecto / cliente
-              </label>
-              <input
-                value={name}
-                onChange={e => setName(e.target.value)}
-                className={inputClass}
-                style={inputStyle}
-                onFocus={e => e.target.style.borderColor = C.muted}
-                onBlur={e => e.target.style.borderColor = `${C.border}50`}
-              />
+          <div
+            className="rounded-2xl p-6 space-y-4"
+            style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Nombre</label>
+                <input
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  style={inputStyle}
+                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Estado</label>
+                <select
+                  value={status}
+                  onChange={e => setStatus(e.target.value)}
+                  style={inputStyle}
+                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+                >
+                  {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Deadline</label>
+                <input
+                  type="date"
+                  value={deadline}
+                  onChange={e => setDeadline(e.target.value)}
+                  style={inputStyle}
+                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>
+                  Descripción <span style={{ color: '#3a3a3a' }}>(opcional)</span>
+                </label>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Contexto breve..."
+                  style={{ ...inputStyle, resize: 'none' }}
+                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium uppercase tracking-wider mb-2" style={{ color: C.muted }}>Estado</label>
-              <select
-                value={status}
-                onChange={e => setStatus(e.target.value)}
-                className={inputClass}
-                style={inputStyle}
-                onFocus={e => e.target.style.borderColor = C.muted}
-                onBlur={e => e.target.style.borderColor = `${C.border}50`}
+            <div
+              className="flex items-center justify-between pt-3"
+              style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <button
+                onClick={handleDelete}
+                className="text-sm transition-colors"
+                style={{ color: '#6e6e73' }}
+                onMouseEnter={e => e.currentTarget.style.color = '#ff453a'}
+                onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}
               >
-                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+                <span className="flex items-center gap-1.5">
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Eliminar
+                </span>
+              </button>
+
+              <button
+                onClick={handleSave}
+                disabled={!isDirty || saving}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                style={{
+                  backgroundColor: isDirty && !saving ? '#f5f5f7' : 'rgba(245,245,247,0.1)',
+                  color: isDirty && !saving ? '#000000' : '#6e6e73',
+                  cursor: isDirty && !saving ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Guardar
+              </button>
             </div>
-
-            <div>
-              <label className="block text-xs font-medium uppercase tracking-wider mb-2" style={{ color: C.muted }}>Deadline</label>
-              <input
-                type="date"
-                value={deadline}
-                onChange={e => setDeadline(e.target.value)}
-                className={inputClass}
-                style={inputStyle}
-                onFocus={e => e.target.style.borderColor = C.muted}
-                onBlur={e => e.target.style.borderColor = `${C.border}50`}
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium uppercase tracking-wider mb-2" style={{ color: C.muted }}>
-                Descripción <span style={{ color: `${C.border}80` }}>(opcional)</span>
-              </label>
-              <textarea
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                rows={3}
-                placeholder="Contexto breve sobre el proyecto..."
-                className={`${inputClass} resize-none`}
-                style={{ ...inputStyle, placeholder: C.border }}
-                onFocus={e => e.target.style.borderColor = C.muted}
-                onBlur={e => e.target.style.borderColor = `${C.border}50`}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between mt-6 pt-5" style={{ borderTop: `1px solid ${C.border}20` }}>
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-1.5 text-sm transition-all"
-              style={{ color: `${C.muted}` }}
-              onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
-              onMouseLeave={e => e.currentTarget.style.color = C.muted}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Eliminar proyecto
-            </button>
-
-            <button
-              onClick={handleSave}
-              disabled={!isDirty || saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
-              style={{
-                backgroundColor: isDirty && !saving ? C.border : `${C.border}40`,
-                color: isDirty && !saving ? C.text : `${C.text}50`,
-                cursor: isDirty && !saving ? 'pointer' : 'not-allowed',
-              }}
-            >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              Guardar cambios
-            </button>
           </div>
         </div>
 
-        {/* Tasks section */}
+        {/* Tasks */}
         <div>
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-bold" style={{ color: C.text }}>Tareas</h2>
+            <h2 className="text-xl font-semibold tracking-tight" style={{ color: '#f5f5f7' }}>Tareas</h2>
             <button
               onClick={() => setShowTaskModal(true)}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all"
-              style={{ backgroundColor: C.border, color: C.text }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#4e6d8f'}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = C.border}
+              style={{ backgroundColor: '#f5f5f7', color: '#000000' }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#ffffff'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f5f5f7'}
             >
               <Plus className="w-3.5 h-3.5" />
               Nueva tarea
             </button>
           </div>
 
-          {/* Filter tabs */}
+          {/* Filter */}
           <div
             className="flex gap-0.5 w-fit rounded-xl p-1 mb-5"
-            style={{ backgroundColor: C.surface, border: `1px solid ${C.border}30` }}
+            style={{ backgroundColor: '#111111' }}
           >
             {[
               { key: 'pending', label: 'Pendientes' },
@@ -278,8 +275,8 @@ export default function ProjectDetail() {
                 onClick={() => setFilter(key)}
                 className="px-3.5 py-1.5 text-sm rounded-lg transition-all font-medium"
                 style={{
-                  backgroundColor: filter === key ? C.border : 'transparent',
-                  color: filter === key ? C.text : C.muted,
+                  backgroundColor: filter === key ? '#2a2a2a' : 'transparent',
+                  color: filter === key ? '#f5f5f7' : '#6e6e73',
                 }}
               >
                 {label}
@@ -292,22 +289,20 @@ export default function ProjectDetail() {
           {filteredTasks.length === 0 && (
             <div
               className="rounded-2xl py-14 text-center"
-              style={{ backgroundColor: C.surface, border: `1px solid ${C.border}20` }}
+              style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
             >
-              <p className="text-sm" style={{ color: C.muted }}>
-                {filter === 'done' ? 'No hay tareas completadas todavía'
-                  : filter === 'pending' ? 'No hay tareas pendientes'
-                  : 'No hay tareas en este proyecto'}
+              <p className="text-sm" style={{ color: '#6e6e73' }}>
+                {filter === 'done' ? 'No hay tareas completadas' : filter === 'pending' ? 'No hay tareas pendientes' : 'Sin tareas'}
               </p>
               {filter !== 'done' && (
                 <button
                   onClick={() => setShowTaskModal(true)}
-                  className="mt-3 text-sm font-medium transition-all"
-                  style={{ color: C.border }}
-                  onMouseEnter={e => e.target.style.color = C.muted}
-                  onMouseLeave={e => e.target.style.color = C.border}
+                  className="mt-3 text-sm transition-colors"
+                  style={{ color: '#6e6e73' }}
+                  onMouseEnter={e => e.target.style.color = '#f5f5f7'}
+                  onMouseLeave={e => e.target.style.color = '#6e6e73'}
                 >
-                  + Crear primera tarea
+                  + Añadir tarea
                 </button>
               )}
             </div>

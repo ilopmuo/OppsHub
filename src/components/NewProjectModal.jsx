@@ -4,16 +4,17 @@ import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import { X, Loader2 } from 'lucide-react'
 
-const C = {
-  bg: '#0d1b2a',
-  surface: '#1b263b',
-  border: '#415a77',
-  muted: '#778da9',
-  text: '#e0e1dd',
+const inputStyle = {
+  backgroundColor: '#000000',
+  border: '1px solid rgba(255,255,255,0.08)',
+  color: '#f5f5f7',
+  borderRadius: 12,
+  padding: '10px 14px',
+  fontSize: 14,
+  width: '100%',
+  outline: 'none',
+  transition: 'border-color 0.15s',
 }
-
-const inputClass = "w-full rounded-xl px-4 py-2.5 text-sm transition-all outline-none"
-const inputStyle = { backgroundColor: C.bg, border: `1px solid ${C.border}50`, color: C.text }
 
 export default function NewProjectModal({ onClose, onCreated }) {
   const { user } = useAuth()
@@ -36,20 +37,29 @@ export default function NewProjectModal({ onClose, onCreated }) {
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{ backgroundColor: 'rgba(13,27,42,0.8)', backdropFilter: 'blur(8px)' }}>
-      <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{ backgroundColor: C.surface, border: `1px solid ${C.border}40` }}>
+    <div
+      className="fixed inset-0 flex items-end sm:items-center justify-center sm:p-4 z-50"
+      style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl overflow-hidden"
+        style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)' }}
+      >
+        {/* Handle (mobile) */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }} />
+        </div>
+
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: `1px solid ${C.border}25` }}>
-          <div>
-            <h2 className="font-semibold" style={{ color: C.text }}>Nuevo proyecto</h2>
-            <p className="text-xs mt-0.5" style={{ color: C.muted }}>Completa los detalles del cliente</p>
-          </div>
+        <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <h2 className="font-semibold text-base" style={{ color: '#f5f5f7' }}>Nuevo proyecto</h2>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg transition-all"
-            style={{ color: C.muted }}
-            onMouseEnter={e => { e.currentTarget.style.color = C.text; e.currentTarget.style.backgroundColor = `${C.border}20` }}
-            onMouseLeave={e => { e.currentTarget.style.color = C.muted; e.currentTarget.style.backgroundColor = 'transparent' }}
+            style={{ color: '#6e6e73' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = '#2a2a2a' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'transparent' }}
           >
             <X className="w-4 h-4" />
           </button>
@@ -58,31 +68,27 @@ export default function NewProjectModal({ onClose, onCreated }) {
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-xs font-medium uppercase tracking-wider mb-2" style={{ color: C.muted }}>
-              Nombre del proyecto / cliente *
-            </label>
+            <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Nombre *</label>
             <input
               autoFocus required
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Ej: Acme Corp, Proyecto Alpha..."
-              className={inputClass}
-              style={{ ...inputStyle, '::placeholder': { color: C.border } }}
-              onFocus={e => e.target.style.borderColor = C.muted}
-              onBlur={e => e.target.style.borderColor = `${C.border}50`}
+              style={inputStyle}
+              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium uppercase tracking-wider mb-2" style={{ color: C.muted }}>Estado</label>
+              <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Estado</label>
               <select
                 value={status}
                 onChange={e => setStatus(e.target.value)}
-                className={inputClass}
                 style={inputStyle}
-                onFocus={e => e.target.style.borderColor = C.muted}
-                onBlur={e => e.target.style.borderColor = `${C.border}50`}
+                onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
+                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
               >
                 <option value="on_track">On track</option>
                 <option value="at_risk">At risk</option>
@@ -90,53 +96,51 @@ export default function NewProjectModal({ onClose, onCreated }) {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium uppercase tracking-wider mb-2" style={{ color: C.muted }}>Deadline</label>
+              <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Deadline</label>
               <input
                 type="date"
                 value={deadline}
                 onChange={e => setDeadline(e.target.value)}
-                className={inputClass}
                 style={inputStyle}
-                onFocus={e => e.target.style.borderColor = C.muted}
-                onBlur={e => e.target.style.borderColor = `${C.border}50`}
+                onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
+                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium uppercase tracking-wider mb-2" style={{ color: C.muted }}>
-              Descripción <span style={{ color: `${C.border}70` }}>(opcional)</span>
+            <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>
+              Descripción <span style={{ color: '#3a3a3a' }}>(opcional)</span>
             </label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               rows={2}
               placeholder="Contexto breve..."
-              className={`${inputClass} resize-none`}
-              style={inputStyle}
-              onFocus={e => e.target.style.borderColor = C.muted}
-              onBlur={e => e.target.style.borderColor = `${C.border}50`}
+              style={{ ...inputStyle, resize: 'none' }}
+              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
             />
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
-              style={{ backgroundColor: `${C.border}20`, color: C.muted, border: `1px solid ${C.border}30` }}
-              onMouseEnter={e => { e.currentTarget.style.color = C.text }}
-              onMouseLeave={e => { e.currentTarget.style.color = C.muted }}
+              className="flex-1 py-3 rounded-xl text-sm font-medium transition-all"
+              style={{ backgroundColor: '#2a2a2a', color: '#6e6e73' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = '#333' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = '#2a2a2a' }}
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving || !name.trim()}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all"
               style={{
-                backgroundColor: name.trim() && !saving ? C.border : `${C.border}40`,
-                color: name.trim() && !saving ? C.text : `${C.text}50`,
+                backgroundColor: name.trim() && !saving ? '#f5f5f7' : 'rgba(245,245,247,0.15)',
+                color: name.trim() && !saving ? '#000000' : '#6e6e73',
                 cursor: name.trim() && !saving ? 'pointer' : 'not-allowed',
               }}
             >

@@ -1,17 +1,10 @@
 import StatusBadge from './StatusBadge'
-import { Calendar, ChevronRight, AlertTriangle } from 'lucide-react'
+import { Calendar, AlertTriangle } from 'lucide-react'
 import { useState } from 'react'
-
-const C = {
-  surface: '#1b263b',
-  border: '#415a77',
-  muted: '#778da9',
-  text: '#e0e1dd',
-}
 
 const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
 const PRIORITY_LABELS = { high: 'Alta', medium: 'Media', low: 'Baja' }
-const PRIORITY_DOT = { high: '#f87171', medium: '#fbbf24', low: '#778da9' }
+const PRIORITY_DOT = { high: '#ff453a', medium: '#ff9f0a', low: '#6e6e73' }
 
 function getNextTask(tasks) {
   return tasks
@@ -42,71 +35,74 @@ export default function ProjectCard({ project, onClick }) {
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="w-full text-left rounded-2xl p-5 transition-all duration-200 cursor-pointer"
+      className="w-full text-left rounded-2xl p-5 transition-all duration-200"
       style={{
-        backgroundColor: C.surface,
-        border: `1px solid ${hovered ? C.border : `${C.border}30`}`,
+        backgroundColor: hovered ? '#161616' : '#111111',
+        border: `1px solid ${hovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`,
         transform: hovered ? 'translateY(-1px)' : 'none',
-        boxShadow: hovered ? `0 8px 24px rgba(13,27,42,0.6)` : 'none',
+        boxShadow: hovered ? '0 8px 30px rgba(0,0,0,0.5)' : 'none',
       }}
     >
-      {/* Top row */}
-      <div className="flex items-start justify-between gap-2 mb-4">
-        <h3 className="font-semibold text-sm leading-snug line-clamp-2 transition-colors" style={{ color: hovered ? C.text : C.text }}>
+      {/* Name + status */}
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <h3
+          className="font-semibold text-sm leading-snug line-clamp-2"
+          style={{ color: '#f5f5f7' }}
+        >
           {project.name}
         </h3>
-        <ChevronRight
-          className="w-4 h-4 shrink-0 mt-0.5 transition-all"
-          style={{ color: hovered ? C.muted : `${C.border}50`, transform: hovered ? 'translateX(2px)' : 'none' }}
-        />
+        <StatusBadge status={project.status} />
       </div>
-
-      {/* Status badge */}
-      <StatusBadge status={project.status} />
 
       {/* Deadline */}
       {project.deadline && (
         <div
-          className="flex items-center gap-1.5 mt-3 text-xs"
-          style={{ color: soon ? '#fbbf24' : C.muted }}
+          className="flex items-center gap-1.5 mb-4 text-xs"
+          style={{ color: soon ? '#ff9f0a' : '#6e6e73' }}
         >
           {soon ? <AlertTriangle className="w-3.5 h-3.5" /> : <Calendar className="w-3.5 h-3.5" />}
           {formatDeadline(project.deadline)}
-          {soon && <span className="font-semibold">· Próximo</span>}
+          {soon && <span className="font-medium">· Próximo</span>}
         </div>
       )}
 
-      {/* Progress bar */}
+      {/* Progress */}
       {totalCount > 0 && (
-        <div className="mt-4">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs" style={{ color: C.muted }}>{progress}% completado</span>
-            <span className="text-xs" style={{ color: `${C.border}80` }}>{totalCount - pendingCount}/{totalCount}</span>
+        <div className="mb-4">
+          <div className="flex justify-between mb-1.5">
+            <span className="text-xs" style={{ color: '#6e6e73' }}>{progress}% completado</span>
+            <span className="text-xs" style={{ color: '#3a3a3a' }}>{totalCount - pendingCount}/{totalCount}</span>
           </div>
-          <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: `${C.border}20` }}>
+          <div className="h-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
             <div
               className="h-full rounded-full transition-all"
-              style={{ width: `${progress}%`, backgroundColor: progress === 100 ? '#34d399' : C.border }}
+              style={{
+                width: `${progress}%`,
+                backgroundColor: progress === 100 ? '#30d158' : 'rgba(255,255,255,0.3)',
+              }}
             />
           </div>
         </div>
       )}
 
-      {/* Divider + next task */}
-      <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${C.border}20` }}>
+      {/* Next task */}
+      <div className="pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         {nextTask ? (
           <div className="flex items-start gap-2">
-            <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: PRIORITY_DOT[nextTask.priority] }} />
+            <span
+              className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
+              style={{ backgroundColor: PRIORITY_DOT[nextTask.priority] }}
+            />
             <div className="min-w-0">
-              <p className="text-xs line-clamp-1" style={{ color: C.text }}>{nextTask.title}</p>
-              <p className="text-xs mt-0.5" style={{ color: C.muted }}>
+              <p className="text-xs line-clamp-1" style={{ color: '#c0c0c0' }}>{nextTask.title}</p>
+              <p className="text-xs mt-0.5" style={{ color: '#6e6e73' }}>
                 Prioridad {PRIORITY_LABELS[nextTask.priority]}
               </p>
             </div>
           </div>
         ) : (
-          <p className="text-xs" style={{ color: `${C.border}60` }}>
-            {pendingCount === 0 && totalCount > 0 ? 'Todas las tareas completadas' : 'Sin tareas pendientes'}
+          <p className="text-xs" style={{ color: '#3a3a3a' }}>
+            {pendingCount === 0 && totalCount > 0 ? 'Todas completadas' : 'Sin tareas pendientes'}
           </p>
         )}
       </div>
