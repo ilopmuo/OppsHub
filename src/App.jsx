@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import ProjectDetail from './pages/ProjectDetail'
+import Agenda from './pages/Agenda'
 import { useTheme } from './hooks/useTheme'
 import { Loader2 } from 'lucide-react'
 
@@ -82,6 +83,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <ProjectDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agenda"
+          element={
+            <ProtectedRoute>
+              <Agenda />
             </ProtectedRoute>
           }
         />

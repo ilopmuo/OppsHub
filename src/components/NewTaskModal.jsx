@@ -16,7 +16,7 @@ const inputStyle = {
   transition: 'border-color 0.15s',
 }
 
-export default function NewTaskModal({ projectId, onClose, onCreated }) {
+export default function NewTaskModal({ projectId, defaultStatus = 'todo', onClose, onCreated }) {
   const { user } = useAuth()
   const [title, setTitle] = useState('')
   const [priority, setPriority] = useState('medium')
@@ -29,7 +29,7 @@ export default function NewTaskModal({ projectId, onClose, onCreated }) {
     setSaving(true)
     const { data, error } = await supabase
       .from('tasks')
-      .insert({ project_id: projectId, user_id: user.id, title: title.trim(), priority, due_date: dueDate || null, done: false })
+      .insert({ project_id: projectId, user_id: user.id, title: title.trim(), priority, due_date: dueDate || null, status: defaultStatus, done: defaultStatus === 'done' })
       .select().single()
     if (error) { toast.error('Error al crear la tarea') } else { onCreated(data) }
     setSaving(false)

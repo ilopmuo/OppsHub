@@ -9,7 +9,7 @@ const PRIORITY_DOT = { high: '#ff453a', medium: '#ff9f0a', low: '#6e6e73' }
 
 function getNextTask(tasks) {
   return tasks
-    .filter(t => !t.done)
+    .filter(t => t.status !== 'done')
     .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1))[0]
 }
 
@@ -35,7 +35,7 @@ export default function ProjectCard({ project, onClick }) {
   const [hovered, setHovered] = useState(false)
   const tasks = project.tasks || []
   const nextTask = getNextTask(tasks)
-  const pendingCount = tasks.filter(t => !t.done).length
+  const pendingCount = tasks.filter(t => t.status !== 'done').length
   const totalCount = tasks.length
   const progress = totalCount > 0 ? Math.round((totalCount - pendingCount) / totalCount * 100) : 0
 
