@@ -54,6 +54,7 @@ export default function ProjectDetail() {
   // Shared editable fields
   const [name, setName] = useState('')
   const [status, setStatus] = useState('on_track')
+  const [startDate, setStartDate] = useState('')
   const [description, setDescription] = useState('')
   // Implementation
   const [deadline, setDeadline] = useState('')
@@ -73,6 +74,7 @@ export default function ProjectDetail() {
     setProject(data)
     setName(data.name)
     setStatus(data.status)
+    setStartDate(data.start_date || '')
     setDescription(data.description || '')
     setDeadline(data.deadline || '')
     setRenewalDate(data.renewal_date || '')
@@ -99,6 +101,7 @@ export default function ProjectDetail() {
     const isImpl = project.type !== 'maintenance'
     const payload = {
       name, status, description,
+      start_date: startDate || null,
       deadline: isImpl ? (deadline || null) : null,
       renewal_date: !isImpl ? (renewalDate || null) : null,
       sla_status: !isImpl ? slaStatus : null,
@@ -155,6 +158,7 @@ export default function ProjectDetail() {
   // Detect unsaved changes
   const isDirty = name !== project.name
     || status !== project.status
+    || startDate !== (project.start_date || '')
     || description !== (project.description || '')
     || (isImpl && deadline !== (project.deadline || ''))
     || (!isImpl && renewalDate !== (project.renewal_date || ''))
@@ -235,9 +239,14 @@ export default function ProjectDetail() {
               </select>
             </div>
 
+            <div>
+              <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Fecha de inicio</label>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} onFocus={focusIn} onBlur={focusOut} />
+            </div>
+
             {/* Implementation: deadline */}
             {isImpl && (
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Deadline</label>
                 <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} style={inputStyle} onFocus={focusIn} onBlur={focusOut} />
               </div>

@@ -24,6 +24,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
   // Shared fields
   const [name, setName] = useState('')
   const [status, setStatus] = useState('on_track')
+  const [startDate, setStartDate] = useState('')
   const [description, setDescription] = useState('')
   // Implementation
   const [deadline, setDeadline] = useState('')
@@ -50,6 +51,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
       name: name.trim(),
       status,
       type,
+      start_date: startDate || null,
       description: description.trim() || null,
       // Implementation fields
       deadline: type === 'implementation' ? (deadline || null) : null,
@@ -184,9 +186,17 @@ export default function NewProjectModal({ onClose, onCreated }) {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Fecha de inicio</label>
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle}
+                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+                />
+              </div>
+
               {/* Implementation: deadline */}
               {type === 'implementation' && (
-                <div>
+                <div className="col-span-2">
                   <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Deadline</label>
                   <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} style={inputStyle}
                     onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
@@ -197,7 +207,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
 
               {/* Maintenance: renewal date */}
               {type === 'maintenance' && (
-                <div>
+                <div className="col-span-2">
                   <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Renovación</label>
                   <input type="date" value={renewalDate} onChange={e => setRenewalDate(e.target.value)} style={inputStyle}
                     onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
