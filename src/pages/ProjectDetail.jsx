@@ -6,6 +6,7 @@ import { Save, Trash2, Plus, Loader2, List, LayoutGrid } from 'lucide-react'
 import TaskList from '../components/TaskList'
 import KanbanBoard from '../components/KanbanBoard'
 import NewTaskModal from '../components/NewTaskModal'
+import TaskDetailModal from '../components/TaskDetailModal'
 import StatusBadge from '../components/StatusBadge'
 import MilestoneList from '../components/MilestoneList'
 import ProjectStats from '../components/ProjectStats'
@@ -55,7 +56,8 @@ export default function ProjectDetail() {
   const [saving, setSaving] = useState(false)
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [taskModalStatus, setTaskModalStatus] = useState('todo')
-  const [filter, setFilter] = useState('active')
+  const [selectedTask, setSelectedTask] = useState(null)
+  const [filter, setFilter] = useState('todo')
   const [taskView, setTaskView] = useState(getTaskView)
 
   // Form fields
@@ -145,7 +147,8 @@ export default function ProjectDetail() {
 
   const filteredTasks = tasks
     .filter(t => {
-      if (filter === 'active') return t.status !== 'done'
+      if (filter === 'todo') return t.status === 'todo'
+      if (filter === 'in_progress') return t.status === 'in_progress'
       if (filter === 'done') return t.status === 'done'
       return true
     })
@@ -325,7 +328,8 @@ export default function ProjectDetail() {
             <>
               <div className="flex gap-0.5 w-fit rounded-xl p-1 mb-5" style={{ backgroundColor: '#111111' }}>
                 {[
-                  { key: 'active', label: 'Activas' },
+                  { key: 'todo', label: 'Por hacer' },
+                  { key: 'in_progress', label: 'En progreso' },
                   { key: 'done', label: 'Completadas' },
                   { key: 'all', label: 'Todas' },
                 ].map(({ key, label }) => (
@@ -337,12 +341,15 @@ export default function ProjectDetail() {
                 ))}
               </div>
 
-              <TaskList tasks={filteredTasks} onChangeStatus={handleChangeStatus} onDelete={handleDeleteTask} />
+              <TaskList tasks={filteredTasks} onChangeStatus={handleChangeStatus} onDelete={handleDeleteTask} onClickTask={setSelectedTask} />
 
               {filteredTasks.length === 0 && (
                 <div className="rounded-2xl py-14 text-center" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <p className="text-sm" style={{ color: '#6e6e73' }}>
-                    {filter === 'done' ? 'No hay tareas completadas' : filter === 'active' ? 'No hay tareas activas' : 'Sin tareas'}
+                    {filter === 'done' ? 'No hay tareas completadas'
+                      : filter === 'todo' ? 'No hay tareas por hacer'
+                      : filter === 'in_progress' ? 'No hay tareas en progreso'
+                      : 'Sin tareas'}
                   </p>
                   {filter !== 'done' && (
                     <button onClick={() => openAddTask('todo')} className="mt-3 text-sm transition-colors"
@@ -365,6 +372,23 @@ export default function ProjectDetail() {
           defaultStatus={taskModalStatus}
           onClose={() => setShowTaskModal(false)}
           onCreated={onTaskCreated}
+        />
+      )}
+
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onUpdated={updated => {
+            setTasks(prev => prev.map(t => t.id === updated.id ? updated : t))
+            setSelectedTask(null)
+            toast.success('Tarea actualizada')
+          }}
+          onDeleted={taskId => {
+            setTasks(prev => prev.filter(t => t.id !== taskId))
+            setSelectedTask(null)
+            toast.success('Tarea eliminada')
+          }}
         />
       )}
     </div>

@@ -46,7 +46,7 @@ function StatusButton({ status, onChange }) {
   )
 }
 
-export default function TaskList({ tasks, onChangeStatus, onDelete }) {
+export default function TaskList({ tasks, onChangeStatus, onDelete, onClickTask }) {
   if (tasks.length === 0) return null
 
   return (
@@ -58,14 +58,18 @@ export default function TaskList({ tasks, onChangeStatus, onDelete }) {
         return (
           <div
             key={task.id}
+            onClick={() => onClickTask?.(task)}
             className="flex items-start gap-3.5 px-4 py-3.5 rounded-xl group transition-all"
             style={{
               backgroundColor: '#111111',
               border: '1px solid rgba(255,255,255,0.06)',
               opacity: isDone ? 0.45 : 1,
+              cursor: onClickTask ? 'pointer' : 'default',
             }}
           >
-            <StatusButton status={task.status} onChange={s => onChangeStatus(task.id, s)} />
+            <div onClick={e => e.stopPropagation()}>
+              <StatusButton status={task.status} onChange={s => onChangeStatus(task.id, s)} />
+            </div>
 
             <div className="flex-1 min-w-0">
               <p className="text-sm leading-snug"
@@ -92,7 +96,7 @@ export default function TaskList({ tasks, onChangeStatus, onDelete }) {
             </div>
 
             <button
-              onClick={() => onDelete(task.id)}
+              onClick={e => { e.stopPropagation(); onDelete(task.id) }}
               className="p-1 rounded opacity-0 group-hover:opacity-100 transition-all"
               style={{ color: '#6e6e73' }}
               onMouseEnter={e => e.currentTarget.style.color = '#ff453a'}
