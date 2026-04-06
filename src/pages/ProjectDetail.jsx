@@ -320,6 +320,7 @@ export default function ProjectDetail() {
               onUpdateStatus={handleChangeStatus}
               onDelete={handleDeleteTask}
               onAddTask={status => openAddTask(status)}
+              onClickTask={setSelectedTask}
             />
           )}
 

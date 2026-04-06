@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   DndContext, DragOverlay, closestCorners,
   PointerSensor, useSensor, useSensors,
@@ -33,15 +33,19 @@ function isOverdue(date) {
 }
 
 /* ── Card ── */
-function KanbanCard({ task, onDelete, overlay = false }) {
+function KanbanCard({ task, onDelete, onClickTask, overlay = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
   const p = PRIORITY_CONFIG[task.priority]
+  const didDrag = useRef(false)
 
   return (
     <div
       ref={setNodeRef}
       {...attributes}
       {...listeners}
+      onPointerDown={() => { didDrag.current = false }}
+      onPointerMove={() => { didDrag.current = true }}
+      onClick={() => { if (!overlay && !didDrag.current) onClickTask?.(task) }}
       className="group rounded-xl p-3.5 select-none"
       style={{
         transform: CSS.Transform.toString(transform),
@@ -92,7 +96,7 @@ function KanbanCard({ task, onDelete, overlay = false }) {
 }
 
 /* ── Column ── */
-function KanbanColumn({ column, tasks, onDelete, onAddTask }) {
+function KanbanColumn({ column, tasks, onDelete, onAddTask, onClickTask }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
 
   return (
@@ -131,7 +135,7 @@ function KanbanColumn({ column, tasks, onDelete, onAddTask }) {
       >
         <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map(task => (
-            <KanbanCard key={task.id} task={task} onDelete={onDelete} />
+            <KanbanCard key={task.id} task={task} onDelete={onDelete} onClickTask={onClickTask} />
           ))}
         </SortableContext>
 
@@ -146,7 +150,7 @@ function KanbanColumn({ column, tasks, onDelete, onAddTask }) {
 }
 
 /* ── Board ── */
-export default function KanbanBoard({ tasks, onUpdateStatus, onDelete, onAddTask }) {
+export default function KanbanBoard({ tasks, onUpdateStatus, onDelete, onAddTask, onClickTask }) {
   const [activeTask, setActiveTask] = useState(null)
 
   const sensors = useSensors(
@@ -201,6 +205,7 @@ export default function KanbanBoard({ tasks, onUpdateStatus, onDelete, onAddTask
             tasks={tasksByColumn[col.id]}
             onDelete={onDelete}
             onAddTask={onAddTask}
+            onClickTask={onClickTask}
           />
         ))}
       </div>
