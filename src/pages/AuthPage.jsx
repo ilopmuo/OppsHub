@@ -50,7 +50,7 @@ export default function AuthPage() {
           {mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
         </h1>
         <p className="text-center text-sm mb-10" style={{ color: '#6e6e73' }}>
-          {mode === 'login' ? 'Accede a OpsHub' : 'Empieza a gestionar tus proyectos'}
+          {mode === 'login' ? 'Accede a OppsHub' : 'Empieza a gestionar tus proyectos'}
         </p>
 
         {/* Form */}

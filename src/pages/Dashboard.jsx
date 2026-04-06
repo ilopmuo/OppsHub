@@ -69,7 +69,7 @@ export default function Dashboard() {
               <rect x="10" y="24" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
               <rect x="24" y="24" width="10" height="10" rx="2" fill="white"/>
             </svg>
-            <span className="font-semibold text-sm" style={{ color: '#f5f5f7' }}>OpsHub</span>
+            <span className="font-semibold text-sm" style={{ color: '#f5f5f7' }}>OppsHub</span>
           </div>
 
           {/* Right */}
