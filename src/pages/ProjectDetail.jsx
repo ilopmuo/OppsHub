@@ -2,16 +2,23 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Save, Trash2, Plus, Loader2, LogOut } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, Plus, Loader2, LogOut, Rocket, Wrench } from 'lucide-react'
 import TaskList from '../components/TaskList'
 import NewTaskModal from '../components/NewTaskModal'
 import StatusBadge from '../components/StatusBadge'
+import MilestoneList from '../components/MilestoneList'
 import { useAuth } from '../contexts/AuthContext'
 
 const STATUS_OPTIONS = [
   { value: 'on_track', label: 'On track' },
   { value: 'at_risk', label: 'At risk' },
   { value: 'blocked', label: 'Blocked' },
+]
+
+const SLA_OPTIONS = [
+  { value: 'ok', label: 'Cumpliendo' },
+  { value: 'at_risk', label: 'En riesgo' },
+  { value: 'breach', label: 'Incumpliendo' },
 ]
 
 const inputStyle = {
@@ -26,20 +33,35 @@ const inputStyle = {
   transition: 'border-color 0.15s',
 }
 
+const focusIn = e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'
+const focusOut = e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'
+
+const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
+
 export default function ProjectDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   const [project, setProject] = useState(null)
   const [tasks, setTasks] = useState([])
+  const [milestones, setMilestones] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [filter, setFilter] = useState('pending')
+
+  // Shared editable fields
   const [name, setName] = useState('')
   const [status, setStatus] = useState('on_track')
-  const [deadline, setDeadline] = useState('')
   const [description, setDescription] = useState('')
+  // Implementation
+  const [deadline, setDeadline] = useState('')
+  // Maintenance
+  const [renewalDate, setRenewalDate] = useState('')
+  const [slaStatus, setSlaStatus] = useState('ok')
+  const [openTickets, setOpenTickets] = useState('')
+  const [lastContact, setLastContact] = useState('')
 
   useEffect(() => { fetchProject() }, [id])
 
@@ -47,22 +69,46 @@ export default function ProjectDetail() {
     setLoading(true)
     const { data, error } = await supabase.from('projects').select('*').eq('id', id).single()
     if (error || !data) { toast.error('Proyecto no encontrado'); navigate('/'); return }
+
     setProject(data)
-    setName(data.name); setStatus(data.status); setDeadline(data.deadline || ''); setDescription(data.description || '')
-    await fetchTasks()
+    setName(data.name)
+    setStatus(data.status)
+    setDescription(data.description || '')
+    setDeadline(data.deadline || '')
+    setRenewalDate(data.renewal_date || '')
+    setSlaStatus(data.sla_status || 'ok')
+    setOpenTickets(data.open_tickets !== null && data.open_tickets !== undefined ? String(data.open_tickets) : '')
+    setLastContact(data.last_contact || '')
+
+    await Promise.all([fetchTasks(), fetchMilestones()])
     setLoading(false)
   }
 
   async function fetchTasks() {
-    const { data, error } = await supabase.from('tasks').select('*').eq('project_id', id).order('created_at', { ascending: true })
-    if (!error) setTasks(data || [])
+    const { data } = await supabase.from('tasks').select('*').eq('project_id', id).order('created_at', { ascending: true })
+    setTasks(data || [])
+  }
+
+  async function fetchMilestones() {
+    const { data } = await supabase.from('milestones').select('*').eq('project_id', id).order('created_at', { ascending: true })
+    setMilestones(data || [])
   }
 
   async function handleSave() {
     setSaving(true)
-    const { error } = await supabase.from('projects').update({ name, status, deadline: deadline || null, description }).eq('id', id)
+    const isImpl = project.type !== 'maintenance'
+    const payload = {
+      name, status, description,
+      deadline: isImpl ? (deadline || null) : null,
+      renewal_date: !isImpl ? (renewalDate || null) : null,
+      sla_status: !isImpl ? slaStatus : null,
+      open_tickets: !isImpl ? (openTickets !== '' ? parseInt(openTickets) : null) : null,
+      last_contact: !isImpl ? (lastContact || null) : null,
+    }
+    const { error } = await supabase.from('projects').update(payload).eq('id', id)
     if (error) { toast.error('Error al guardar') } else {
-      toast.success('Guardado'); setProject(p => ({ ...p, name, status, deadline, description }))
+      toast.success('Guardado')
+      setProject(p => ({ ...p, ...payload }))
     }
     setSaving(false)
   }
@@ -87,7 +133,6 @@ export default function ProjectDetail() {
     setTasks(prev => [...prev, task]); setShowTaskModal(false); toast.success('Tarea creada')
   }
 
-  const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
   const filteredTasks = tasks
     .filter(t => filter === 'pending' ? !t.done : filter === 'done' ? t.done : true)
     .sort((a, b) => {
@@ -105,7 +150,17 @@ export default function ProjectDetail() {
     )
   }
 
-  const isDirty = name !== project.name || status !== project.status || deadline !== (project.deadline || '') || description !== (project.description || '')
+  const isImpl = project.type !== 'maintenance'
+
+  // Detect unsaved changes
+  const isDirty = name !== project.name
+    || status !== project.status
+    || description !== (project.description || '')
+    || (isImpl && deadline !== (project.deadline || ''))
+    || (!isImpl && renewalDate !== (project.renewal_date || ''))
+    || (!isImpl && slaStatus !== (project.sla_status || 'ok'))
+    || (!isImpl && openTickets !== (project.open_tickets !== null && project.open_tickets !== undefined ? String(project.open_tickets) : ''))
+    || (!isImpl && lastContact !== (project.last_contact || ''))
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#000000' }}>
@@ -136,8 +191,7 @@ export default function ProjectDetail() {
           </div>
           <button
             onClick={async () => await supabase.auth.signOut()}
-            className="transition-colors"
-            style={{ color: '#6e6e73' }}
+            className="transition-colors" style={{ color: '#6e6e73' }}
             onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
             onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}
           >
@@ -147,102 +201,117 @@ export default function ProjectDetail() {
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-12 space-y-10">
-        {/* Project form */}
+
+        {/* Project heading */}
         <div>
-          <div className="flex items-start justify-between mb-6">
+          <div className="flex items-start justify-between gap-4 mb-2">
             <h1 className="text-3xl font-bold tracking-tight" style={{ color: '#f5f5f7', letterSpacing: '-0.02em' }}>
               {project.name}
             </h1>
             <StatusBadge status={project.status} />
           </div>
-
-          <div
-            className="rounded-2xl p-6 space-y-4"
-            style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
+          {/* Type pill */}
+          <span
+            className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full"
+            style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Nombre</label>
-                <input
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  style={inputStyle}
-                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
-                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Estado</label>
-                <select
-                  value={status}
-                  onChange={e => setStatus(e.target.value)}
-                  style={inputStyle}
-                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
-                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
-                >
-                  {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
+            {isImpl ? <Rocket className="w-3 h-3" /> : <Wrench className="w-3 h-3" />}
+            {isImpl ? 'Implementación' : 'Mantenimiento'}
+          </span>
+        </div>
+
+        {/* Form card */}
+        <div className="rounded-2xl p-6 space-y-4" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Nombre</label>
+              <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} onFocus={focusIn} onBlur={focusOut} />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Estado</label>
+              <select value={status} onChange={e => setStatus(e.target.value)} style={inputStyle} onFocus={focusIn} onBlur={focusOut}>
+                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+
+            {/* Implementation: deadline */}
+            {isImpl && (
               <div>
                 <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Deadline</label>
-                <input
-                  type="date"
-                  value={deadline}
-                  onChange={e => setDeadline(e.target.value)}
-                  style={inputStyle}
-                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
-                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
-                />
+                <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} style={inputStyle} onFocus={focusIn} onBlur={focusOut} />
               </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>
-                  Descripción <span style={{ color: '#3a3a3a' }}>(opcional)</span>
-                </label>
-                <textarea
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  rows={3}
-                  placeholder="Contexto breve..."
-                  style={{ ...inputStyle, resize: 'none' }}
-                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
-                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
-                />
-              </div>
-            </div>
+            )}
 
-            <div
-              className="flex items-center justify-between pt-3"
-              style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
-            >
-              <button
-                onClick={handleDelete}
-                className="text-sm transition-colors"
-                style={{ color: '#6e6e73' }}
-                onMouseEnter={e => e.currentTarget.style.color = '#ff453a'}
-                onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}
-              >
-                <span className="flex items-center gap-1.5">
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Eliminar
-                </span>
-              </button>
+            {/* Maintenance fields */}
+            {!isImpl && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Renovación de contrato</label>
+                  <input type="date" value={renewalDate} onChange={e => setRenewalDate(e.target.value)} style={inputStyle} onFocus={focusIn} onBlur={focusOut} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Estado SLA</label>
+                  <select value={slaStatus} onChange={e => setSlaStatus(e.target.value)} style={inputStyle} onFocus={focusIn} onBlur={focusOut}>
+                    {SLA_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Tickets abiertos</label>
+                  <input
+                    type="number" min="0" value={openTickets}
+                    onChange={e => setOpenTickets(e.target.value)}
+                    placeholder="0" style={inputStyle} onFocus={focusIn} onBlur={focusOut}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Último contacto</label>
+                  <input type="date" value={lastContact} onChange={e => setLastContact(e.target.value)} style={inputStyle} onFocus={focusIn} onBlur={focusOut} />
+                </div>
+              </>
+            )}
 
-              <button
-                onClick={handleSave}
-                disabled={!isDirty || saving}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
-                style={{
-                  backgroundColor: isDirty && !saving ? '#f5f5f7' : 'rgba(245,245,247,0.1)',
-                  color: isDirty && !saving ? '#000000' : '#6e6e73',
-                  cursor: isDirty && !saving ? 'pointer' : 'not-allowed',
-                }}
-              >
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                Guardar
-              </button>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>
+                Descripción <span style={{ color: '#3a3a3a' }}>(opcional)</span>
+              </label>
+              <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3}
+                placeholder="Contexto breve..." style={{ ...inputStyle, resize: 'none' }} onFocus={focusIn} onBlur={focusOut} />
             </div>
           </div>
+
+          <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <button onClick={handleDelete} className="flex items-center gap-1.5 text-sm transition-colors"
+              style={{ color: '#6e6e73' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#ff453a'}
+              onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Eliminar
+            </button>
+            <button onClick={handleSave} disabled={!isDirty || saving}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+              style={{
+                backgroundColor: isDirty && !saving ? '#f5f5f7' : 'rgba(245,245,247,0.1)',
+                color: isDirty && !saving ? '#000000' : '#6e6e73',
+                cursor: isDirty && !saving ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              Guardar
+            </button>
+          </div>
         </div>
+
+        {/* Milestones (implementation only) */}
+        {isImpl && (
+          <div>
+            <MilestoneList
+              projectId={id}
+              milestones={milestones}
+              onChange={setMilestones}
+            />
+          </div>
+        )}
 
         {/* Tasks */}
         <div>
@@ -261,23 +330,15 @@ export default function ProjectDetail() {
           </div>
 
           {/* Filter */}
-          <div
-            className="flex gap-0.5 w-fit rounded-xl p-1 mb-5"
-            style={{ backgroundColor: '#111111' }}
-          >
+          <div className="flex gap-0.5 w-fit rounded-xl p-1 mb-5" style={{ backgroundColor: '#111111' }}>
             {[
               { key: 'pending', label: 'Pendientes' },
               { key: 'done', label: 'Completadas' },
               { key: 'all', label: 'Todas' },
             ].map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setFilter(key)}
+              <button key={key} onClick={() => setFilter(key)}
                 className="px-3.5 py-1.5 text-sm rounded-lg transition-all font-medium"
-                style={{
-                  backgroundColor: filter === key ? '#2a2a2a' : 'transparent',
-                  color: filter === key ? '#f5f5f7' : '#6e6e73',
-                }}
+                style={{ backgroundColor: filter === key ? '#2a2a2a' : 'transparent', color: filter === key ? '#f5f5f7' : '#6e6e73' }}
               >
                 {label}
               </button>
@@ -287,17 +348,12 @@ export default function ProjectDetail() {
           <TaskList tasks={filteredTasks} onToggle={handleToggleTask} onDelete={handleDeleteTask} />
 
           {filteredTasks.length === 0 && (
-            <div
-              className="rounded-2xl py-14 text-center"
-              style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
-            >
+            <div className="rounded-2xl py-14 text-center" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
               <p className="text-sm" style={{ color: '#6e6e73' }}>
                 {filter === 'done' ? 'No hay tareas completadas' : filter === 'pending' ? 'No hay tareas pendientes' : 'Sin tareas'}
               </p>
               {filter !== 'done' && (
-                <button
-                  onClick={() => setShowTaskModal(true)}
-                  className="mt-3 text-sm transition-colors"
+                <button onClick={() => setShowTaskModal(true)} className="mt-3 text-sm transition-colors"
                   style={{ color: '#6e6e73' }}
                   onMouseEnter={e => e.target.style.color = '#f5f5f7'}
                   onMouseLeave={e => e.target.style.color = '#6e6e73'}
