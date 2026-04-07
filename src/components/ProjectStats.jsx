@@ -66,7 +66,7 @@ export default function ProjectStats({ project, tasks, milestones }) {
 
   return (
     <div
-      className="rounded-2xl px-6 py-5 mb-6"
+      className="rounded-2xl px-6 py-5"
       style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
     >
       {isImpl ? (

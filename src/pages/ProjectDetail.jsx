@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
-import { Save, Trash2, Plus, Loader2, List, LayoutGrid, AlertTriangle, Download } from 'lucide-react'
+import { Save, Trash2, Plus, Loader2, List, LayoutGrid, AlertTriangle, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import TaskList from '../components/TaskList'
 import KanbanBoard from '../components/KanbanBoard'
 import NewTaskModal from '../components/NewTaskModal'
@@ -72,6 +72,7 @@ export default function ProjectDetail() {
   const [selectedTask, setSelectedTask] = useState(null)
   const [filter, setFilter] = useState('todo')
   const [taskView, setTaskView] = useState(getTaskView)
+  const [editingDetails, setEditingDetails] = useState(false)
 
   // Form fields
   const [name, setName] = useState('')
@@ -277,234 +278,307 @@ export default function ProjectDetail() {
     || (!isImpl && slaStatus !== (project.sla_status || 'ok'))
     || (!isImpl && lastContact !== (project.last_contact || ''))
 
+  function fmtDate(d) {
+    if (!d) return null
+    return new Date(d + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
+  const deadlineDate = isImpl ? project.deadline : project.renewal_date
+  const deadlineDays = deadlineDate
+    ? Math.ceil((new Date(deadlineDate + 'T00:00:00') - new Date()) / 86400000)
+    : null
+  const showAlert = deadlineDays !== null && deadlineDays <= 7
+  const alertOver = deadlineDays !== null && deadlineDays < 0
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#000000' }}>
       <NavBar breadcrumb={name} />
 
-      <main className="max-w-5xl mx-auto px-6 py-12 space-y-10">
+      <main className="max-w-6xl mx-auto px-6 py-8">
 
-        {/* Heading */}
-        <div>
-          <div className="flex items-start justify-between gap-4 mb-2">
-            <h1 className="text-3xl font-bold tracking-tight" style={{ color: '#f5f5f7', letterSpacing: '-0.02em' }}>
+        {/* ── Header ── */}
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1.5">
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}>
+                {isImpl ? 'Implementación' : 'Mantenimiento'}
+              </span>
+              <StatusBadge status={project.status} />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#f5f5f7', letterSpacing: '-0.02em' }}>
               {project.name}
             </h1>
-            <div className="flex items-center gap-2 shrink-0">
-              <StatusBadge status={project.status} />
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
-                style={{ backgroundColor: '#1a1a1a', color: '#6e6e73', border: '1px solid rgba(255,255,255,0.08)' }}
-                onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' }}
-                onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
-              >
-                <Download className="w-3.5 h-3.5" />
-                Exportar
-              </button>
-            </div>
           </div>
-          <span className="text-xs" style={{ color: '#6e6e73' }}>
-            {isImpl ? 'Implementación' : 'Mantenimiento'}
-          </span>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all shrink-0 mt-1"
+            style={{ backgroundColor: '#1a1a1a', color: '#6e6e73', border: '1px solid rgba(255,255,255,0.08)' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+          >
+            <Download className="w-3.5 h-3.5" />
+            Exportar
+          </button>
         </div>
 
-        {/* Deadline alert */}
-        {(() => {
-          const d = isImpl ? project.deadline : project.renewal_date
-          if (!d) return null
-          const days = Math.ceil((new Date(d + 'T00:00:00') - new Date()) / 86400000)
-          if (days > 7) return null
-          const isOver = days < 0
-          return (
-            <div className="flex items-center gap-3 rounded-2xl px-4 py-3"
-              style={{
-                backgroundColor: isOver ? 'rgba(255,69,58,0.08)' : 'rgba(255,159,10,0.08)',
-                border: `1px solid ${isOver ? 'rgba(255,69,58,0.2)' : 'rgba(255,159,10,0.2)'}`,
-              }}>
-              <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: isOver ? '#ff453a' : '#ff9f0a' }} />
-              <p className="text-sm" style={{ color: isOver ? '#ff453a' : '#ff9f0a' }}>
-                {isOver
-                  ? `${isImpl ? 'Deadline' : 'Renovación'} vencido hace ${Math.abs(days)} día${Math.abs(days) !== 1 ? 's' : ''}`
-                  : days === 0
-                    ? `${isImpl ? 'Deadline' : 'Renovación'} es hoy`
-                    : `${isImpl ? 'Deadline' : 'Renovación'} en ${days} día${days !== 1 ? 's' : ''}`}
-              </p>
-            </div>
-          )
-        })()}
-
-        {/* Stats */}
-        <ProjectStats project={project} tasks={tasks} milestones={milestones} />
-
-        {/* Form */}
-        <div className="rounded-2xl p-6 space-y-4" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <h2 className="text-sm font-semibold" style={{ color: '#6e6e73' }}>Detalles</h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Nombre</label>
-              <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo} />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Estado</label>
-              <select value={status} onChange={e => setStatus(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo}>
-                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Fecha de inicio</label>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo} />
-            </div>
-
-            {isImpl && (
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Deadline</label>
-                <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo} />
-              </div>
-            )}
-
-            {!isImpl && (
-              <>
-                <div>
-                  <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Renovación de contrato</label>
-                  <input type="date" value={renewalDate} onChange={e => setRenewalDate(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Estado SLA</label>
-                  <select value={slaStatus} onChange={e => setSlaStatus(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo}>
-                    {SLA_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Último contacto</label>
-                  <input type="date" value={lastContact} onChange={e => setLastContact(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo} />
-                </div>
-              </>
-            )}
-
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Descripción <span style={{ color: '#3a3a3a' }}>(opcional)</span></label>
-              <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3}
-                placeholder="Contexto breve..." style={{ ...inputStyle, resize: 'none' }} onFocus={fi} onBlur={fo} />
-            </div>
+        {/* ── Deadline alert ── */}
+        {showAlert && (
+          <div className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-6"
+            style={{
+              backgroundColor: alertOver ? 'rgba(255,69,58,0.08)' : 'rgba(255,159,10,0.08)',
+              border: `1px solid ${alertOver ? 'rgba(255,69,58,0.2)' : 'rgba(255,159,10,0.2)'}`,
+            }}>
+            <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: alertOver ? '#ff453a' : '#ff9f0a' }} />
+            <p className="text-sm" style={{ color: alertOver ? '#ff453a' : '#ff9f0a' }}>
+              {alertOver
+                ? `${isImpl ? 'Deadline' : 'Renovación'} vencido hace ${Math.abs(deadlineDays)} día${Math.abs(deadlineDays) !== 1 ? 's' : ''}`
+                : deadlineDays === 0
+                  ? `${isImpl ? 'Deadline' : 'Renovación'} es hoy`
+                  : `${isImpl ? 'Deadline' : 'Renovación'} en ${deadlineDays} día${deadlineDays !== 1 ? 's' : ''}`}
+            </p>
           </div>
-
-          <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <button onClick={handleDelete} className="flex items-center gap-1.5 text-sm transition-colors"
-              style={{ color: '#6e6e73' }}
-              onMouseEnter={e => e.currentTarget.style.color = '#ff453a'}
-              onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}>
-              <Trash2 className="w-3.5 h-3.5" /> Eliminar
-            </button>
-            <button onClick={handleSave} disabled={!isDirty || saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
-              style={{
-                backgroundColor: isDirty && !saving ? '#f5f5f7' : 'rgba(245,245,247,0.1)',
-                color: isDirty && !saving ? '#000000' : '#6e6e73',
-                cursor: isDirty && !saving ? 'pointer' : 'not-allowed',
-              }}>
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              Guardar
-            </button>
-          </div>
-        </div>
-
-        {/* Milestones (implementation only) */}
-        {isImpl && (
-          <MilestoneList projectId={id} milestones={milestones} onChange={setMilestones} />
         )}
 
-        {/* Team */}
-        <ProjectMembers projectId={id} projectOwnerId={project.user_id} />
+        {/* ── Two-column layout ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_272px] gap-8 items-start">
 
-        {/* Activity Log */}
-        <ActivityLog projectId={id} />
-
-        {/* Tasks */}
-        <div>
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-xl font-semibold tracking-tight" style={{ color: '#f5f5f7' }}>Tareas</h2>
-
-            <div className="flex items-center gap-3">
-              {/* View toggle */}
-              <div className="flex gap-0.5 rounded-xl p-1" style={{ backgroundColor: '#111111' }}>
-                <button onClick={() => switchView('list')}
-                  className="p-1.5 rounded-lg transition-all"
-                  style={{ backgroundColor: taskView === 'list' ? '#2a2a2a' : 'transparent', color: taskView === 'list' ? '#f5f5f7' : '#6e6e73' }}>
-                  <List className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => switchView('kanban')}
-                  className="p-1.5 rounded-lg transition-all"
-                  style={{ backgroundColor: taskView === 'kanban' ? '#2a2a2a' : 'transparent', color: taskView === 'kanban' ? '#f5f5f7' : '#6e6e73' }}>
-                  <LayoutGrid className="w-3.5 h-3.5" />
+          {/* ── LEFT: Tasks (primary) ── */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold" style={{ color: '#f5f5f7' }}>Tareas</h2>
+                {tasks.filter(t => t.status !== 'done').length > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}>
+                    {tasks.filter(t => t.status !== 'done').length} pendientes
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex gap-0.5 rounded-xl p-1" style={{ backgroundColor: '#111111' }}>
+                  <button onClick={() => switchView('list')}
+                    className="p-1.5 rounded-lg transition-all"
+                    style={{ backgroundColor: taskView === 'list' ? '#2a2a2a' : 'transparent', color: taskView === 'list' ? '#f5f5f7' : '#6e6e73' }}>
+                    <List className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => switchView('kanban')}
+                    className="p-1.5 rounded-lg transition-all"
+                    style={{ backgroundColor: taskView === 'kanban' ? '#2a2a2a' : 'transparent', color: taskView === 'kanban' ? '#f5f5f7' : '#6e6e73' }}>
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <button onClick={() => openAddTask('todo')}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all"
+                  style={{ backgroundColor: '#f5f5f7', color: '#000000' }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#ffffff'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f5f5f7'}>
+                  <Plus className="w-3.5 h-3.5" /> Nueva tarea
                 </button>
               </div>
-
-              <button onClick={() => openAddTask('todo')}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all"
-                style={{ backgroundColor: '#f5f5f7', color: '#000000' }}
-                onMouseEnter={e => e.currentTarget.style.backgroundColor = '#ffffff'}
-                onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f5f5f7'}>
-                <Plus className="w-3.5 h-3.5" /> Nueva tarea
-              </button>
             </div>
+
+            {/* Kanban */}
+            {taskView === 'kanban' && (
+              <KanbanBoard
+                tasks={tasks}
+                onUpdateStatus={handleChangeStatus}
+                onDelete={handleDeleteTask}
+                onAddTask={status => openAddTask(status)}
+                onClickTask={setSelectedTask}
+              />
+            )}
+
+            {/* List */}
+            {taskView === 'list' && (
+              <>
+                <div className="flex gap-0.5 w-fit rounded-xl p-1 mb-4" style={{ backgroundColor: '#111111' }}>
+                  {[
+                    { key: 'backlog', label: 'Backlog' },
+                    { key: 'todo', label: 'Por hacer' },
+                    { key: 'in_progress', label: 'En progreso' },
+                    { key: 'done', label: 'Completadas' },
+                    { key: 'all', label: 'Todas' },
+                  ].map(({ key, label }) => (
+                    <button key={key} onClick={() => setFilter(key)}
+                      className="px-3 py-1.5 text-sm rounded-lg transition-all font-medium"
+                      style={{ backgroundColor: filter === key ? '#2a2a2a' : 'transparent', color: filter === key ? '#f5f5f7' : '#6e6e73' }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <TaskList tasks={filteredTasks} onChangeStatus={handleChangeStatus} onDelete={handleDeleteTask} onClickTask={setSelectedTask} members={members} />
+                {filteredTasks.length === 0 && (
+                  <div className="rounded-2xl py-14 text-center" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <p className="text-sm" style={{ color: '#6e6e73' }}>
+                      {filter === 'done' ? 'No hay tareas completadas'
+                        : filter === 'backlog' ? 'No hay tareas en backlog'
+                        : filter === 'todo' ? 'No hay tareas por hacer'
+                        : filter === 'in_progress' ? 'No hay tareas en progreso'
+                        : 'Sin tareas'}
+                    </p>
+                    {filter !== 'done' && (
+                      <button onClick={() => openAddTask('todo')} className="mt-3 text-sm transition-colors"
+                        style={{ color: '#6e6e73' }}
+                        onMouseEnter={e => e.target.style.color = '#f5f5f7'}
+                        onMouseLeave={e => e.target.style.color = '#6e6e73'}>
+                        + Añadir tarea
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
-          {/* Kanban view */}
-          {taskView === 'kanban' && (
-            <KanbanBoard
-              tasks={tasks}
-              onUpdateStatus={handleChangeStatus}
-              onDelete={handleDeleteTask}
-              onAddTask={status => openAddTask(status)}
-              onClickTask={setSelectedTask}
-            />
-          )}
+          {/* ── RIGHT: Sidebar ── */}
+          <div className="space-y-4 lg:sticky lg:top-20">
 
-          {/* List view */}
-          {taskView === 'list' && (
-            <>
-              <div className="flex gap-0.5 w-fit rounded-xl p-1 mb-5" style={{ backgroundColor: '#111111' }}>
-                {[
-                  { key: 'backlog', label: 'Backlog' },
-                  { key: 'todo', label: 'Por hacer' },
-                  { key: 'in_progress', label: 'En progreso' },
-                  { key: 'done', label: 'Completadas' },
-                  { key: 'all', label: 'Todas' },
-                ].map(({ key, label }) => (
-                  <button key={key} onClick={() => setFilter(key)}
-                    className="px-3.5 py-1.5 text-sm rounded-lg transition-all font-medium"
-                    style={{ backgroundColor: filter === key ? '#2a2a2a' : 'transparent', color: filter === key ? '#f5f5f7' : '#6e6e73' }}>
-                    {label}
-                  </button>
-                ))}
-              </div>
+            {/* Stats */}
+            <ProjectStats project={project} tasks={tasks} milestones={milestones} />
 
-              <TaskList tasks={filteredTasks} onChangeStatus={handleChangeStatus} onDelete={handleDeleteTask} onClickTask={setSelectedTask} members={members} />
+            {/* Project details (collapsible) */}
+            <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <button
+                onClick={() => setEditingDetails(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 transition-all"
+                style={{ borderBottom: editingDetails ? '1px solid rgba(255,255,255,0.06)' : 'none' }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <span className="text-xs font-semibold" style={{ color: '#6e6e73' }}>Detalles del proyecto</span>
+                {editingDetails
+                  ? <ChevronUp className="w-3.5 h-3.5" style={{ color: '#6e6e73' }} />
+                  : <ChevronDown className="w-3.5 h-3.5" style={{ color: '#6e6e73' }} />
+                }
+              </button>
 
-              {filteredTasks.length === 0 && (
-                <div className="rounded-2xl py-14 text-center" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <p className="text-sm" style={{ color: '#6e6e73' }}>
-                    {filter === 'done' ? 'No hay tareas completadas'
-                      : filter === 'backlog' ? 'No hay tareas en backlog'
-                      : filter === 'todo' ? 'No hay tareas por hacer'
-                      : filter === 'in_progress' ? 'No hay tareas en progreso'
-                      : 'Sin tareas'}
-                  </p>
-                  {filter !== 'done' && (
-                    <button onClick={() => openAddTask('todo')} className="mt-3 text-sm transition-colors"
-                      style={{ color: '#6e6e73' }}
-                      onMouseEnter={e => e.target.style.color = '#f5f5f7'}
-                      onMouseLeave={e => e.target.style.color = '#6e6e73'}>
-                      + Añadir tarea
-                    </button>
+              {!editingDetails && (
+                <div className="px-4 pb-4 pt-2 space-y-2">
+                  {project.description && (
+                    <p className="text-xs leading-relaxed" style={{ color: '#6e6e73' }}>{project.description}</p>
+                  )}
+                  <div className="space-y-1.5">
+                    {project.start_date && (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs" style={{ color: '#3a3a3a' }}>Inicio</span>
+                        <span className="text-xs" style={{ color: '#6e6e73' }}>{fmtDate(project.start_date)}</span>
+                      </div>
+                    )}
+                    {isImpl && project.deadline && (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs" style={{ color: '#3a3a3a' }}>Deadline</span>
+                        <span className="text-xs" style={{ color: '#6e6e73' }}>{fmtDate(project.deadline)}</span>
+                      </div>
+                    )}
+                    {!isImpl && project.renewal_date && (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs" style={{ color: '#3a3a3a' }}>Renovación</span>
+                        <span className="text-xs" style={{ color: '#6e6e73' }}>{fmtDate(project.renewal_date)}</span>
+                      </div>
+                    )}
+                    {!isImpl && project.last_contact && (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs" style={{ color: '#3a3a3a' }}>Último contacto</span>
+                        <span className="text-xs" style={{ color: '#6e6e73' }}>
+                          {new Date(project.last_contact + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {!project.description && !project.start_date && !project.deadline && !project.renewal_date && (
+                    <p className="text-xs" style={{ color: '#3a3a3a' }}>Sin detalles</p>
                   )}
                 </div>
               )}
-            </>
-          )}
+
+              {editingDetails && (
+                <div className="px-4 pb-4 pt-3 space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#6e6e73' }}>Nombre</label>
+                    <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#6e6e73' }}>Estado</label>
+                    <select value={status} onChange={e => setStatus(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo}>
+                      {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#6e6e73' }}>Fecha de inicio</label>
+                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo} />
+                  </div>
+                  {isImpl && (
+                    <div>
+                      <label className="block text-xs font-medium mb-1.5" style={{ color: '#6e6e73' }}>Deadline</label>
+                      <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo} />
+                    </div>
+                  )}
+                  {!isImpl && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium mb-1.5" style={{ color: '#6e6e73' }}>Renovación</label>
+                        <input type="date" value={renewalDate} onChange={e => setRenewalDate(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1.5" style={{ color: '#6e6e73' }}>Estado SLA</label>
+                        <select value={slaStatus} onChange={e => setSlaStatus(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo}>
+                          {SLA_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1.5" style={{ color: '#6e6e73' }}>Último contacto</label>
+                        <input type="date" value={lastContact} onChange={e => setLastContact(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo} />
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#6e6e73' }}>Descripción</label>
+                    <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3}
+                      placeholder="Contexto breve..." style={{ ...inputStyle, resize: 'none' }} onFocus={fi} onBlur={fo} />
+                  </div>
+                  <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <button onClick={handleDelete} className="flex items-center gap-1 text-xs transition-colors"
+                      style={{ color: '#6e6e73' }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#ff453a'}
+                      onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}>
+                      <Trash2 className="w-3 h-3" /> Eliminar proyecto
+                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditingDetails(false)}
+                        className="text-xs px-3 py-1.5 rounded-lg transition-all"
+                        style={{ backgroundColor: '#2a2a2a', color: '#6e6e73' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = '#333' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = '#2a2a2a' }}>
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={async () => { await handleSave(); setEditingDetails(false) }}
+                        disabled={!isDirty || saving}
+                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all"
+                        style={{
+                          backgroundColor: isDirty && !saving ? '#f5f5f7' : 'rgba(245,245,247,0.1)',
+                          color: isDirty && !saving ? '#000' : '#6e6e73',
+                          cursor: isDirty && !saving ? 'pointer' : 'not-allowed',
+                        }}>
+                        {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                        Guardar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Milestones */}
+            {isImpl && (
+              <MilestoneList projectId={id} milestones={milestones} onChange={setMilestones} />
+            )}
+
+            {/* Team */}
+            <ProjectMembers projectId={id} projectOwnerId={project.user_id} />
+
+            {/* Activity */}
+            <ActivityLog projectId={id} />
+          </div>
         </div>
       </main>
 
