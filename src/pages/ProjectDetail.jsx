@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import { Save, Trash2, Plus, Loader2, List, LayoutGrid, AlertTriangle, Download } from 'lucide-react'
 import TaskList from '../components/TaskList'
@@ -12,6 +13,15 @@ import MilestoneList from '../components/MilestoneList'
 import ProjectStats from '../components/ProjectStats'
 import NavBar from '../components/NavBar'
 import ProjectMembers from '../components/ProjectMembers'
+import ActivityLog from '../components/ActivityLog'
+
+async function logActivity(projectId, userId, action, metadata = {}) {
+  await supabase.from('project_activity').insert({ project_id: projectId, user_id: userId, action, metadata })
+}
+async function createNotification(userId, type, projectId, taskId, message) {
+  if (!userId) return
+  await supabase.from('notifications').insert({ user_id: userId, type, project_id: projectId, task_id: taskId, message })
+}
 
 const STATUS_OPTIONS = [
   { value: 'on_track', label: 'On track' },
@@ -49,6 +59,7 @@ function getTaskView() {
 export default function ProjectDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   const [project, setProject] = useState(null)
   const [tasks, setTasks] = useState([])
@@ -135,17 +146,30 @@ export default function ProjectDetail() {
   }
 
   async function handleChangeStatus(taskId, newStatus) {
+    const task = tasks.find(t => t.id === taskId)
     const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', taskId)
-    if (!error) setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
+    if (!error) {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
+      const action = newStatus === 'done' ? 'task_completed' : 'task_moved'
+      logActivity(id, user.id, action, { task_title: task?.title, from: task?.status, to: newStatus })
+    }
   }
 
   async function handleDeleteTask(taskId) {
+    const task = tasks.find(t => t.id === taskId)
     const { error } = await supabase.from('tasks').delete().eq('id', taskId)
-    if (!error) { setTasks(prev => prev.filter(t => t.id !== taskId)); toast.success('Tarea eliminada') }
+    if (!error) {
+      setTasks(prev => prev.filter(t => t.id !== taskId))
+      toast.success('Tarea eliminada')
+      logActivity(id, user.id, 'task_deleted', { task_title: task?.title })
+    }
   }
 
   function onTaskCreated(task) {
-    setTasks(prev => [...prev, task]); setShowTaskModal(false); toast.success('Tarea creada')
+    setTasks(prev => [...prev, task])
+    setShowTaskModal(false)
+    toast.success('Tarea creada')
+    logActivity(id, user.id, 'task_created', { task_title: task.title })
   }
 
   function openAddTask(status = 'todo') {
@@ -224,6 +248,7 @@ export default function ProjectDetail() {
 
   const filteredTasks = tasks
     .filter(t => {
+      if (filter === 'backlog') return t.status === 'backlog'
       if (filter === 'todo') return t.status === 'todo'
       if (filter === 'in_progress') return t.status === 'in_progress'
       if (filter === 'done') return t.status === 'done'
@@ -394,6 +419,9 @@ export default function ProjectDetail() {
         {/* Team */}
         <ProjectMembers projectId={id} projectOwnerId={project.user_id} />
 
+        {/* Activity Log */}
+        <ActivityLog projectId={id} />
+
         {/* Tasks */}
         <div>
           <div className="flex items-center justify-between mb-5">
@@ -440,6 +468,7 @@ export default function ProjectDetail() {
             <>
               <div className="flex gap-0.5 w-fit rounded-xl p-1 mb-5" style={{ backgroundColor: '#111111' }}>
                 {[
+                  { key: 'backlog', label: 'Backlog' },
                   { key: 'todo', label: 'Por hacer' },
                   { key: 'in_progress', label: 'En progreso' },
                   { key: 'done', label: 'Completadas' },
@@ -459,6 +488,7 @@ export default function ProjectDetail() {
                 <div className="rounded-2xl py-14 text-center" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <p className="text-sm" style={{ color: '#6e6e73' }}>
                     {filter === 'done' ? 'No hay tareas completadas'
+                      : filter === 'backlog' ? 'No hay tareas en backlog'
                       : filter === 'todo' ? 'No hay tareas por hacer'
                       : filter === 'in_progress' ? 'No hay tareas en progreso'
                       : 'Sin tareas'}

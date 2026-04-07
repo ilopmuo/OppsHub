@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { LogOut, Search } from 'lucide-react'
 import SearchOverlay from './SearchOverlay'
+import NotificationsPanel from './NotificationsPanel'
 
 const COLORS = ['#ff453a', '#ff9f0a', '#30d158', '#64d2ff', '#bf5af2', '#f5f5f7']
 function avatarColor(email) {
@@ -147,6 +148,7 @@ export default function NavBar({ breadcrumb }) {
             <Search className="w-3.5 h-3.5" />
             <kbd className="text-xs hidden sm:block" style={{ color: '#3a3a3a' }}>⌘K</kbd>
           </button>
+          <NotificationsPanel />
           <button
             onClick={() => navigate('/profile')}
             className="flex items-center gap-2 rounded-full transition-all"

@@ -11,6 +11,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Trash2, Calendar, Plus } from 'lucide-react'
 
 const COLUMNS = [
+  { id: 'backlog',     label: 'Backlog',      color: '#3a3a3a' },
   { id: 'todo',        label: 'Por hacer',    color: '#6e6e73' },
   { id: 'in_progress', label: 'En progreso',  color: '#ff9f0a' },
   { id: 'done',        label: 'Hecho',        color: '#30d158' },
@@ -165,6 +166,7 @@ export default function KanbanBoard({ tasks, onUpdateStatus, onDelete, onAddTask
   )
 
   const tasksByColumn = {
+    backlog:     tasks.filter(t => t.status === 'backlog'),
     todo:        tasks.filter(t => t.status === 'todo'),
     in_progress: tasks.filter(t => t.status === 'in_progress'),
     done:        tasks.filter(t => t.status === 'done'),
@@ -206,7 +208,7 @@ export default function KanbanBoard({ tasks, onUpdateStatus, onDelete, onAddTask
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 overflow-x-auto">
         {COLUMNS.map(col => (
           <KanbanColumn
             key={col.id}

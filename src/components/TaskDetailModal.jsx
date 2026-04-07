@@ -20,6 +20,7 @@ const fi = e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'
 const fo = e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'
 
 const STATUS_OPTIONS = [
+  { value: 'backlog',     label: 'Backlog' },
   { value: 'todo',        label: 'Por hacer' },
   { value: 'in_progress', label: 'En progreso' },
   { value: 'done',        label: 'Hecho' },
@@ -99,6 +100,16 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted, m
     if (error) {
       toast.error('Error al guardar')
     } else {
+      // Notify new assignee if changed
+      if (assigneeId && assigneeId !== currentAssigneeId && assigneeId !== user.id) {
+        await supabase.from('notifications').insert({
+          user_id: assigneeId,
+          type: 'task_assigned',
+          project_id: task.project_id,
+          task_id: task.id,
+          message: `Se te asignó la tarea "${title.trim()}"`,
+        })
+      }
       onUpdated({ ...task, ...payload })
       onClose()
     }
@@ -132,6 +143,17 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted, m
       setComments(prev => [...prev, data])
       setNewComment('')
       setTimeout(() => commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+      // Notify assignee if different from commenter
+      const notifyId = task.assignee?.id || task.assignee_id
+      if (notifyId && notifyId !== user.id) {
+        await supabase.from('notifications').insert({
+          user_id: notifyId,
+          type: 'comment_added',
+          project_id: task.project_id,
+          task_id: task.id,
+          message: `Nuevo comentario en "${task.title}"`,
+        })
+      }
     }
     setSendingComment(false)
   }

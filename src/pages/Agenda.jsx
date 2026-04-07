@@ -179,6 +179,7 @@ export default function Agenda() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('active')
   const [view, setView] = useState('list')
+  const [assigneeFilter, setAssigneeFilter] = useState('')
 
   useEffect(() => { fetchData() }, [])
 
@@ -186,7 +187,7 @@ export default function Agenda() {
     setLoading(true)
     const { data, error } = await supabase
       .from('projects')
-      .select('*, tasks(*)')
+      .select('*, tasks(*, assignee:assignee_id(id, email, display_name))')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -210,10 +211,24 @@ export default function Agenda() {
 
   function filterTasks(tasks) {
     if (!tasks) return []
-    if (filter === 'active') return tasks.filter(t => t.status !== 'done')
-    if (filter === 'todo') return tasks.filter(t => t.status === 'todo')
-    if (filter === 'in_progress') return tasks.filter(t => t.status === 'in_progress')
-    return tasks
+    let filtered = tasks
+    if (filter === 'active') filtered = filtered.filter(t => t.status !== 'done' && t.status !== 'backlog')
+    else if (filter === 'todo') filtered = filtered.filter(t => t.status === 'todo')
+    else if (filter === 'in_progress') filtered = filtered.filter(t => t.status === 'in_progress')
+    if (assigneeFilter) filtered = filtered.filter(t => (t.assignee?.id || t.assignee_id) === assigneeFilter)
+    return filtered
+  }
+
+  // Collect unique assignees across all projects
+  const allAssignees = []
+  const seenIds = new Set()
+  for (const p of projects) {
+    for (const t of (p.tasks || [])) {
+      if (t.assignee?.id && !seenIds.has(t.assignee.id)) {
+        seenIds.add(t.assignee.id)
+        allAssignees.push(t.assignee)
+      }
+    }
   }
 
   const STATUS_ORDER = { blocked: 0, at_risk: 1, on_track: 2 }
@@ -254,7 +269,7 @@ export default function Agenda() {
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-wrap items-center gap-3 mb-8">
           <div className="flex gap-0.5 w-fit rounded-xl p-1" style={{ backgroundColor: '#111111' }}>
             {FILTERS.map(({ key, label }) => (
               <button
@@ -271,7 +286,25 @@ export default function Agenda() {
             ))}
           </div>
 
-          <div className="flex gap-0.5 rounded-xl p-1" style={{ backgroundColor: '#111111' }}>
+          {allAssignees.length > 0 && (
+            <select
+              value={assigneeFilter}
+              onChange={e => setAssigneeFilter(e.target.value)}
+              className="text-sm rounded-xl px-3 py-2 outline-none"
+              style={{
+                backgroundColor: '#111111',
+                color: assigneeFilter ? '#f5f5f7' : '#6e6e73',
+                border: assigneeFilter ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.04)',
+              }}
+            >
+              <option value="">Por persona</option>
+              {allAssignees.map(a => (
+                <option key={a.id} value={a.id}>{a.display_name || a.email}</option>
+              ))}
+            </select>
+          )}
+
+          <div className="flex gap-0.5 rounded-xl p-1 ml-auto" style={{ backgroundColor: '#111111' }}>
             <button onClick={() => setView('list')}
               className="p-1.5 rounded-lg transition-all"
               style={{ backgroundColor: view === 'list' ? '#2a2a2a' : 'transparent', color: view === 'list' ? '#f5f5f7' : '#6e6e73' }}>
