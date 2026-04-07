@@ -110,6 +110,17 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted, m
           message: `Se te asignó la tarea "${title.trim()}"`,
         })
       }
+      // Notify on completion
+      if (status === 'done' && task.status !== 'done') {
+        const notifyId = (assigneeId || task.assignee?.id || task.assignee_id) || user.id
+        await supabase.from('notifications').insert({
+          user_id: notifyId,
+          type: 'task_completed',
+          project_id: task.project_id,
+          task_id: task.id,
+          message: `Tarea completada: "${title.trim()}"`,
+        })
+      }
       onUpdated({ ...task, ...payload })
       onClose()
     }
