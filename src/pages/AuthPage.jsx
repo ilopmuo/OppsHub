@@ -38,11 +38,19 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: '#000000' }}>
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden" style={{ backgroundColor: '#000000' }}>
+      {/* Background glows */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        background: 'radial-gradient(ellipse 70% 50% at 50% 0%, rgba(255,255,255,0.04) 0%, transparent 65%)',
+      }} />
+      <div className="absolute inset-0 pointer-events-none" style={{
+        background: 'radial-gradient(ellipse 40% 30% at 80% 80%, rgba(48,209,88,0.04) 0%, transparent 60%)',
+      }} />
+
+      <div className="w-full max-w-sm relative page-enter">
         {/* Logo mark */}
         <div className="flex justify-center mb-10">
-          <div style={{ width: 44, height: 44 }}>
+          <div className="logo-float" style={{ width: 44, height: 44 }}>
             <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect width="44" height="44" rx="10" fill="#1a1a1a"/>
               <rect x="10" y="10" width="10" height="10" rx="2" fill="white"/>

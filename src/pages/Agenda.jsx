@@ -248,7 +248,7 @@ export default function Agenda() {
     <div className="min-h-screen" style={{ backgroundColor: '#000000' }}>
       <NavBar />
 
-      <main className="max-w-3xl mx-auto px-6 py-12">
+      <main className="max-w-3xl mx-auto px-6 py-12 page-enter">
         {/* Header */}
         <div className="mb-8">
           <p className="text-xs font-medium uppercase tracking-widest mb-2" style={{ color: '#3a3a3a' }}>
@@ -330,8 +330,13 @@ export default function Agenda() {
           </div>
         ) : view === 'list' && visibleProjects.length === 0 ? (
           <div className="rounded-2xl py-20 text-center" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center" style={{ backgroundColor: 'rgba(48,209,88,0.08)', border: '1px solid rgba(48,209,88,0.18)' }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#30d158" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path className="milestone-tick" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
             <p className="font-semibold mb-1.5 text-sm" style={{ color: '#f5f5f7' }}>Todo al día</p>
-            <p className="text-sm" style={{ color: '#6e6e73' }}>No hay tareas pendientes</p>
+            <p className="text-sm" style={{ color: '#6e6e73' }}>No hay tareas pendientes con este filtro</p>
           </div>
         ) : view === 'list' ? (
           <div className="space-y-8">

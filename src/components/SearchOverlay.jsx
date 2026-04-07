@@ -9,16 +9,19 @@ const STATUS_LABEL = { todo: 'Por hacer', in_progress: 'En progreso', done: 'Hec
 export default function SearchOverlay({ onClose }) {
   const navigate = useNavigate()
   const inputRef = useRef(null)
+  const [closing, setClosing] = useState(false)
   const [query, setQuery] = useState('')
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
+
+  function handleClose() { setClosing(true); setTimeout(onClose, 170) }
 
   useEffect(() => {
     inputRef.current?.focus()
     fetchAll()
 
     function onKey(e) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') handleClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -54,15 +57,18 @@ export default function SearchOverlay({ onClose }) {
     onClose()
   }
 
+  const anim = closing ? 'modal-out' : 'modal-in'
+  const dur  = closing ? '0.17s ease' : '0.22s cubic-bezier(0.16,1,0.3,1)'
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] px-4"
-      style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-      onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: `${closing ? 'backdrop-out' : 'backdrop-in'} 0.17s ease both` }}
+      onClick={e => e.target === e.currentTarget && handleClose()}
     >
       <div
         className="w-full max-w-xl rounded-2xl overflow-hidden"
-        style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 80px rgba(0,0,0,0.8)' }}
+        style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 80px rgba(0,0,0,0.8)', animation: `${anim} ${dur} both` }}
       >
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-4" style={{ borderBottom: q ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>

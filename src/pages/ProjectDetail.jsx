@@ -301,7 +301,19 @@ export default function ProjectDetail() {
     <div className="min-h-screen" style={{ backgroundColor: '#000000' }}>
       <NavBar breadcrumb={name} />
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      {/* Status color strip */}
+      {project && (
+        <div style={{
+          height: 1,
+          background: project.status === 'blocked'
+            ? 'linear-gradient(90deg, rgba(255,69,58,0.7) 0%, rgba(255,69,58,0.15) 35%, transparent 65%)'
+            : project.status === 'at_risk'
+            ? 'linear-gradient(90deg, rgba(255,159,10,0.6) 0%, rgba(255,159,10,0.12) 35%, transparent 65%)'
+            : 'linear-gradient(90deg, rgba(48,209,88,0.45) 0%, rgba(48,209,88,0.08) 35%, transparent 65%)',
+        }} />
+      )}
+
+      <main className="max-w-6xl mx-auto px-6 py-8 page-enter">
 
         {/* ── Header ── */}
         <div className="flex items-start justify-between gap-4 mb-6">

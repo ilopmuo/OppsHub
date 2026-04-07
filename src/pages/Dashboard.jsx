@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
@@ -6,6 +6,25 @@ import { Plus, AlertTriangle, TrendingUp, CheckSquare } from 'lucide-react'
 import ProjectCard from '../components/ProjectCard'
 import NewProjectModal from '../components/NewProjectModal'
 import NavBar from '../components/NavBar'
+
+function useCountUp(target) {
+  const [val, setVal] = useState(0)
+  const raf = useRef(null)
+  useEffect(() => {
+    if (target === 0) { setVal(0); return }
+    let start = null
+    const duration = 500
+    function step(ts) {
+      if (!start) start = ts
+      const p = Math.min((ts - start) / duration, 1)
+      setVal(Math.round(p * p * target))
+      if (p < 1) raf.current = requestAnimationFrame(step)
+    }
+    raf.current = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf.current)
+  }, [target])
+  return val
+}
 
 const STATUS_ORDER = { blocked: 0, at_risk: 1, on_track: 2 }
 
@@ -89,26 +108,41 @@ export default function Dashboard() {
   })
   const alerts = [...overdue, ...soonDeadline.filter(p => !overdue.includes(p))]
 
+  const countProjects = useCountUp(projects.length)
+  const countPending  = useCountUp(pendingTasks)
+  const countAlert    = useCountUp(blocked + atRisk)
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#000000' }}>
       <NavBar />
 
-      <main className="max-w-5xl mx-auto px-6 py-12">
+      <main className="max-w-5xl mx-auto px-6 py-12 page-enter" style={{ position: 'relative' }}>
+        {/* Subtle radial glow behind heading */}
+        <div className="pointer-events-none absolute inset-0" style={{
+          background: 'radial-gradient(ellipse 55% 30% at 12% 55%, rgba(255,255,255,0.025) 0%, transparent 70%)',
+          zIndex: 0,
+        }} />
 
         {/* Global metrics */}
         {projects.length > 0 && (
-          <div className="grid grid-cols-3 gap-3 mb-8">
+          <div className="grid grid-cols-3 gap-3 mb-8 relative z-10">
             {[
-              { label: 'Proyectos activos', value: projects.length, icon: TrendingUp, color: '#f5f5f7' },
-              { label: 'Tareas pendientes', value: pendingTasks, icon: CheckSquare, color: pendingTasks > 10 ? '#ff9f0a' : '#f5f5f7' },
-              { label: 'Requieren atención', value: blocked + atRisk, icon: AlertTriangle, color: blocked + atRisk > 0 ? '#ff453a' : '#30d158' },
-            ].map(({ label, value, icon: Icon, color }) => (
-              <div key={label} className="rounded-2xl px-5 py-4" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div className="flex items-center justify-between mb-2">
+              { label: 'Proyectos activos', value: countProjects, icon: TrendingUp, color: '#f5f5f7', accent: 'rgba(255,255,255,0.12)' },
+              { label: 'Tareas pendientes', value: countPending,  icon: CheckSquare, color: pendingTasks > 10 ? '#ff9f0a' : '#f5f5f7', accent: pendingTasks > 10 ? 'rgba(255,159,10,0.5)' : 'rgba(255,255,255,0.12)' },
+              { label: 'Requieren atención', value: countAlert,   icon: AlertTriangle, color: blocked + atRisk > 0 ? '#ff453a' : '#30d158', accent: blocked + atRisk > 0 ? 'rgba(255,69,58,0.5)' : 'rgba(48,209,88,0.5)' },
+            ].map(({ label, value, icon: Icon, color, accent }) => (
+              <div key={label} className="rounded-2xl px-5 py-4 relative overflow-hidden" style={{
+                backgroundColor: '#111111',
+                border: `1px solid ${color === '#ff453a' ? 'rgba(255,69,58,0.2)' : color === '#ff9f0a' ? 'rgba(255,159,10,0.18)' : color === '#30d158' ? 'rgba(48,209,88,0.2)' : 'rgba(255,255,255,0.06)'}`,
+              }}>
+                <div className="absolute top-0 left-0 right-0 h-px" style={{ background: accent }} />
+                <div className="flex items-center justify-between mb-3">
                   <span className="text-xs" style={{ color: '#6e6e73' }}>{label}</span>
-                  <Icon className="w-3.5 h-3.5" style={{ color: '#3a3a3a' }} />
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${color}18` }}>
+                    <Icon className="w-3.5 h-3.5" style={{ color }} />
+                  </div>
                 </div>
-                <span className="text-2xl font-bold tracking-tight" style={{ color }}>{value}</span>
+                <span className="text-3xl font-bold tracking-tight tabular" style={{ color, letterSpacing: '-0.03em' }}>{value}</span>
               </div>
             ))}
           </div>

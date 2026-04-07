@@ -26,7 +26,10 @@ export default function StatusBadge({ status }) {
       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
       style={{ backgroundColor: config.bg, color: config.color, border: `1px solid ${config.border}` }}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${status !== 'on_track' ? 'status-pulse' : ''}`}
+        style={{ backgroundColor: config.color, color: config.color }}
+      />
       {config.label}
     </span>
   )

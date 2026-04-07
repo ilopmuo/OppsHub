@@ -56,9 +56,19 @@ export default function ProjectCard({ project, onClick, index = 0 }) {
       className="w-full text-left rounded-2xl p-5 transition-all duration-200"
       style={{
         backgroundColor: hovered ? '#161616' : '#111111',
-        border: `1px solid ${hovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`,
-        transform: hovered ? 'translateY(-1px)' : 'none',
-        boxShadow: hovered ? '0 8px 30px rgba(0,0,0,0.5)' : 'none',
+        border: `1px solid ${
+          project.status === 'blocked' ? 'rgba(255,69,58,0.28)' :
+          project.status === 'at_risk' ? 'rgba(255,159,10,0.22)' :
+          hovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'
+        }`,
+        transform: hovered ? 'translateY(-2px)' : 'none',
+        boxShadow: hovered
+          ? project.status === 'blocked' ? '0 12px 40px rgba(255,69,58,0.18)'
+          : project.status === 'at_risk'  ? '0 12px 40px rgba(255,159,10,0.14)'
+          : '0 12px 40px rgba(0,0,0,0.5)'
+          : project.status === 'blocked' ? 'inset 0 0 0 0 transparent, 0 0 20px rgba(255,69,58,0.06)'
+          : project.status === 'at_risk'  ? 'inset 0 0 0 0 transparent, 0 0 20px rgba(255,159,10,0.05)'
+          : 'none',
         animation: 'card-in 0.4s cubic-bezier(0.16,1,0.3,1) both',
         animationDelay: `${index * 55}ms`,
       }}
@@ -104,7 +114,7 @@ export default function ProjectCard({ project, onClick, index = 0 }) {
               </div>
               <div className="h-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
                 <div className="h-full rounded-full transition-all duration-700"
-                  style={{ width: `${displayProgress}%`, backgroundColor: displayProgress === 100 ? '#30d158' : 'rgba(255,255,255,0.3)' }} />
+                  style={{ width: `${displayProgress}%`, background: displayProgress === 100 ? 'linear-gradient(90deg,#30d158,#4cd964)' : 'linear-gradient(90deg,rgba(255,255,255,0.15),rgba(255,255,255,0.45))' }} />
               </div>
             </div>
           )}
