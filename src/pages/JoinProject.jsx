@@ -25,7 +25,7 @@ export default function JoinProject() {
   async function fetchInvitation() {
     const { data, error } = await supabase
       .from('project_invitations')
-      .select('*, projects(id, name, type)')
+      .select('*, projects(id, name, type, user_id)')
       .eq('token', token)
       .single()
 
@@ -36,7 +36,7 @@ export default function JoinProject() {
     }
 
     setInvitation(data)
-    setProject(data.projects)
+    setProject(data.projects || null)
 
     // Check if already a member
     if (user) {
@@ -47,7 +47,7 @@ export default function JoinProject() {
         .eq('user_id', user.id)
         .single()
 
-      if (existing || data.projects.user_id === user.id) {
+      if (existing || data.projects?.user_id === user.id) {
         setAlreadyMember(true)
       }
     }
@@ -63,24 +63,28 @@ export default function JoinProject() {
   async function handleJoin() {
     if (!user) { handleLoginRedirect(); return }
     setJoining(true)
+    try {
+      const { error } = await supabase.from('project_members').insert({
+        project_id: invitation.project_id,
+        user_id: user.id,
+        role: 'member',
+      })
 
-    const { error } = await supabase.from('project_members').insert({
-      project_id: invitation.project_id,
-      user_id: user.id,
-      role: 'member',
-    })
+      if (error && error.code !== '23505') { // ignore duplicate key
+        toast.error('Error al unirse al proyecto')
+        return
+      }
 
-    if (error && error.code !== '23505') { // ignore duplicate
-      toast.error('Error al unirse al proyecto')
+      // Mark invitation as accepted
+      await supabase.from('project_invitations').update({ accepted_at: new Date().toISOString() }).eq('id', invitation.id)
+
+      toast.success(project?.name ? `Te has unido a "${project.name}"` : '¡Te has unido al proyecto!')
+      navigate(`/project/${invitation.project_id}`)
+    } catch {
+      toast.error('Error inesperado al unirse')
+    } finally {
       setJoining(false)
-      return
     }
-
-    // Mark invitation as accepted
-    await supabase.from('project_invitations').update({ accepted_at: new Date().toISOString() }).eq('id', invitation.id)
-
-    toast.success(`Te has unido a "${project.name}"`)
-    navigate(`/project/${invitation.project_id}`)
   }
 
   if (authLoading || loading) {
