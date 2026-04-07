@@ -18,6 +18,7 @@ const inputStyle = {
 
 export default function NewTaskModal({ projectId, defaultStatus = 'todo', onClose, onCreated }) {
   const { user } = useAuth()
+  const [closing, setClosing] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState('medium')
@@ -36,15 +37,19 @@ export default function NewTaskModal({ projectId, defaultStatus = 'todo', onClos
     setSaving(false)
   }
 
+  function handleClose() { setClosing(true); setTimeout(onClose, 170) }
+  const anim = closing ? 'modal-out' : 'modal-in'
+  const dur  = closing ? '0.17s ease' : '0.22s cubic-bezier(0.16,1,0.3,1)'
+
   return (
     <div
       className="fixed inset-0 flex items-end sm:items-center justify-center sm:p-4 z-50"
-      style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-      onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: `${closing ? 'backdrop-out' : 'backdrop-in'} 0.17s ease both` }}
+      onClick={e => e.target === e.currentTarget && handleClose()}
     >
       <div
         className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl overflow-hidden"
-        style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)' }}
+        style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)', animation: `${anim} ${dur} both` }}
       >
         {/* Handle (mobile) */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden">
@@ -54,7 +59,7 @@ export default function NewTaskModal({ projectId, defaultStatus = 'todo', onClos
         <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <h2 className="font-semibold text-base" style={{ color: '#f5f5f7' }}>Nueva tarea</h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1.5 rounded-lg transition-all"
             style={{ color: '#6e6e73' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = '#2a2a2a' }}

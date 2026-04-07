@@ -46,6 +46,7 @@ function initials(email) {
 
 export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted, members = [] }) {
   const { user } = useAuth()
+  const [closing, setClosing] = useState(false)
   const [tab, setTab] = useState('details')
 
   // Detail fields
@@ -163,15 +164,19 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted, m
     if (!error) setComments(prev => prev.filter(c => c.id !== id))
   }
 
+  function handleClose() { setClosing(true); setTimeout(onClose, 170) }
+  const anim = closing ? 'modal-out' : 'modal-in'
+  const dur  = closing ? '0.17s ease' : '0.22s cubic-bezier(0.16,1,0.3,1)'
+
   return (
     <div
       className="fixed inset-0 flex items-end sm:items-center justify-center sm:p-4 z-50"
-      style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-      onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: `${closing ? 'backdrop-out' : 'backdrop-in'} 0.17s ease both` }}
+      onClick={e => e.target === e.currentTarget && handleClose()}
     >
       <div
         className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl overflow-hidden flex flex-col"
-        style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '90vh' }}
+        style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '90vh', animation: `${anim} ${dur} both` }}
       >
         {/* Handle (mobile) */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden shrink-0">
@@ -192,7 +197,7 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted, m
               </button>
             ))}
           </div>
-          <button onClick={onClose}
+          <button onClick={handleClose}
             className="p-1.5 rounded-lg transition-all"
             style={{ color: '#6e6e73' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = '#2a2a2a' }}
@@ -203,7 +208,7 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted, m
 
         {/* Tab: Details */}
         {tab === 'details' && (
-          <div className="overflow-y-auto flex-1">
+          <div className="overflow-y-auto flex-1 tab-content">
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Tarea</label>
@@ -292,7 +297,7 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted, m
 
         {/* Tab: Comments */}
         {tab === 'comments' && (
-          <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex flex-col flex-1 overflow-hidden tab-content">
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {loadingComments ? (

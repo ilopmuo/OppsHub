@@ -1,7 +1,7 @@
 import StatusBadge from './StatusBadge'
 import SLABadge from './SLABadge'
 import { Calendar, AlertTriangle, RefreshCw, Clock, Rocket, Wrench, Circle, CheckCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
 const PRIORITY_LABELS = { high: 'Alta', medium: 'Media', low: 'Baja' }
@@ -33,6 +33,7 @@ function daysSince(date) {
 
 export default function ProjectCard({ project, onClick }) {
   const [hovered, setHovered] = useState(false)
+  const [displayProgress, setDisplayProgress] = useState(0)
   const tasks = project.tasks || []
   const nextTask = getNextTask(tasks)
   const pendingCount = tasks.filter(t => t.status !== 'done').length
@@ -41,6 +42,11 @@ export default function ProjectCard({ project, onClick }) {
 
   const isImpl = project.type !== 'maintenance'
   const soon = isDeadlineSoon(project.deadline)
+
+  useEffect(() => {
+    const t = setTimeout(() => setDisplayProgress(progress), 60)
+    return () => clearTimeout(t)
+  }, [])
 
   return (
     <button
@@ -95,8 +101,8 @@ export default function ProjectCard({ project, onClick }) {
                 <span className="text-xs" style={{ color: '#3a3a3a' }}>{totalCount - pendingCount}/{totalCount}</span>
               </div>
               <div className="h-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-                <div className="h-full rounded-full transition-all"
-                  style={{ width: `${progress}%`, backgroundColor: progress === 100 ? '#30d158' : 'rgba(255,255,255,0.3)' }} />
+                <div className="h-full rounded-full transition-all duration-700"
+                  style={{ width: `${displayProgress}%`, backgroundColor: displayProgress === 100 ? '#30d158' : 'rgba(255,255,255,0.3)' }} />
               </div>
             </div>
           )}

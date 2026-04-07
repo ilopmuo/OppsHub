@@ -88,6 +88,7 @@ const inputStyle = {
 
 export default function NewProjectModal({ onClose, onCreated }) {
   const { user } = useAuth()
+  const [closing, setClosing] = useState(false)
   const [step, setStep] = useState('type') // 'type' | 'template' | 'form'
   const [type, setType] = useState(null)
   const [template, setTemplate] = useState('blank')
@@ -105,6 +106,8 @@ export default function NewProjectModal({ onClose, onCreated }) {
   const [lastContact, setLastContact] = useState('')
 
   const [saving, setSaving] = useState(false)
+
+  function handleClose() { setClosing(true); setTimeout(onClose, 170) }
 
   function selectType(t) {
     setType(t)
@@ -158,15 +161,18 @@ export default function NewProjectModal({ onClose, onCreated }) {
     setSaving(false)
   }
 
+  const anim = closing ? 'modal-out' : 'modal-in'
+  const dur = closing ? '0.17s ease' : '0.22s cubic-bezier(0.16,1,0.3,1)'
+
   return (
     <div
       className="fixed inset-0 flex items-end sm:items-center justify-center sm:p-4 z-50"
-      style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-      onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: `${closing ? 'backdrop-out' : 'backdrop-in'} 0.17s ease both` }}
+      onClick={e => e.target === e.currentTarget && handleClose()}
     >
       <div
         className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl overflow-hidden"
-        style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)' }}
+        style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)', animation: `${anim} ${dur} both` }}
       >
         {/* Handle mobile */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden">
@@ -192,7 +198,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
             </h2>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1.5 rounded-lg transition-all"
             style={{ color: '#6e6e73' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = '#2a2a2a' }}
@@ -376,7 +382,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
             </div>
 
             <div className="flex gap-3 pt-1">
-              <button type="button" onClick={onClose}
+              <button type="button" onClick={handleClose}
                 className="flex-1 py-3 rounded-xl text-sm font-medium transition-all"
                 style={{ backgroundColor: '#2a2a2a', color: '#6e6e73' }}
                 onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = '#333' }}

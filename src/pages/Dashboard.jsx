@@ -9,6 +9,34 @@ import NavBar from '../components/NavBar'
 
 const STATUS_ORDER = { blocked: 0, at_risk: 1, on_track: 2 }
 
+function SkeletonCard() {
+  return (
+    <div className="rounded-2xl p-5" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="skeleton h-3.5 rounded" style={{ width: '62%' }} />
+        <div className="skeleton h-5 rounded-full shrink-0" style={{ width: 46 }} />
+      </div>
+      <div className="skeleton h-5 rounded-full mb-4" style={{ width: 68 }} />
+      <div className="mb-4">
+        <div className="flex justify-between mb-1.5">
+          <div className="skeleton h-3 rounded" style={{ width: 78 }} />
+          <div className="skeleton h-3 rounded" style={{ width: 30 }} />
+        </div>
+        <div className="h-0.5 rounded-full skeleton" />
+      </div>
+      <div className="pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="flex items-start gap-2">
+          <div className="skeleton rounded-full shrink-0 mt-1.5" style={{ width: 6, height: 6 }} />
+          <div className="flex-1 space-y-1.5">
+            <div className="skeleton h-3 rounded" style={{ width: '78%' }} />
+            <div className="skeleton h-3 rounded" style={{ width: '45%' }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const [projects, setProjects] = useState([])
@@ -139,7 +167,7 @@ export default function Dashboard() {
 
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shrink-0"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.97] shrink-0"
             style={{ backgroundColor: '#f5f5f7', color: '#000000' }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = '#ffffff'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f5f5f7'}
@@ -151,9 +179,7 @@ export default function Dashboard() {
 
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="rounded-2xl h-52 animate-pulse" style={{ backgroundColor: '#111111' }} />
-            ))}
+            {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
           </div>
         ) : projects.length === 0 ? (
           <div className="rounded-2xl p-16 text-center" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>

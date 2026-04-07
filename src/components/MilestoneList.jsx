@@ -92,7 +92,7 @@ export default function MilestoneList({ projectId, milestones, onChange }) {
               >
                 {m.done && (
                   <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="#000" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    <path className="milestone-tick" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 )}
               </button>

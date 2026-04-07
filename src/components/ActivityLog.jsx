@@ -43,6 +43,7 @@ function avatarColor(email) {
 export default function ActivityLog({ projectId }) {
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
+  const [newIds, setNewIds] = useState(new Set())
 
   useEffect(() => {
     fetchActivity()
@@ -54,7 +55,12 @@ export default function ActivityLog({ projectId }) {
         event: 'INSERT', schema: 'public', table: 'project_activity',
         filter: `project_id=eq.${projectId}`,
       }, payload => {
+        const newId = payload.new?.id
         fetchActivity()
+        if (newId) {
+          setNewIds(prev => new Set([...prev, newId]))
+          setTimeout(() => setNewIds(prev => { const s = new Set(prev); s.delete(newId); return s }), 2100)
+        }
       })
       .subscribe()
 
@@ -88,7 +94,7 @@ export default function ActivityLog({ projectId }) {
             const label = ACTION_LABELS[a.action]?.(a.metadata || {}) || a.action
             const profile = a.profile
             return (
-              <div key={a.id} className="flex items-start gap-3">
+              <div key={a.id} className={`flex items-start gap-3 ${newIds.has(a.id) ? 'activity-new' : ''}`}>
                 <div
                   className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-xs font-bold overflow-hidden"
                   style={{ backgroundColor: profile?.avatar_url ? '#000' : avatarColor(profile?.email), color: '#000' }}
