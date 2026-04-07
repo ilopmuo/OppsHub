@@ -60,9 +60,9 @@ export default function ProjectStats({ project, tasks, milestones }) {
 
   const deadlineDays = daysUntil(project.deadline)
   const renewalDays = daysUntil(project.renewal_date)
-  const ticketColor = project.open_tickets > 5 ? '#ff453a'
-    : project.open_tickets > 0 ? '#ff9f0a'
-    : '#30d158'
+  const openTasks = tasks.filter(t => t.status !== 'done').length
+  const closedTasks = doneTasks
+  const openTaskColor = openTasks > 5 ? '#ff453a' : openTasks > 0 ? '#ff9f0a' : '#30d158'
 
   return (
     <div
@@ -99,9 +99,8 @@ export default function ProjectStats({ project, tasks, milestones }) {
           {project.sla_status && (
             <Stat label="SLA" value={SLA_LABELS[project.sla_status]} color={SLA_COLORS[project.sla_status]} />
           )}
-          {project.open_tickets !== null && project.open_tickets !== undefined && (
-            <Stat label="Tickets abiertos" value={project.open_tickets} color={ticketColor} />
-          )}
+          <Stat label="Tareas abiertas" value={openTasks} color={openTaskColor} />
+          <Stat label="Tareas cerradas" value={closedTasks} color="#6e6e73" />
           {project.last_contact && (
             <Stat label="Último contacto" value={daysSince(project.last_contact)} />
           )}

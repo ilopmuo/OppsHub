@@ -1,6 +1,6 @@
 import StatusBadge from './StatusBadge'
 import SLABadge from './SLABadge'
-import { Calendar, AlertTriangle, RefreshCw, Ticket, Clock, Rocket, Wrench } from 'lucide-react'
+import { Calendar, AlertTriangle, RefreshCw, Clock, Rocket, Wrench, Circle, CheckCircle } from 'lucide-react'
 import { useState } from 'react'
 
 const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
@@ -139,18 +139,21 @@ export default function ProjectCard({ project, onClick }) {
                 <span className="ml-auto" style={{ color: '#c0c0c0' }}>{formatDate(project.renewal_date)}</span>
               </div>
             )}
-            {project.open_tickets !== null && project.open_tickets !== undefined && (
-              <div className="flex items-center gap-2 text-xs">
-                <Ticket className="w-3.5 h-3.5 shrink-0" style={{ color: '#6e6e73' }} />
-                <span style={{ color: '#6e6e73' }}>Tickets abiertos</span>
-                <span
-                  className="ml-auto font-semibold"
-                  style={{ color: project.open_tickets > 5 ? '#ff453a' : project.open_tickets > 0 ? '#ff9f0a' : '#30d158' }}
-                >
-                  {project.open_tickets}
-                </span>
-              </div>
-            )}
+            <div className="flex items-center gap-2 text-xs">
+              <Circle className="w-3.5 h-3.5 shrink-0" style={{ color: '#6e6e73' }} />
+              <span style={{ color: '#6e6e73' }}>Tareas abiertas</span>
+              <span className="ml-auto font-semibold"
+                style={{ color: pendingCount > 5 ? '#ff453a' : pendingCount > 0 ? '#ff9f0a' : '#30d158' }}>
+                {pendingCount}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <CheckCircle className="w-3.5 h-3.5 shrink-0" style={{ color: '#6e6e73' }} />
+              <span style={{ color: '#6e6e73' }}>Tareas cerradas</span>
+              <span className="ml-auto font-semibold" style={{ color: '#6e6e73' }}>
+                {totalCount - pendingCount}
+              </span>
+            </div>
             {project.last_contact && (
               <div className="flex items-center gap-2 text-xs">
                 <Clock className="w-3.5 h-3.5 shrink-0" style={{ color: '#6e6e73' }} />

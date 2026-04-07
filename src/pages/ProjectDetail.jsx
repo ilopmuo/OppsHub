@@ -68,7 +68,6 @@ export default function ProjectDetail() {
   const [deadline, setDeadline] = useState('')
   const [renewalDate, setRenewalDate] = useState('')
   const [slaStatus, setSlaStatus] = useState('ok')
-  const [openTickets, setOpenTickets] = useState('')
   const [lastContact, setLastContact] = useState('')
 
   useEffect(() => { fetchProject() }, [id])
@@ -81,7 +80,6 @@ export default function ProjectDetail() {
     setName(data.name); setStatus(data.status); setStartDate(data.start_date || '')
     setDescription(data.description || ''); setDeadline(data.deadline || '')
     setRenewalDate(data.renewal_date || ''); setSlaStatus(data.sla_status || 'ok')
-    setOpenTickets(data.open_tickets !== null && data.open_tickets !== undefined ? String(data.open_tickets) : '')
     setLastContact(data.last_contact || '')
     await Promise.all([fetchTasks(), fetchMilestones()])
     setLoading(false)
@@ -105,7 +103,6 @@ export default function ProjectDetail() {
       deadline: isImpl ? (deadline || null) : null,
       renewal_date: !isImpl ? (renewalDate || null) : null,
       sla_status: !isImpl ? slaStatus : null,
-      open_tickets: !isImpl ? (openTickets !== '' ? parseInt(openTickets) : null) : null,
       last_contact: !isImpl ? (lastContact || null) : null,
     }
     const { error } = await supabase.from('projects').update(payload).eq('id', id)
@@ -173,7 +170,6 @@ export default function ProjectDetail() {
     || (isImpl && deadline !== (project.deadline || ''))
     || (!isImpl && renewalDate !== (project.renewal_date || ''))
     || (!isImpl && slaStatus !== (project.sla_status || 'ok'))
-    || (!isImpl && openTickets !== (project.open_tickets !== null && project.open_tickets !== undefined ? String(project.open_tickets) : ''))
     || (!isImpl && lastContact !== (project.last_contact || ''))
 
   return (
@@ -238,11 +234,6 @@ export default function ProjectDetail() {
                   <select value={slaStatus} onChange={e => setSlaStatus(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo}>
                     {SLA_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Tickets abiertos</label>
-                  <input type="number" min="0" value={openTickets} onChange={e => setOpenTickets(e.target.value)}
-                    placeholder="0" style={inputStyle} onFocus={fi} onBlur={fo} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Último contacto</label>
