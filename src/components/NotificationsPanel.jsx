@@ -14,6 +14,8 @@ function timeAgo(ts) {
 
 const TYPE_ICON = {
   task_assigned: '👤',
+  task_completed: '✅',
+  deadline_soon: '⏰',
   comment_added: '💬',
   member_joined: '🤝',
 }

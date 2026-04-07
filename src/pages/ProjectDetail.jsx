@@ -116,7 +116,56 @@ export default function ProjectDetail() {
 
   async function fetchTasks() {
     const { data } = await supabase.from('tasks').select('*, assignee:assignee_id(id, email, display_name)').eq('project_id', id).order('created_at', { ascending: true })
-    setTasks(data || [])
+    const taskList = data || []
+    setTasks(taskList)
+    checkDeadlineNotifications(taskList)
+  }
+
+  async function checkDeadlineNotifications(taskList) {
+    if (!user) return
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayStr = today.toISOString().slice(0, 10)
+
+    const urgent = taskList.filter(t => {
+      if (t.status === 'done' || !t.due_date) return false
+      const due = new Date(t.due_date + 'T00:00:00')
+      const diffDays = Math.ceil((due - today) / 86400000)
+      return diffDays <= 1  // today or tomorrow
+    })
+
+    if (urgent.length === 0) return
+
+    // Check which ones already have a deadline_soon notification created today
+    const taskIds = urgent.map(t => t.id)
+    const { data: existing } = await supabase
+      .from('notifications')
+      .select('task_id')
+      .eq('user_id', user.id)
+      .eq('type', 'deadline_soon')
+      .in('task_id', taskIds)
+      .gte('created_at', todayStr)
+
+    const alreadyNotified = new Set((existing || []).map(n => n.task_id))
+
+    const toInsert = urgent
+      .filter(t => !alreadyNotified.has(t.id))
+      .map(t => {
+        const due = new Date(t.due_date + 'T00:00:00')
+        const diffDays = Math.ceil((due - today) / 86400000)
+        const label = diffDays <= 0 ? 'vence hoy' : 'vence mañana'
+        return {
+          user_id: user.id,
+          type: 'deadline_soon',
+          project_id: id,
+          task_id: t.id,
+          message: `"${t.title}" ${label}`,
+        }
+      })
+
+    if (toInsert.length > 0) {
+      await supabase.from('notifications').insert(toInsert)
+    }
   }
 
   async function fetchMilestones() {
@@ -154,6 +203,17 @@ export default function ProjectDetail() {
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
       const action = newStatus === 'done' ? 'task_completed' : 'task_moved'
       logActivity(id, user.id, action, { task_title: task?.title, from: task?.status, to: newStatus })
+      if (newStatus === 'done') {
+        const assigneeId = task?.assignee?.id || task?.assignee_id
+        const notifyId = assigneeId || user.id
+        await supabase.from('notifications').insert({
+          user_id: notifyId,
+          type: 'task_completed',
+          project_id: id,
+          task_id: taskId,
+          message: `Tarea completada: "${task?.title}"`,
+        })
+      }
     }
   }
 
