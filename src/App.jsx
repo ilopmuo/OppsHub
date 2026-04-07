@@ -7,6 +7,7 @@ import ProjectDetail from './pages/ProjectDetail'
 import Agenda from './pages/Agenda'
 import JoinProject from './pages/JoinProject'
 import ProfileSettings from './pages/ProfileSettings'
+import Habits from './pages/Habits'
 import { useTheme } from './hooks/useTheme'
 import { useDeadlineNotifications } from './hooks/useDeadlineNotifications'
 import { Loader2 } from 'lucide-react'
@@ -98,6 +99,7 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route path="/habits" element={<ProtectedRoute><Habits /></ProtectedRoute>} />
         <Route path="/join" element={<JoinProject />} />
         <Route path="/profile" element={<ProtectedRoute><ProfileSettings /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
