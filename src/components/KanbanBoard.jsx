@@ -62,6 +62,9 @@ function KanbanCard({ task, onDelete, onClickTask, wasDraggingRef, overlay = fal
         }}>
           {task.title}
         </p>
+        {task.description && !overlay && (
+          <p className="text-xs mt-0.5 line-clamp-2" style={{ color: '#6e6e73' }}>{task.description}</p>
+        )}
         {!overlay && (
           <button
             onPointerDown={e => e.stopPropagation()}

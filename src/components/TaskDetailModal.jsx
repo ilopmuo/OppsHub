@@ -29,19 +29,20 @@ const PRIORITY_OPTIONS = [
 
 export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted }) {
   const [title, setTitle] = useState(task.title)
+  const [description, setDescription] = useState(task.description || '')
   const [status, setStatus] = useState(task.status)
   const [priority, setPriority] = useState(task.priority)
   const [dueDate, setDueDate] = useState(task.due_date || '')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  const isDirty = title !== task.title || status !== task.status
-    || priority !== task.priority || dueDate !== (task.due_date || '')
+  const isDirty = title !== task.title || description !== (task.description || '')
+    || status !== task.status || priority !== task.priority || dueDate !== (task.due_date || '')
 
   async function handleSave() {
     if (!title.trim()) return
     setSaving(true)
-    const payload = { title: title.trim(), status, priority, due_date: dueDate || null }
+    const payload = { title: title.trim(), description: description.trim() || null, status, priority, due_date: dueDate || null }
     const { error } = await supabase.from('tasks').update(payload).eq('id', task.id)
     if (error) {
       toast.error('Error al guardar')
@@ -101,6 +102,19 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
               value={title}
               onChange={e => setTitle(e.target.value)}
               style={inputStyle}
+              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Descripción <span style={{ color: '#3a3a3a' }}>(opcional)</span></label>
+            <textarea
+              rows={3}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Contexto, detalles, enlaces..."
+              style={{ ...inputStyle, resize: 'none' }}
               onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
               onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
             />

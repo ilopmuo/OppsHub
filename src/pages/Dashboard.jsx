@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { Plus } from 'lucide-react'
+import { Plus, AlertTriangle, TrendingUp, CheckSquare } from 'lucide-react'
 import ProjectCard from '../components/ProjectCard'
 import NewProjectModal from '../components/NewProjectModal'
 import NavBar from '../components/NavBar'
@@ -46,11 +46,72 @@ export default function Dashboard() {
   const blocked = projects.filter(p => p.status === 'blocked').length
   const atRisk = projects.filter(p => p.status === 'at_risk').length
 
+  const allTasks = projects.flatMap(p => p.tasks || [])
+  const pendingTasks = allTasks.filter(t => t.status !== 'done').length
+  const today = new Date()
+  const overdue = projects.filter(p => {
+    const d = p.deadline || p.renewal_date
+    return d && new Date(d + 'T00:00:00') < today
+  })
+  const soonDeadline = projects.filter(p => {
+    const d = p.deadline || p.renewal_date
+    if (!d) return false
+    const days = Math.ceil((new Date(d + 'T00:00:00') - today) / 86400000)
+    return days >= 0 && days <= 7
+  })
+  const alerts = [...overdue, ...soonDeadline.filter(p => !overdue.includes(p))]
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#000000' }}>
       <NavBar />
 
       <main className="max-w-5xl mx-auto px-6 py-12">
+
+        {/* Global metrics */}
+        {projects.length > 0 && (
+          <div className="grid grid-cols-3 gap-3 mb-8">
+            {[
+              { label: 'Proyectos activos', value: projects.length, icon: TrendingUp, color: '#f5f5f7' },
+              { label: 'Tareas pendientes', value: pendingTasks, icon: CheckSquare, color: pendingTasks > 10 ? '#ff9f0a' : '#f5f5f7' },
+              { label: 'Requieren atención', value: blocked + atRisk, icon: AlertTriangle, color: blocked + atRisk > 0 ? '#ff453a' : '#30d158' },
+            ].map(({ label, value, icon: Icon, color }) => (
+              <div key={label} className="rounded-2xl px-5 py-4" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs" style={{ color: '#6e6e73' }}>{label}</span>
+                  <Icon className="w-3.5 h-3.5" style={{ color: '#3a3a3a' }} />
+                </div>
+                <span className="text-2xl font-bold tracking-tight" style={{ color }}>{value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Deadline alerts */}
+        {alerts.length > 0 && (
+          <div className="rounded-2xl p-4 mb-8 space-y-2" style={{ backgroundColor: 'rgba(255,159,10,0.06)', border: '1px solid rgba(255,159,10,0.15)' }}>
+            <p className="text-xs font-semibold mb-3" style={{ color: '#ff9f0a' }}>Proyectos que requieren atención</p>
+            {alerts.map(p => {
+              const d = p.deadline || p.renewal_date
+              const days = Math.ceil((new Date(d + 'T00:00:00') - today) / 86400000)
+              const isOver = days < 0
+              return (
+                <div key={p.id}
+                  onClick={() => navigate(`/project/${p.id}`)}
+                  className="flex items-center justify-between cursor-pointer rounded-xl px-3 py-2 transition-all"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'}
+                >
+                  <span className="text-sm" style={{ color: '#f5f5f7' }}>{p.name}</span>
+                  <span className="text-xs font-medium" style={{ color: isOver ? '#ff453a' : '#ff9f0a' }}>
+                    {isOver ? `Vencido hace ${Math.abs(days)}d` : days === 0 ? 'Vence hoy' : `Vence en ${days}d`}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         <div className="flex items-end justify-between mb-10">
           <div>
             <p className="text-xs font-medium uppercase tracking-widest mb-2" style={{ color: '#3a3a3a' }}>

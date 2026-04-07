@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { Save, Trash2, Plus, Loader2, List, LayoutGrid } from 'lucide-react'
+import { Save, Trash2, Plus, Loader2, List, LayoutGrid, AlertTriangle } from 'lucide-react'
 import TaskList from '../components/TaskList'
 import KanbanBoard from '../components/KanbanBoard'
 import NewTaskModal from '../components/NewTaskModal'
@@ -86,7 +86,7 @@ export default function ProjectDetail() {
   }
 
   async function fetchTasks() {
-    const { data } = await supabase.from('tasks').select('*').eq('project_id', id).order('created_at', { ascending: true })
+    const { data } = await supabase.from('tasks').select('*, description').eq('project_id', id).order('created_at', { ascending: true })
     setTasks(data || [])
   }
 
@@ -190,6 +190,31 @@ export default function ProjectDetail() {
             {isImpl ? 'Implementación' : 'Mantenimiento'}
           </span>
         </div>
+
+        {/* Deadline alert */}
+        {(() => {
+          const d = isImpl ? project.deadline : project.renewal_date
+          if (!d) return null
+          const days = Math.ceil((new Date(d + 'T00:00:00') - new Date()) / 86400000)
+          if (days > 7) return null
+          const isOver = days < 0
+          return (
+            <div className="flex items-center gap-3 rounded-2xl px-4 py-3"
+              style={{
+                backgroundColor: isOver ? 'rgba(255,69,58,0.08)' : 'rgba(255,159,10,0.08)',
+                border: `1px solid ${isOver ? 'rgba(255,69,58,0.2)' : 'rgba(255,159,10,0.2)'}`,
+              }}>
+              <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: isOver ? '#ff453a' : '#ff9f0a' }} />
+              <p className="text-sm" style={{ color: isOver ? '#ff453a' : '#ff9f0a' }}>
+                {isOver
+                  ? `${isImpl ? 'Deadline' : 'Renovación'} vencido hace ${Math.abs(days)} día${Math.abs(days) !== 1 ? 's' : ''}`
+                  : days === 0
+                    ? `${isImpl ? 'Deadline' : 'Renovación'} es hoy`
+                    : `${isImpl ? 'Deadline' : 'Renovación'} en ${days} día${days !== 1 ? 's' : ''}`}
+              </p>
+            </div>
+          )
+        })()}
 
         {/* Stats */}
         <ProjectStats project={project} tasks={tasks} milestones={milestones} />

@@ -19,6 +19,7 @@ const inputStyle = {
 export default function NewTaskModal({ projectId, defaultStatus = 'todo', onClose, onCreated }) {
   const { user } = useAuth()
   const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
   const [priority, setPriority] = useState('medium')
   const [dueDate, setDueDate] = useState('')
   const [saving, setSaving] = useState(false)
@@ -29,7 +30,7 @@ export default function NewTaskModal({ projectId, defaultStatus = 'todo', onClos
     setSaving(true)
     const { data, error } = await supabase
       .from('tasks')
-      .insert({ project_id: projectId, user_id: user.id, title: title.trim(), priority, due_date: dueDate || null, status: defaultStatus, done: defaultStatus === 'done' })
+      .insert({ project_id: projectId, user_id: user.id, title: title.trim(), description: description.trim() || null, priority, due_date: dueDate || null, status: defaultStatus, done: defaultStatus === 'done' })
       .select().single()
     if (error) { toast.error('Error al crear la tarea') } else { onCreated(data) }
     setSaving(false)
@@ -72,6 +73,19 @@ export default function NewTaskModal({ projectId, defaultStatus = 'todo', onClos
               onChange={e => setTitle(e.target.value)}
               placeholder="¿Qué hay que hacer?"
               style={inputStyle}
+              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Descripción <span style={{ color: '#3a3a3a' }}>(opcional)</span></label>
+            <textarea
+              rows={2}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Contexto, detalles, enlaces..."
+              style={{ ...inputStyle, resize: 'none' }}
               onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
               onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
             />

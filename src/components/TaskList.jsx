@@ -76,6 +76,9 @@ export default function TaskList({ tasks, onChangeStatus, onDelete, onClickTask 
                 style={{ color: isDone ? '#6e6e73' : '#f5f5f7', textDecoration: isDone ? 'line-through' : 'none' }}>
                 {task.title}
               </p>
+              {task.description && (
+                <p className="text-xs mt-0.5 line-clamp-1" style={{ color: '#6e6e73' }}>{task.description}</p>
+              )}
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 <span className="text-xs px-2 py-0.5 rounded-md font-medium"
                   style={{ backgroundColor: p.bg, color: p.color, border: `1px solid ${p.border}` }}>
