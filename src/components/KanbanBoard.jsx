@@ -79,10 +79,10 @@ function KanbanCard({ task, onDelete, onClickTask, wasDraggingRef, overlay = fal
         )}
       </div>
       <div className="flex items-center gap-2 flex-wrap">
-        {task.assignee && (
+        {(task.assignee?.email || task.assignee) && (
           <span className="text-xs px-1.5 py-0.5 rounded-full"
             style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}>
-            {task.assignee}
+            {task.assignee?.display_name || task.assignee?.email || task.assignee}
           </span>
         )}
         <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"

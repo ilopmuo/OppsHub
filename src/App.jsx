@@ -5,6 +5,7 @@ import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import ProjectDetail from './pages/ProjectDetail'
 import Agenda from './pages/Agenda'
+import JoinProject from './pages/JoinProject'
 import { useTheme } from './hooks/useTheme'
 import { Loader2 } from 'lucide-react'
 
@@ -94,6 +95,7 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route path="/join" element={<JoinProject />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

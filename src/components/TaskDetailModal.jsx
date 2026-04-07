@@ -42,7 +42,7 @@ function initials(email) {
   return email.split('@')[0].slice(0, 2).toUpperCase()
 }
 
-export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted }) {
+export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted, members = [] }) {
   const { user } = useAuth()
   const [tab, setTab] = useState('details')
 
@@ -52,7 +52,7 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
   const [status, setStatus] = useState(task.status)
   const [priority, setPriority] = useState(task.priority)
   const [dueDate, setDueDate] = useState(task.due_date || '')
-  const [assignee, setAssignee] = useState(task.assignee || '')
+  const [assigneeId, setAssigneeId] = useState(task.assignee?.id || task.assignee_id || '')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -63,9 +63,10 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
   const [sendingComment, setSendingComment] = useState(false)
   const commentsEndRef = useRef(null)
 
+  const currentAssigneeId = task.assignee?.id || task.assignee_id || ''
   const isDirty = title !== task.title || description !== (task.description || '')
     || status !== task.status || priority !== task.priority
-    || dueDate !== (task.due_date || '') || assignee !== (task.assignee || '')
+    || dueDate !== (task.due_date || '') || assigneeId !== currentAssigneeId
 
   useEffect(() => {
     if (tab === 'comments') fetchComments()
@@ -92,7 +93,7 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
       status,
       priority,
       due_date: dueDate || null,
-      assignee: assignee.trim() || null,
+      assignee_id: assigneeId || null,
     }
     const { error } = await supabase.from('tasks').update(payload).eq('id', task.id)
     if (error) {
@@ -217,9 +218,20 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Asignado a</label>
-                  <input value={assignee} onChange={e => setAssignee(e.target.value)}
-                    placeholder="Nombre o email..."
-                    style={inputStyle} onFocus={fi} onBlur={fo} />
+                  {members.length > 0 ? (
+                    <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo}>
+                      <option value="">Sin asignar</option>
+                      {members.map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.display_name || m.email}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input value={assigneeId} onChange={e => setAssigneeId(e.target.value)}
+                      placeholder="Sin miembros aún..."
+                      disabled style={{ ...inputStyle, color: '#3a3a3a' }} />
+                  )}
                 </div>
               </div>
             </div>

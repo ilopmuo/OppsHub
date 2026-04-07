@@ -11,6 +11,7 @@ import StatusBadge from '../components/StatusBadge'
 import MilestoneList from '../components/MilestoneList'
 import ProjectStats from '../components/ProjectStats'
 import NavBar from '../components/NavBar'
+import ProjectMembers from '../components/ProjectMembers'
 
 const STATUS_OPTIONS = [
   { value: 'on_track', label: 'On track' },
@@ -54,6 +55,7 @@ export default function ProjectDetail() {
   const [milestones, setMilestones] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [members, setMembers] = useState([])
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [taskModalStatus, setTaskModalStatus] = useState('todo')
   const [selectedTask, setSelectedTask] = useState(null)
@@ -81,12 +83,26 @@ export default function ProjectDetail() {
     setDescription(data.description || ''); setDeadline(data.deadline || '')
     setRenewalDate(data.renewal_date || ''); setSlaStatus(data.sla_status || 'ok')
     setLastContact(data.last_contact || '')
-    await Promise.all([fetchTasks(), fetchMilestones()])
+    await Promise.all([fetchTasks(), fetchMilestones(), fetchMembers(data)])
     setLoading(false)
   }
 
+  async function fetchMembers(proj) {
+    const p = proj || project
+    if (!p) return
+    const [{ data: pm }, { data: owner }] = await Promise.all([
+      supabase.from('project_members').select('id, role, profile:user_id(id, email, display_name)').eq('project_id', id),
+      supabase.from('profiles').select('id, email, display_name').eq('id', p.user_id).single(),
+    ])
+    const all = [
+      owner ? { profile: owner, role: 'owner' } : null,
+      ...(pm || []),
+    ].filter(Boolean).map(m => m.profile)
+    setMembers(all.filter(Boolean))
+  }
+
   async function fetchTasks() {
-    const { data } = await supabase.from('tasks').select('*, description').eq('project_id', id).order('created_at', { ascending: true })
+    const { data } = await supabase.from('tasks').select('*, assignee:assignee_id(id, email, display_name)').eq('project_id', id).order('created_at', { ascending: true })
     setTasks(data || [])
   }
 
@@ -375,6 +391,9 @@ export default function ProjectDetail() {
           <MilestoneList projectId={id} milestones={milestones} onChange={setMilestones} />
         )}
 
+        {/* Team */}
+        <ProjectMembers projectId={id} projectOwnerId={project.user_id} />
+
         {/* Tasks */}
         <div>
           <div className="flex items-center justify-between mb-5">
@@ -434,7 +453,7 @@ export default function ProjectDetail() {
                 ))}
               </div>
 
-              <TaskList tasks={filteredTasks} onChangeStatus={handleChangeStatus} onDelete={handleDeleteTask} onClickTask={setSelectedTask} />
+              <TaskList tasks={filteredTasks} onChangeStatus={handleChangeStatus} onDelete={handleDeleteTask} onClickTask={setSelectedTask} members={members} />
 
               {filteredTasks.length === 0 && (
                 <div className="rounded-2xl py-14 text-center" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -471,6 +490,7 @@ export default function ProjectDetail() {
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}
+          members={members}
           onClose={() => setSelectedTask(null)}
           onUpdated={updated => {
             setTasks(prev => prev.map(t => t.id === updated.id ? updated : t))

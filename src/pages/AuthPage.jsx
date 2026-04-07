@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { Loader2 } from 'lucide-react'
 
 export default function AuthPage() {
+  const navigate = useNavigate()
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,7 +22,13 @@ export default function AuthPage() {
       } else {
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
-        toast.success('Cuenta creada. Revisa tu email.')
+        toast.success('Cuenta creada')
+      }
+      // Redirect to pending invite if exists
+      const pendingInvite = localStorage.getItem('pending_invite')
+      if (pendingInvite) {
+        localStorage.removeItem('pending_invite')
+        navigate(`/join?token=${pendingInvite}`, { replace: true })
       }
     } catch (err) {
       toast.error(err.message || 'Ha ocurrido un error')
