@@ -14,6 +14,7 @@ import ProjectStats from '../components/ProjectStats'
 import NavBar from '../components/NavBar'
 import ProjectMembers from '../components/ProjectMembers'
 import ActivityLog from '../components/ActivityLog'
+import ProjectNotificationSettings from '../components/ProjectNotificationSettings'
 
 async function logActivity(projectId, userId, action, metadata = {}) {
   await supabase.from('project_activity').insert({ project_id: projectId, user_id: userId, action, metadata })
@@ -310,6 +311,7 @@ export default function ProjectDetail() {
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0 mt-1">
+            <ProjectNotificationSettings projectId={id} />
             <button
               onClick={handleExport}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
