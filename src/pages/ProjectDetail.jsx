@@ -309,16 +309,28 @@ export default function ProjectDetail() {
               {project.name}
             </h1>
           </div>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all shrink-0 mt-1"
-            style={{ backgroundColor: '#1a1a1a', color: '#6e6e73', border: '1px solid rgba(255,255,255,0.08)' }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
-          >
-            <Download className="w-3.5 h-3.5" />
-            Exportar
-          </button>
+          <div className="flex items-center gap-2 shrink-0 mt-1">
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
+              style={{ backgroundColor: '#1a1a1a', color: '#6e6e73', border: '1px solid rgba(255,255,255,0.08)' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+            >
+              <Download className="w-3.5 h-3.5" />
+              Exportar
+            </button>
+            <button
+              onClick={handleDelete}
+              title="Eliminar proyecto"
+              className="flex items-center justify-center w-8 h-8 rounded-xl transition-all"
+              style={{ backgroundColor: '#1a1a1a', color: '#6e6e73', border: '1px solid rgba(255,255,255,0.08)' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#ff453a'; e.currentTarget.style.borderColor = 'rgba(255,69,58,0.3)'; e.currentTarget.style.backgroundColor = 'rgba(255,69,58,0.08)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.backgroundColor = '#1a1a1a' }}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* ── Deadline alert ── */}
