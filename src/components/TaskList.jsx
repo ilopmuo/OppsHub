@@ -80,6 +80,12 @@ export default function TaskList({ tasks, onChangeStatus, onDelete, onClickTask 
                 <p className="text-xs mt-0.5 line-clamp-1" style={{ color: '#6e6e73' }}>{task.description}</p>
               )}
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                {task.assignee && (
+                  <span className="text-xs px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}>
+                    {task.assignee}
+                  </span>
+                )}
                 <span className="text-xs px-2 py-0.5 rounded-md font-medium"
                   style={{ backgroundColor: p.bg, color: p.color, border: `1px solid ${p.border}` }}>
                   {p.label}

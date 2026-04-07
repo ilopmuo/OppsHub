@@ -2,7 +2,77 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
-import { X, Loader2, ArrowLeft, Wrench, Rocket } from 'lucide-react'
+import { X, Loader2, ArrowLeft, Wrench, Rocket, LayoutGrid } from 'lucide-react'
+
+const TEMPLATES = {
+  implementation: [
+    {
+      id: 'blank',
+      label: 'En blanco',
+      description: 'Sin tareas predefinidas',
+      tasks: [],
+    },
+    {
+      id: 'web',
+      label: 'Proyecto web',
+      description: 'Kickoff → Diseño → Dev → QA → Entrega',
+      tasks: [
+        { title: 'Reunión de kickoff', priority: 'high' },
+        { title: 'Análisis de requisitos', priority: 'high' },
+        { title: 'Diseño y prototipo', priority: 'medium' },
+        { title: 'Desarrollo frontend', priority: 'medium' },
+        { title: 'Desarrollo backend', priority: 'medium' },
+        { title: 'Testing y QA', priority: 'medium' },
+        { title: 'Despliegue a producción', priority: 'high' },
+      ],
+    },
+    {
+      id: 'onboarding',
+      label: 'Onboarding cliente',
+      description: 'Bienvenida → Configuración → Formación → Go-live',
+      tasks: [
+        { title: 'Reunión de bienvenida', priority: 'high' },
+        { title: 'Recopilación de datos del cliente', priority: 'high' },
+        { title: 'Configuración inicial', priority: 'medium' },
+        { title: 'Sesión de formación', priority: 'medium' },
+        { title: 'Pruebas con el cliente', priority: 'medium' },
+        { title: 'Go-live y cierre', priority: 'high' },
+      ],
+    },
+  ],
+  maintenance: [
+    {
+      id: 'blank',
+      label: 'En blanco',
+      description: 'Sin tareas predefinidas',
+      tasks: [],
+    },
+    {
+      id: 'sla',
+      label: 'SLA básico',
+      description: 'Revisiones y seguimiento de incidencias',
+      tasks: [
+        { title: 'Revisión mensual de servicio', priority: 'high' },
+        { title: 'Control de incidencias abiertas', priority: 'medium' },
+        { title: 'Actualización de dependencias', priority: 'low' },
+        { title: 'Informe de estado al cliente', priority: 'medium' },
+      ],
+    },
+    {
+      id: 'enterprise',
+      label: 'Cuenta enterprise',
+      description: 'SLA + business review trimestral',
+      tasks: [
+        { title: 'Revisión mensual de servicio', priority: 'high' },
+        { title: 'Control de incidencias', priority: 'high' },
+        { title: 'Business review trimestral', priority: 'high' },
+        { title: 'Plan de mejora continua', priority: 'medium' },
+        { title: 'Actualización de documentación', priority: 'low' },
+        { title: 'Renovación / negociación contrato', priority: 'high' },
+      ],
+    },
+  ],
+}
 
 const inputStyle = {
   backgroundColor: '#000000',
@@ -18,8 +88,9 @@ const inputStyle = {
 
 export default function NewProjectModal({ onClose, onCreated }) {
   const { user } = useAuth()
-  const [step, setStep] = useState('type') // 'type' | 'form'
+  const [step, setStep] = useState('type') // 'type' | 'template' | 'form'
   const [type, setType] = useState(null)
+  const [template, setTemplate] = useState('blank')
 
   // Shared fields
   const [name, setName] = useState('')
@@ -31,13 +102,18 @@ export default function NewProjectModal({ onClose, onCreated }) {
   // Maintenance
   const [renewalDate, setRenewalDate] = useState('')
   const [slaStatus, setSlaStatus] = useState('ok')
-  const [openTickets, setOpenTickets] = useState('')
   const [lastContact, setLastContact] = useState('')
 
   const [saving, setSaving] = useState(false)
 
   function selectType(t) {
     setType(t)
+    setTemplate('blank')
+    setStep('template')
+  }
+
+  function selectTemplate(tpl) {
+    setTemplate(tpl)
     setStep('form')
   }
 
@@ -53,17 +129,32 @@ export default function NewProjectModal({ onClose, onCreated }) {
       type,
       start_date: startDate || null,
       description: description.trim() || null,
-      // Implementation fields
       deadline: type === 'implementation' ? (deadline || null) : null,
-      // Maintenance fields
       renewal_date: type === 'maintenance' ? (renewalDate || null) : null,
       sla_status: type === 'maintenance' ? slaStatus : null,
-      open_tickets: type === 'maintenance' ? (openTickets !== '' ? parseInt(openTickets) : null) : null,
       last_contact: type === 'maintenance' ? (lastContact || null) : null,
     }
 
     const { data, error } = await supabase.from('projects').insert(payload).select().single()
-    if (error) { toast.error('Error al crear el proyecto') } else { toast.success('Proyecto creado'); onCreated(data) }
+    if (error) { toast.error('Error al crear el proyecto'); setSaving(false); return }
+
+    // Insert template tasks
+    const tplDef = TEMPLATES[type]?.find(t => t.id === template)
+    if (tplDef?.tasks?.length > 0) {
+      await supabase.from('tasks').insert(
+        tplDef.tasks.map(t => ({
+          project_id: data.id,
+          user_id: user.id,
+          title: t.title,
+          priority: t.priority,
+          status: 'todo',
+          done: false,
+        }))
+      )
+    }
+
+    toast.success('Proyecto creado')
+    onCreated(data)
     setSaving(false)
   }
 
@@ -85,9 +176,9 @@ export default function NewProjectModal({ onClose, onCreated }) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-3">
-            {step === 'form' && (
+            {(step === 'template' || step === 'form') && (
               <button
-                onClick={() => setStep('type')}
+                onClick={() => setStep(step === 'form' ? 'template' : 'type')}
                 className="p-1 rounded-lg transition-all"
                 style={{ color: '#6e6e73' }}
                 onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
@@ -97,7 +188,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
               </button>
             )}
             <h2 className="font-semibold text-base" style={{ color: '#f5f5f7' }}>
-              {step === 'type' ? 'Nuevo proyecto' : type === 'implementation' ? 'Implementación' : 'Mantenimiento'}
+              {step === 'type' ? 'Nuevo proyecto' : step === 'template' ? 'Plantilla' : type === 'implementation' ? 'Implementación' : 'Mantenimiento'}
             </h2>
           </div>
           <button
@@ -158,7 +249,39 @@ export default function NewProjectModal({ onClose, onCreated }) {
           </div>
         )}
 
-        {/* Step 2 — Form */}
+        {/* Step 2 — Template */}
+        {step === 'template' && (
+          <div className="p-6 space-y-3">
+            <p className="text-sm mb-4" style={{ color: '#6e6e73' }}>¿Con qué plantilla quieres empezar?</p>
+            {(TEMPLATES[type] || []).map(tpl => (
+              <button
+                key={tpl.id}
+                onClick={() => selectTemplate(tpl.id)}
+                className="w-full text-left p-4 rounded-2xl transition-all"
+                style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#161616'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)' }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#111111'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)' }}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#1a1a1a' }}>
+                    <LayoutGrid className="w-4 h-4" style={{ color: tpl.id === 'blank' ? '#3a3a3a' : '#f5f5f7' }} />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm mb-0.5" style={{ color: '#f5f5f7' }}>{tpl.label}</p>
+                    <p className="text-xs" style={{ color: '#6e6e73' }}>{tpl.description}</p>
+                    {tpl.tasks.length > 0 && (
+                      <p className="text-xs mt-1.5" style={{ color: '#3a3a3a' }}>
+                        {tpl.tasks.length} tarea{tpl.tasks.length !== 1 ? 's' : ''} incluida{tpl.tasks.length !== 1 ? 's' : ''}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Step 3 — Form */}
         {step === 'form' && (
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             {/* Common fields */}
@@ -232,15 +355,6 @@ export default function NewProjectModal({ onClose, onCreated }) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Tickets abiertos</label>
-                  <input
-                    type="number" min="0" value={openTickets} onChange={e => setOpenTickets(e.target.value)}
-                    placeholder="0" style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
-                    onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
-                  />
-                </div>
-                <div className="col-span-2">
                   <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Último contacto</label>
                   <input type="date" value={lastContact} onChange={e => setLastContact(e.target.value)} style={inputStyle}
                     onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}

@@ -79,6 +79,12 @@ function KanbanCard({ task, onDelete, onClickTask, wasDraggingRef, overlay = fal
         )}
       </div>
       <div className="flex items-center gap-2 flex-wrap">
+        {task.assignee && (
+          <span className="text-xs px-1.5 py-0.5 rounded-full"
+            style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}>
+            {task.assignee}
+          </span>
+        )}
         <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
           style={{ backgroundColor: p.bg, color: p.color, border: `1px solid ${p.border}` }}>
           {p.label}
