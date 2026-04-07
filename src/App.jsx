@@ -8,6 +8,7 @@ import Agenda from './pages/Agenda'
 import JoinProject from './pages/JoinProject'
 import ProfileSettings from './pages/ProfileSettings'
 import { useTheme } from './hooks/useTheme'
+import { useDeadlineNotifications } from './hooks/useDeadlineNotifications'
 import { Loader2 } from 'lucide-react'
 
 function ProtectedRoute({ children }) {
@@ -40,6 +41,7 @@ function PublicRoute({ children }) {
 
 function AppContent() {
   useTheme()
+  useDeadlineNotifications()
 
   return (
     <>
