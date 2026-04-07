@@ -83,7 +83,7 @@ export default function ActivityLog({ projectId }) {
       ) : activities.length === 0 ? (
         <p className="text-sm text-center py-6" style={{ color: '#3a3a3a' }}>Sin actividad todavía</p>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto" style={{ maxHeight: 320 }}>
           {activities.map(a => {
             const label = ACTION_LABELS[a.action]?.(a.metadata || {}) || a.action
             const profile = a.profile
