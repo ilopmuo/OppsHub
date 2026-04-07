@@ -87,7 +87,12 @@ export default function ActivityLog({ projectId }) {
           <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#6e6e73' }} />
         </div>
       ) : activities.length === 0 ? (
-        <p className="text-sm text-center py-6" style={{ color: '#3a3a3a' }}>Sin actividad todavía</p>
+        <div className="flex flex-col items-center py-6 gap-2">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'rgba(255,255,255,0.08)' }}>
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          <p className="text-xs" style={{ color: '#3a3a3a' }}>Sin actividad todavía</p>
+        </div>
       ) : (
         <div className="space-y-4 overflow-y-auto" style={{ maxHeight: 320 }}>
           {activities.map(a => {

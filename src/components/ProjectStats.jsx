@@ -1,4 +1,5 @@
 import { Calendar, CheckCircle, Flag, Ticket, RefreshCw, Clock } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
 function daysUntil(date) {
   if (!date) return null
@@ -54,6 +55,8 @@ export default function ProjectStats({ project, tasks, milestones }) {
   const totalTasks = tasks.length
   const doneTasks = tasks.filter(t => t.status === 'done').length
   const pct = totalTasks > 0 ? Math.round(doneTasks / totalTasks * 100) : 0
+  const [displayPct, setDisplayPct] = useState(0)
+  useEffect(() => { const t = setTimeout(() => setDisplayPct(pct), 60); return () => clearTimeout(t) }, [pct])
 
   const totalMilestones = milestones.length
   const doneMilestones = milestones.filter(m => m.done).length
@@ -75,12 +78,12 @@ export default function ProjectStats({ project, tasks, milestones }) {
           <div className="flex flex-col gap-1">
             <span className="text-xs" style={{ color: '#6e6e73' }}>Progreso tareas</span>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold" style={{ color: '#f5f5f7' }}>{pct}%</span>
+              <span className="text-sm font-semibold tabular" style={{ color: '#f5f5f7' }}>{pct}%</span>
               <div className="w-20 h-1 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-                <div className="h-full rounded-full transition-all"
-                  style={{ width: `${pct}%`, backgroundColor: pct === 100 ? '#30d158' : 'rgba(255,255,255,0.3)' }} />
+                <div className="h-full rounded-full transition-all duration-700"
+                  style={{ width: `${displayPct}%`, backgroundColor: displayPct === 100 ? '#30d158' : 'rgba(255,255,255,0.3)' }} />
               </div>
-              <span className="text-xs" style={{ color: '#6e6e73' }}>{doneTasks}/{totalTasks}</span>
+              <span className="text-xs tabular" style={{ color: '#6e6e73' }}>{doneTasks}/{totalTasks}</span>
             </div>
           </div>
           {totalMilestones > 0 && (

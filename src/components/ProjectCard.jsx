@@ -31,7 +31,7 @@ function daysSince(date) {
   return `Hace ${diff} días`
 }
 
-export default function ProjectCard({ project, onClick }) {
+export default function ProjectCard({ project, onClick, index = 0 }) {
   const [hovered, setHovered] = useState(false)
   const [displayProgress, setDisplayProgress] = useState(0)
   const tasks = project.tasks || []
@@ -59,6 +59,8 @@ export default function ProjectCard({ project, onClick }) {
         border: `1px solid ${hovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`,
         transform: hovered ? 'translateY(-1px)' : 'none',
         boxShadow: hovered ? '0 8px 30px rgba(0,0,0,0.5)' : 'none',
+        animation: 'card-in 0.4s cubic-bezier(0.16,1,0.3,1) both',
+        animationDelay: `${index * 55}ms`,
       }}
     >
       {/* Name + type chip */}

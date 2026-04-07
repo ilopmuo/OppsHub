@@ -58,6 +58,30 @@
 /* ── Tabular numbers ── */
 .tabular { font-variant-numeric: tabular-nums; }
 
+/* ── Notification dropdown ── */
+@keyframes dropdown-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+.dropdown-in { animation: dropdown-in 0.2s cubic-bezier(0.16,1,0.3,1) both; }
+
+/* ── Bell ring ── */
+@keyframes bell-ring {
+  0%,100% { transform: rotate(0deg); }
+  15%     { transform: rotate(14deg); }
+  30%     { transform: rotate(-11deg); }
+  45%     { transform: rotate(8deg); }
+  60%     { transform: rotate(-5deg); }
+  75%     { transform: rotate(3deg); }
+}
+.bell-ring { animation: bell-ring 0.55s ease-out; }
+
+/* ── Staggered card entrance ── */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 * {
   font-family: 'Inter', system-ui, sans-serif;
 }

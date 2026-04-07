@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import {
   DndContext, DragOverlay, closestCorners,
-  PointerSensor, useSensor, useSensors,
+  PointerSensor, useSensor, useSensors, useDndContext,
 } from '@dnd-kit/core'
 import {
   SortableContext, verticalListSortingStrategy, useSortable,
@@ -105,6 +105,9 @@ function KanbanCard({ task, onDelete, onClickTask, wasDraggingRef, overlay = fal
 /* ── Column ── */
 function KanbanColumn({ column, tasks, onDelete, onAddTask, onClickTask, wasDraggingRef }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
+  const { active: draggingItem } = useDndContext()
+  const isDraggingAny = !!draggingItem
+  const isEmpty = tasks.length === 0
 
   return (
     <div className="flex flex-col min-w-0" style={{ minHeight: 200 }}>
@@ -136,7 +139,9 @@ function KanbanColumn({ column, tasks, onDelete, onAddTask, onClickTask, wasDrag
         className="flex-1 rounded-2xl p-2 space-y-2 transition-all"
         style={{
           backgroundColor: isOver ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
-          border: `1px solid ${isOver ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)'}`,
+          border: isEmpty && isDraggingAny
+            ? `1.5px dashed ${isOver ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)'}`
+            : `1px solid ${isOver ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)'}`,
           minHeight: 120,
         }}
       >
@@ -146,9 +151,11 @@ function KanbanColumn({ column, tasks, onDelete, onAddTask, onClickTask, wasDrag
           ))}
         </SortableContext>
 
-        {tasks.length === 0 && (
+        {isEmpty && (
           <div className="h-full flex items-center justify-center py-8">
-            <p className="text-xs" style={{ color: '#3a3a3a' }}>Sin tareas</p>
+            <p className="text-xs transition-colors" style={{ color: isDraggingAny ? (isOver ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)') : '#3a3a3a' }}>
+              {isDraggingAny ? 'Soltar aquí' : 'Sin tareas'}
+            </p>
           </div>
         )}
       </div>

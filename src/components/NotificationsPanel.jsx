@@ -4,6 +4,12 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { Bell } from 'lucide-react'
 
+const EmptyBell = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'rgba(255,255,255,0.1)' }}>
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+  </svg>
+)
+
 function timeAgo(ts) {
   const diff = Math.floor((Date.now() - new Date(ts)) / 1000)
   if (diff < 60) return 'ahora'
@@ -26,6 +32,8 @@ export default function NotificationsPanel() {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unread, setUnread] = useState(0)
+  const [ringing, setRinging] = useState(false)
+  const prevUnread = useRef(0)
   const panelRef = useRef(null)
 
   useEffect(() => {
@@ -59,7 +67,13 @@ export default function NotificationsPanel() {
       .order('created_at', { ascending: false })
       .limit(20)
     setNotifications(data || [])
-    setUnread((data || []).filter(n => !n.read).length)
+    const newUnread = (data || []).filter(n => !n.read).length
+    if (newUnread > prevUnread.current) {
+      setRinging(true)
+      setTimeout(() => setRinging(false), 600)
+    }
+    prevUnread.current = newUnread
+    setUnread(newUnread)
   }
 
   async function markAllRead() {
@@ -88,7 +102,7 @@ export default function NotificationsPanel() {
         onMouseLeave={e => e.currentTarget.style.color = unread > 0 ? '#f5f5f7' : '#6e6e73'}
         title="Notificaciones"
       >
-        <Bell className="w-4 h-4" />
+        <Bell className={`w-4 h-4 ${ringing ? 'bell-ring' : ''}`} />
         {unread > 0 && (
           <span
             className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold"
@@ -101,7 +115,7 @@ export default function NotificationsPanel() {
 
       {open && (
         <div
-          className="absolute right-0 top-10 w-80 rounded-2xl overflow-hidden z-50"
+          className="absolute right-0 top-10 w-80 rounded-2xl overflow-hidden z-50 dropdown-in"
           style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 48px rgba(0,0,0,0.7)' }}
         >
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -117,7 +131,10 @@ export default function NotificationsPanel() {
 
           <div className="overflow-y-auto" style={{ maxHeight: 360 }}>
             {notifications.length === 0 ? (
-              <p className="text-sm text-center py-10" style={{ color: '#6e6e73' }}>Sin notificaciones</p>
+              <div className="flex flex-col items-center py-10 gap-3">
+                <EmptyBell />
+                <p className="text-sm" style={{ color: '#6e6e73' }}>Sin notificaciones</p>
+              </div>
             ) : (
               notifications.map(n => (
                 <button
@@ -131,7 +148,7 @@ export default function NotificationsPanel() {
                   <span className="text-base mt-0.5 shrink-0">{TYPE_ICON[n.type] || '🔔'}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm leading-snug" style={{ color: n.read ? '#6e6e73' : '#f5f5f7' }}>{n.message}</p>
-                    <p className="text-xs mt-0.5" style={{ color: '#3a3a3a' }}>{timeAgo(n.created_at)}</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#4a4a4a' }}>{timeAgo(n.created_at)}</p>
                   </div>
                   {!n.read && (
                     <span className="w-2 h-2 rounded-full shrink-0 mt-1.5" style={{ backgroundColor: '#30d158' }} />
