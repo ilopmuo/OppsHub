@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import { X, Loader2, Trash2, Send } from 'lucide-react'
+import { notify } from '../lib/notify'
 
 const inputStyle = {
   backgroundColor: '#000000',
@@ -102,24 +103,12 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted, m
     } else {
       // Notify new assignee if changed
       if (assigneeId && assigneeId !== currentAssigneeId && assigneeId !== user.id) {
-        await supabase.from('notifications').insert({
-          user_id: assigneeId,
-          type: 'task_assigned',
-          project_id: task.project_id,
-          task_id: task.id,
-          message: `Se te asignó la tarea "${title.trim()}"`,
-        })
+        await notify({ userId: assigneeId, type: 'task_assigned', projectId: task.project_id, taskId: task.id, message: `Se te asignó la tarea "${title.trim()}"` })
       }
       // Notify on completion
       if (status === 'done' && task.status !== 'done') {
         const notifyId = (assigneeId || task.assignee?.id || task.assignee_id) || user.id
-        await supabase.from('notifications').insert({
-          user_id: notifyId,
-          type: 'task_completed',
-          project_id: task.project_id,
-          task_id: task.id,
-          message: `Tarea completada: "${title.trim()}"`,
-        })
+        await notify({ userId: notifyId, type: 'task_completed', projectId: task.project_id, taskId: task.id, message: `Tarea completada: "${title.trim()}"` })
       }
       onUpdated({ ...task, ...payload })
       onClose()

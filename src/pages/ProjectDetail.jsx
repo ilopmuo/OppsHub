@@ -15,6 +15,7 @@ import NavBar from '../components/NavBar'
 import ProjectMembers from '../components/ProjectMembers'
 import ActivityLog from '../components/ActivityLog'
 import ProjectNotificationSettings from '../components/ProjectNotificationSettings'
+import { notify } from '../lib/notify'
 
 async function logActivity(projectId, userId, action, metadata = {}) {
   await supabase.from('project_activity').insert({ project_id: projectId, user_id: userId, action, metadata })
@@ -157,13 +158,7 @@ export default function ProjectDetail() {
       if (newStatus === 'done') {
         const assigneeId = task?.assignee?.id || task?.assignee_id
         const notifyId = assigneeId || user.id
-        await supabase.from('notifications').insert({
-          user_id: notifyId,
-          type: 'task_completed',
-          project_id: id,
-          task_id: taskId,
-          message: `Tarea completada: "${task?.title}"`,
-        })
+        await notify({ userId: notifyId, type: 'task_completed', projectId: id, taskId, message: `Tarea completada: "${task?.title}"` })
       }
     }
   }

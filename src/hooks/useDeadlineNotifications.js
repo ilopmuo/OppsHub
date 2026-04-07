@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { notify } from '../lib/notify'
 
 export function useDeadlineNotifications() {
   const { user } = useAuth()
@@ -56,8 +57,8 @@ export function useDeadlineNotifications() {
         }
       })
 
-    if (toInsert.length > 0) {
-      await supabase.from('notifications').insert(toInsert)
+    for (const n of toInsert) {
+      await notify({ userId: n.user_id, type: n.type, projectId: n.project_id, taskId: n.task_id, message: n.message })
     }
   }
 }
