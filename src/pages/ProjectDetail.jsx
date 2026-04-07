@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { Save, Trash2, Plus, Loader2, List, LayoutGrid, AlertTriangle } from 'lucide-react'
+import { Save, Trash2, Plus, Loader2, List, LayoutGrid, AlertTriangle, Download } from 'lucide-react'
 import TaskList from '../components/TaskList'
 import KanbanBoard from '../components/KanbanBoard'
 import NewTaskModal from '../components/NewTaskModal'
@@ -142,6 +142,70 @@ export default function ProjectDetail() {
     localStorage.setItem('opshub-task-view', v)
   }
 
+  function handleExport() {
+    const isImpl = project.type !== 'maintenance'
+    const statusLabel = { on_track: 'On track', at_risk: 'At risk', blocked: 'Blocked' }
+    const priorityLabel = { high: 'Alta', medium: 'Media', low: 'Baja' }
+    const taskStatusLabel = { todo: 'Por hacer', in_progress: 'En progreso', done: 'Hecho' }
+    const todoTasks = tasks.filter(t => t.status === 'todo')
+    const inProgressTasks = tasks.filter(t => t.status === 'in_progress')
+    const doneTasks = tasks.filter(t => t.status === 'done')
+    const pct = tasks.length > 0 ? Math.round(doneTasks.length / tasks.length * 100) : 0
+
+    const lines = [
+      `# ${project.name}`,
+      `Tipo: ${isImpl ? 'Implementación' : 'Mantenimiento'}`,
+      `Estado: ${statusLabel[project.status]}`,
+      project.start_date ? `Inicio: ${project.start_date}` : '',
+      isImpl && project.deadline ? `Deadline: ${project.deadline}` : '',
+      !isImpl && project.renewal_date ? `Renovación: ${project.renewal_date}` : '',
+      project.description ? `\nDescripción: ${project.description}` : '',
+      '',
+      `## Progreso de tareas: ${pct}% (${doneTasks.length}/${tasks.length})`,
+      '',
+    ]
+
+    if (inProgressTasks.length > 0) {
+      lines.push('### En progreso')
+      inProgressTasks.forEach(t => {
+        lines.push(`- [~] ${t.title} (${priorityLabel[t.priority]})${t.due_date ? ` · ${t.due_date}` : ''}`)
+        if (t.description) lines.push(`       ${t.description}`)
+      })
+      lines.push('')
+    }
+    if (todoTasks.length > 0) {
+      lines.push('### Por hacer')
+      todoTasks.forEach(t => {
+        lines.push(`- [ ] ${t.title} (${priorityLabel[t.priority]})${t.due_date ? ` · ${t.due_date}` : ''}`)
+        if (t.description) lines.push(`       ${t.description}`)
+      })
+      lines.push('')
+    }
+    if (doneTasks.length > 0) {
+      lines.push('### Completadas')
+      doneTasks.forEach(t => lines.push(`- [x] ${t.title}`))
+      lines.push('')
+    }
+
+    if (milestones.length > 0) {
+      lines.push('## Hitos')
+      milestones.forEach(m => lines.push(`- [${m.done ? 'x' : ' '}] ${m.title}`))
+      lines.push('')
+    }
+
+    lines.push(`---`)
+    lines.push(`Exportado desde OppsHub · ${new Date().toLocaleDateString('es-ES')}`)
+
+    const blob = new Blob([lines.filter(l => l !== null && l !== undefined).join('\n')], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${project.name.replace(/\s+/g, '_')}_resumen.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Resumen exportado')
+  }
+
   const filteredTasks = tasks
     .filter(t => {
       if (filter === 'todo') return t.status === 'todo'
@@ -184,7 +248,19 @@ export default function ProjectDetail() {
             <h1 className="text-3xl font-bold tracking-tight" style={{ color: '#f5f5f7', letterSpacing: '-0.02em' }}>
               {project.name}
             </h1>
-            <StatusBadge status={project.status} />
+            <div className="flex items-center gap-2 shrink-0">
+              <StatusBadge status={project.status} />
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
+                style={{ backgroundColor: '#1a1a1a', color: '#6e6e73', border: '1px solid rgba(255,255,255,0.08)' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+              >
+                <Download className="w-3.5 h-3.5" />
+                Exportar
+              </button>
+            </div>
           </div>
           <span className="text-xs" style={{ color: '#6e6e73' }}>
             {isImpl ? 'Implementación' : 'Mantenimiento'}

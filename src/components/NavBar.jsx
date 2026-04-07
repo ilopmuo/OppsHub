@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { LogOut } from 'lucide-react'
+import { LogOut, Search } from 'lucide-react'
+import SearchOverlay from './SearchOverlay'
 
 const NAV = [
   {
@@ -32,12 +34,25 @@ export default function NavBar({ breadcrumb }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
+  const [showSearch, setShowSearch] = useState(false)
+
+  useEffect(() => {
+    function onKey(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowSearch(s => !s)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
   }
 
   return (
+    <>
     <header
       className="sticky top-0 z-20"
       style={{
@@ -100,6 +115,17 @@ export default function NavBar({ breadcrumb }) {
 
         {/* User */}
         <div className="flex items-center gap-3 shrink-0">
+          <button
+            onClick={() => setShowSearch(true)}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-all"
+            style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+            title="Buscar (⌘K)"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <kbd className="text-xs hidden sm:block" style={{ color: '#3a3a3a' }}>⌘K</kbd>
+          </button>
           <span className="text-xs hidden sm:block" style={{ color: '#6e6e73' }}>{user?.email}</span>
           <button
             onClick={handleLogout}
@@ -114,5 +140,8 @@ export default function NavBar({ breadcrumb }) {
         </div>
       </div>
     </header>
+
+    {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
+  </>
   )
 }

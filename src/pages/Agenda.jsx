@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { Loader2, ChevronRight } from 'lucide-react'
+import { Loader2, ChevronRight, Calendar, List, ChevronLeft } from 'lucide-react'
 import NavBar from '../components/NavBar'
 import StatusBadge from '../components/StatusBadge'
-import { Calendar, Ticket } from 'lucide-react'
 
 const PRIORITY_CONFIG = {
   high:   { label: 'Alta',  color: '#ff453a', bg: 'rgba(255,69,58,0.08)',   border: 'rgba(255,69,58,0.18)' },
@@ -59,11 +58,127 @@ const FILTERS = [
   { key: 'all', label: 'Todas' },
 ]
 
+const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const PRIORITY_DOT = { high: '#ff453a', medium: '#ff9f0a', low: '#6e6e73' }
+
+function CalendarView({ projects, onNavigate }) {
+  const today = new Date()
+  const [current, setCurrent] = useState({ year: today.getFullYear(), month: today.getMonth() })
+
+  const allTasks = projects.flatMap(p =>
+    (p.tasks || []).filter(t => t.due_date).map(t => ({ ...t, projectId: p.id, projectName: p.name }))
+  )
+
+  function tasksByDay(day) {
+    const key = `${current.year}-${String(current.month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+    return allTasks.filter(t => t.due_date === key)
+  }
+
+  const firstDay = new Date(current.year, current.month, 1)
+  const daysInMonth = new Date(current.year, current.month + 1, 0).getDate()
+  // Monday-first: getDay() returns 0=Sun, so offset by -1 mod 7
+  const startOffset = (firstDay.getDay() + 6) % 7
+  const cells = Array.from({ length: startOffset + daysInMonth }, (_, i) => i < startOffset ? null : i - startOffset + 1)
+
+  const isToday = (d) => d === today.getDate() && current.month === today.getMonth() && current.year === today.getFullYear()
+
+  return (
+    <div>
+      {/* Month nav */}
+      <div className="flex items-center justify-between mb-5">
+        <button onClick={() => setCurrent(c => {
+          const d = new Date(c.year, c.month - 1)
+          return { year: d.getFullYear(), month: d.getMonth() }
+        })} className="p-1.5 rounded-lg transition-all" style={{ color: '#6e6e73' }}
+          onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
+          onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}>
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="text-sm font-semibold" style={{ color: '#f5f5f7' }}>
+          {MONTHS[current.month]} {current.year}
+        </span>
+        <button onClick={() => setCurrent(c => {
+          const d = new Date(c.year, c.month + 1)
+          return { year: d.getFullYear(), month: d.getMonth() }
+        })} className="p-1.5 rounded-lg transition-all" style={{ color: '#6e6e73' }}
+          onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
+          onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}>
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Grid */}
+      <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
+        {/* Day headers */}
+        <div className="grid grid-cols-7 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+          {DAYS.map(d => (
+            <div key={d} className="py-2 text-center text-xs font-medium" style={{ color: '#6e6e73' }}>{d}</div>
+          ))}
+        </div>
+
+        {/* Cells */}
+        <div className="grid grid-cols-7">
+          {cells.map((day, i) => {
+            const tasks = day ? tasksByDay(day) : []
+            const pending = tasks.filter(t => t.status !== 'done')
+            return (
+              <div
+                key={i}
+                className="min-h-[72px] p-1.5 relative"
+                style={{
+                  borderRight: (i + 1) % 7 !== 0 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                  borderBottom: i < cells.length - 7 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                }}
+              >
+                {day && (
+                  <>
+                    <span
+                      className="text-xs w-5 h-5 flex items-center justify-center rounded-full mb-1 font-medium"
+                      style={{
+                        backgroundColor: isToday(day) ? '#f5f5f7' : 'transparent',
+                        color: isToday(day) ? '#000' : pending.length > 0 ? '#f5f5f7' : '#3a3a3a',
+                      }}
+                    >
+                      {day}
+                    </span>
+                    <div className="space-y-0.5">
+                      {tasks.slice(0, 3).map(t => (
+                        <button
+                          key={t.id}
+                          onClick={() => onNavigate(t.projectId)}
+                          className="w-full text-left px-1.5 py-0.5 rounded text-xs truncate transition-all"
+                          style={{
+                            backgroundColor: t.status === 'done' ? 'rgba(255,255,255,0.04)' : `${PRIORITY_DOT[t.priority]}22`,
+                            color: t.status === 'done' ? '#3a3a3a' : '#f5f5f7',
+                            textDecoration: t.status === 'done' ? 'line-through' : 'none',
+                          }}
+                          title={`${t.title} · ${t.projectName}`}
+                        >
+                          {t.title}
+                        </button>
+                      ))}
+                      {tasks.length > 3 && (
+                        <p className="text-xs px-1" style={{ color: '#6e6e73' }}>+{tasks.length - 3} más</p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Agenda() {
   const navigate = useNavigate()
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('active')
+  const [view, setView] = useState('list')
 
   useEffect(() => { fetchData() }, [])
 
@@ -138,34 +253,54 @@ export default function Agenda() {
           </div>
         </div>
 
-        {/* Filter tabs */}
-        <div className="flex gap-0.5 w-fit rounded-xl p-1 mb-8" style={{ backgroundColor: '#111111' }}>
-          {FILTERS.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className="px-3.5 py-1.5 text-sm rounded-lg transition-all font-medium"
-              style={{
-                backgroundColor: filter === key ? '#2a2a2a' : 'transparent',
-                color: filter === key ? '#f5f5f7' : '#6e6e73',
-              }}
-            >
-              {label}
+        {/* Controls */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex gap-0.5 w-fit rounded-xl p-1" style={{ backgroundColor: '#111111' }}>
+            {FILTERS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => { setFilter(key); setView('list') }}
+                className="px-3.5 py-1.5 text-sm rounded-lg transition-all font-medium"
+                style={{
+                  backgroundColor: view === 'list' && filter === key ? '#2a2a2a' : 'transparent',
+                  color: view === 'list' && filter === key ? '#f5f5f7' : '#6e6e73',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-0.5 rounded-xl p-1" style={{ backgroundColor: '#111111' }}>
+            <button onClick={() => setView('list')}
+              className="p-1.5 rounded-lg transition-all"
+              style={{ backgroundColor: view === 'list' ? '#2a2a2a' : 'transparent', color: view === 'list' ? '#f5f5f7' : '#6e6e73' }}>
+              <List className="w-3.5 h-3.5" />
             </button>
-          ))}
+            <button onClick={() => setView('calendar')}
+              className="p-1.5 rounded-lg transition-all"
+              style={{ backgroundColor: view === 'calendar' ? '#2a2a2a' : 'transparent', color: view === 'calendar' ? '#f5f5f7' : '#6e6e73' }}>
+              <Calendar className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
-        {/* Content */}
-        {loading ? (
+        {/* Calendar view */}
+        {!loading && view === 'calendar' && (
+          <CalendarView projects={projects} onNavigate={id => navigate(`/project/${id}`)} />
+        )}
+
+        {/* List view */}
+        {view === 'list' && loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#6e6e73' }} />
           </div>
-        ) : visibleProjects.length === 0 ? (
+        ) : view === 'list' && visibleProjects.length === 0 ? (
           <div className="rounded-2xl py-20 text-center" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
             <p className="font-semibold mb-1.5 text-sm" style={{ color: '#f5f5f7' }}>Todo al día</p>
             <p className="text-sm" style={{ color: '#6e6e73' }}>No hay tareas pendientes</p>
           </div>
-        ) : (
+        ) : view === 'list' ? (
           <div className="space-y-8">
             {visibleProjects.map(project => (
               <div key={project.id}>
@@ -245,7 +380,7 @@ export default function Agenda() {
               </div>
             ))}
           </div>
-        )}
+        ) : null}
       </main>
     </div>
   )
