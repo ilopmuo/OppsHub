@@ -5,6 +5,19 @@ import { useAuth } from '../contexts/AuthContext'
 import { LogOut, Search } from 'lucide-react'
 import SearchOverlay from './SearchOverlay'
 
+const COLORS = ['#ff453a', '#ff9f0a', '#30d158', '#64d2ff', '#bf5af2', '#f5f5f7']
+function avatarColor(email) {
+  if (!email) return COLORS[5]
+  let hash = 0
+  for (const c of email) hash = (hash * 31 + c.charCodeAt(0)) % COLORS.length
+  return COLORS[Math.abs(hash)]
+}
+function initials(email, name) {
+  if (name) return name.slice(0, 2).toUpperCase()
+  if (!email) return '?'
+  return email.split('@')[0].slice(0, 2).toUpperCase()
+}
+
 const NAV = [
   {
     label: 'Proyectos',
@@ -35,6 +48,14 @@ export default function NavBar({ breadcrumb }) {
   const location = useLocation()
   const { user } = useAuth()
   const [showSearch, setShowSearch] = useState(false)
+  const [profile, setProfile] = useState(null)
+
+  useEffect(() => {
+    if (user) {
+      supabase.from('profiles').select('display_name, avatar_url').eq('id', user.id).single()
+        .then(({ data }) => setProfile(data))
+    }
+  }, [user])
 
   useEffect(() => {
     function onKey(e) {
@@ -126,7 +147,24 @@ export default function NavBar({ breadcrumb }) {
             <Search className="w-3.5 h-3.5" />
             <kbd className="text-xs hidden sm:block" style={{ color: '#3a3a3a' }}>⌘K</kbd>
           </button>
-          <span className="text-xs hidden sm:block" style={{ color: '#6e6e73' }}>{user?.email}</span>
+          <button
+            onClick={() => navigate('/profile')}
+            className="flex items-center gap-2 rounded-full transition-all"
+            title="Mi perfil"
+          >
+            <div
+              className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold shrink-0"
+              style={{ backgroundColor: profile?.avatar_url ? '#000' : avatarColor(user?.email), color: '#000' }}
+            >
+              {profile?.avatar_url
+                ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                : initials(user?.email, profile?.display_name)
+              }
+            </div>
+            <span className="text-xs hidden sm:block" style={{ color: '#6e6e73' }}>
+              {profile?.display_name || user?.email}
+            </span>
+          </button>
           <button
             onClick={handleLogout}
             className="transition-colors"
