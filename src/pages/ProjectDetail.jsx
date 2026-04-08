@@ -106,14 +106,19 @@ export default function ProjectDetail() {
     const p = proj || project
     if (!p) return
     const [{ data: pm }, { data: owner }] = await Promise.all([
-      supabase.from('project_members').select('id, role, profile:user_id(id, email, display_name)').eq('project_id', id),
-      supabase.from('profiles').select('id, email, display_name').eq('id', p.user_id).single(),
+      supabase.from('project_members').select('id, role, user_id').eq('project_id', id),
+      supabase.from('profiles').select('id, email, display_name, avatar_url').eq('id', p.user_id).single(),
     ])
+    const userIds = (pm || []).map(m => m.user_id).filter(Boolean)
+    const { data: profiles } = userIds.length > 0
+      ? await supabase.from('profiles').select('id, email, display_name, avatar_url').in('id', userIds)
+      : { data: [] }
+    const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]))
     const all = [
-      owner ? { profile: owner, role: 'owner' } : null,
-      ...(pm || []),
-    ].filter(Boolean).map(m => m.profile)
-    setMembers(all.filter(Boolean))
+      owner ? owner : null,
+      ...(pm || []).map(m => profileMap[m.user_id]).filter(Boolean),
+    ].filter(Boolean)
+    setMembers(all)
   }
 
   async function fetchTasks() {

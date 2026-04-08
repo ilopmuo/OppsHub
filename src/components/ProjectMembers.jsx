@@ -32,13 +32,21 @@ export default function ProjectMembers({ projectId, projectOwnerId }) {
 
   async function fetchMembers() {
     const [{ data: pm }, { data: owner }] = await Promise.all([
-      supabase.from('project_members')
-        .select('id, role, joined_at, profile:user_id(id, email, display_name, avatar_url)')
-        .eq('project_id', projectId),
+      supabase.from('project_members').select('id, role, joined_at, user_id').eq('project_id', projectId),
       supabase.from('profiles').select('id, email, display_name, avatar_url').eq('id', projectOwnerId).single(),
     ])
+
+    // fetch profiles for all members separately (user_id FK points to auth.users, not profiles)
+    const userIds = (pm || []).map(m => m.user_id).filter(Boolean)
+    const { data: profiles } = userIds.length > 0
+      ? await supabase.from('profiles').select('id, email, display_name, avatar_url').in('id', userIds)
+      : { data: [] }
+
+    const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]))
+    const membersWithProfiles = (pm || []).map(m => ({ ...m, profile: profileMap[m.user_id] || null }))
+
     setOwnerProfile(owner)
-    setMembers(pm || [])
+    setMembers(membersWithProfiles)
     setLoading(false)
   }
 
