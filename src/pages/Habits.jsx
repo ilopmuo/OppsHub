@@ -181,17 +181,23 @@ export default function Habits() {
 
               {/* ── Month progress ── */}
               {!loading && totalScheduled > 0 && (
-                <div style={{ flex: 1, maxWidth: 260, margin: '0 32px' }}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span style={{ fontSize: 10, fontWeight: 600, color: '#3a3a3a', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Progreso del mes</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: pctColor }}>{pct}%</span>
+                <div style={{
+                  flex: 1, maxWidth: 340, margin: '0 40px',
+                  backgroundColor: '#111', borderRadius: 16,
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  padding: '16px 20px',
+                }}>
+                  <div className="flex items-end justify-between mb-3">
+                    <div>
+                      <p style={{ fontSize: 10, fontWeight: 600, color: '#3a3a3a', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Progreso del mes</p>
+                      <p style={{ fontSize: 28, fontWeight: 800, color: '#f5f5f7', letterSpacing: '-0.03em', lineHeight: 1 }}>{pct}<span style={{ fontSize: 14, fontWeight: 600, color: '#4a4a4a' }}>%</span></p>
+                    </div>
+                    <p style={{ fontSize: 12, color: '#4a4a4a', fontWeight: 500, paddingBottom: 2 }}>
+                      <span style={{ color: '#f5f5f7', fontWeight: 700 }}>{totalDone}</span> / {totalScheduled}
+                    </p>
                   </div>
-                  <div style={{ height: 4, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, borderRadius: 4, backgroundColor: pctColor, transition: 'width 0.6s ease' }} />
-                  </div>
-                  <div className="flex items-center justify-between mt-1.5">
-                    <span style={{ fontSize: 10, color: '#3a3a3a' }}>{totalDone} completadas</span>
-                    <span style={{ fontSize: 10, color: '#3a3a3a' }}>{totalScheduled} programadas</span>
+                  <div style={{ height: 6, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${pct}%`, borderRadius: 6, background: 'linear-gradient(90deg, #3a3a3a, #f5f5f7)', transition: 'width 0.7s ease' }} />
                   </div>
                 </div>
               )}
