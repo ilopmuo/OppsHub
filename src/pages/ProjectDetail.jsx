@@ -16,6 +16,7 @@ import ProjectMembers from '../components/ProjectMembers'
 import ActivityLog from '../components/ActivityLog'
 import ProjectNotificationSettings from '../components/ProjectNotificationSettings'
 import ProjectDetailReports from '../components/ProjectDetailReports'
+import ProjectIconUpload from '../components/ProjectIconUpload'
 import { notify } from '../lib/notify'
 
 async function logActivity(projectId, userId, action, metadata = {}) {
@@ -323,16 +324,22 @@ export default function ProjectDetail() {
 
         {/* ── Header ── */}
         <div className="flex items-start justify-between gap-4 mb-6">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1.5">
-              <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}>
-                {isImpl ? 'Implementación' : 'Mantenimiento'}
-              </span>
-              <StatusBadge status={project.status} />
+          <div className="flex items-start gap-4 min-w-0">
+            {project.icon_url && (
+              <img src={project.icon_url} alt="" className="shrink-0 rounded-xl object-cover mt-1"
+                style={{ width: 48, height: 48 }} />
+            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}>
+                  {isImpl ? 'Implementación' : 'Mantenimiento'}
+                </span>
+                <StatusBadge status={project.status} />
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#f5f5f7', letterSpacing: '-0.02em' }}>
+                {project.name}
+              </h1>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#f5f5f7', letterSpacing: '-0.02em' }}>
-              {project.name}
-            </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0 mt-1">
             <ProjectNotificationSettings projectId={id} />
@@ -531,9 +538,19 @@ export default function ProjectDetail() {
 
               {editingDetails && (
                 <div className="px-4 pb-4 pt-3 space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#6e6e73' }}>Nombre</label>
-                    <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo} />
+                  <div className="flex items-center gap-3">
+                    <ProjectIconUpload
+                      iconUrl={project.icon_url}
+                      size={48}
+                      onChange={async (url) => {
+                        await supabase.from('projects').update({ icon_url: url }).eq('id', id)
+                        setProject(p => ({ ...p, icon_url: url }))
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <label className="block text-xs font-medium mb-1.5" style={{ color: '#6e6e73' }}>Nombre</label>
+                      <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} onFocus={fi} onBlur={fo} />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium mb-1.5" style={{ color: '#6e6e73' }}>Estado</label>

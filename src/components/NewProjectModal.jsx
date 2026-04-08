@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import { X, Loader2, ArrowLeft, Wrench, Rocket, LayoutGrid } from 'lucide-react'
+import ProjectIconUpload from './ProjectIconUpload'
 
 const TEMPLATES = {
   implementation: [
@@ -105,6 +106,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
   const [slaStatus, setSlaStatus] = useState('ok')
   const [lastContact, setLastContact] = useState('')
 
+  const [iconUrl, setIconUrl] = useState(null)
   const [saving, setSaving] = useState(false)
 
   function handleClose() { setClosing(true); setTimeout(onClose, 170) }
@@ -136,6 +138,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
       renewal_date: type === 'maintenance' ? (renewalDate || null) : null,
       sla_status: type === 'maintenance' ? slaStatus : null,
       last_contact: type === 'maintenance' ? (lastContact || null) : null,
+      icon_url: iconUrl || null,
     }
 
     const { data, error } = await supabase.from('projects').insert(payload).select().single()
@@ -290,16 +293,19 @@ export default function NewProjectModal({ onClose, onCreated }) {
         {/* Step 3 — Form */}
         {step === 'form' && (
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {/* Common fields */}
-            <div>
-              <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Nombre *</label>
-              <input
+            {/* Icon + name row */}
+            <div className="flex items-center gap-3">
+              <ProjectIconUpload iconUrl={iconUrl} onChange={setIconUrl} size={56} />
+              <div className="flex-1 min-w-0">
+                <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Nombre *</label>
+                <input
                 autoFocus required value={name} onChange={e => setName(e.target.value)}
                 placeholder="Ej: Acme Corp, Proyecto Alpha..."
                 style={inputStyle}
                 onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
               />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">

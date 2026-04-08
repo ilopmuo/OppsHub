@@ -75,9 +75,19 @@ export default function ProjectCard({ project, onClick, index = 0 }) {
     >
       {/* Name + type chip */}
       <div className="flex items-start justify-between gap-3 mb-1">
-        <h3 className="font-semibold text-sm leading-snug line-clamp-2" style={{ color: '#f5f5f7' }}>
-          {project.name}
-        </h3>
+        <div className="flex items-start gap-2.5 min-w-0">
+          {project.icon_url && (
+            <img
+              src={project.icon_url}
+              alt=""
+              className="shrink-0 rounded-lg object-cover mt-0.5"
+              style={{ width: 28, height: 28 }}
+            />
+          )}
+          <h3 className="font-semibold text-sm leading-snug line-clamp-2" style={{ color: '#f5f5f7' }}>
+            {project.name}
+          </h3>
+        </div>
         <span
           className="shrink-0 flex items-center gap-1 text-xs px-2 py-0.5 rounded-full mt-0.5"
           style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}
