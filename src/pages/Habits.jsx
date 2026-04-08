@@ -815,7 +815,7 @@ export default function Habits() {
               <div className="mt-8">
                 <p className="text-xs font-medium uppercase tracking-widest mb-4" style={{ color: '#3a3a3a' }}>Habit Reports</p>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, alignItems: 'start' }}>
 
                   {/* ── Chart 1: Tasa por hábito ── */}
                   <div style={{ backgroundColor: BG2, borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px' }}>
@@ -911,7 +911,7 @@ export default function Habits() {
                 </div>
 
                 {/* ── Second row: Rachas + Heatmap ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginTop: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginTop: 12, alignItems: 'start' }}>
 
                   {/* ── Chart 4: Rachas por hábito ── */}
                   <div style={{ backgroundColor: BG2, borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px' }}>
