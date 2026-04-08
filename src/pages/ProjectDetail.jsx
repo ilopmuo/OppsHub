@@ -621,6 +621,7 @@ export default function ProjectDetail() {
         <NewTaskModal
           projectId={id}
           defaultStatus={taskModalStatus}
+          members={members}
           onClose={() => setShowTaskModal(false)}
           onCreated={onTaskCreated}
         />

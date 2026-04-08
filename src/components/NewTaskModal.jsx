@@ -16,14 +16,17 @@ const inputStyle = {
   transition: 'border-color 0.15s',
 }
 
-export default function NewTaskModal({ projectId, defaultStatus = 'todo', onClose, onCreated }) {
+export default function NewTaskModal({ projectId, defaultStatus = 'todo', members = [], onClose, onCreated }) {
   const { user } = useAuth()
   const [closing, setClosing] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState('medium')
   const [dueDate, setDueDate] = useState('')
+  const [assigneeId, setAssigneeId] = useState(user?.id || '')
   const [saving, setSaving] = useState(false)
+
+  const hasTeam = members.length > 1
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -31,8 +34,19 @@ export default function NewTaskModal({ projectId, defaultStatus = 'todo', onClos
     setSaving(true)
     const { data, error } = await supabase
       .from('tasks')
-      .insert({ project_id: projectId, user_id: user.id, title: title.trim(), description: description.trim() || null, priority, due_date: dueDate || null, status: defaultStatus, done: defaultStatus === 'done' })
-      .select().single()
+      .insert({
+        project_id: projectId,
+        user_id: user.id,
+        title: title.trim(),
+        description: description.trim() || null,
+        priority,
+        due_date: dueDate || null,
+        status: defaultStatus,
+        done: defaultStatus === 'done',
+        assignee_id: assigneeId || user.id,
+      })
+      .select('*, assignee:assignee_id(id, email, display_name)')
+      .single()
     if (error) { toast.error('Error al crear la tarea') } else { onCreated(data) }
     setSaving(false)
   }
@@ -123,6 +137,25 @@ export default function NewTaskModal({ projectId, defaultStatus = 'todo', onClos
               />
             </div>
           </div>
+
+          {hasTeam && (
+            <div>
+              <label className="block text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Asignado a</label>
+              <select
+                value={assigneeId}
+                onChange={e => setAssigneeId(e.target.value)}
+                style={inputStyle}
+                onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
+                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+              >
+                {members.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.display_name || m.email}{m.id === user?.id ? ' (tú)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex gap-3 pt-1">
             <button
