@@ -521,6 +521,173 @@ export default function Habits() {
               </tbody>
             </table>
           </div>
+
+          {/* ── Habit Reports ── */}
+          {(() => {
+            const BG2 = '#111'
+            const pastDays = days.filter(d => dateStr(d) <= TODAY)
+
+            // ── Data: completion % per habit (full month scheduled) ──────────
+            const habitStats = habits.map(h => {
+              const scheduled = days.filter(d => isScheduled(h, d)).length
+              const done      = logs.filter(l => l.habit_id === h.id && l.completed).length
+              const pct       = scheduled > 0 ? Math.round(done / scheduled * 100) : 0
+              return { habit: h, scheduled, done, pct }
+            }).sort((a, b) => b.pct - a.pct)
+
+            // ── Data: daily total completions (past days only) ────────────────
+            const dailyData = pastDays.map(d => {
+              const ds   = dateStr(d)
+              const done = logs.filter(l => l.date === ds && l.completed).length
+              const sched = habits.filter(h => isScheduled(h, d)).length
+              return { day: d.getDate(), done, sched, pct: sched > 0 ? done / sched : 0 }
+            })
+
+            // ── Data: avg completion % by day of week (0=Mon…6=Sun) ──────────
+            const DOW_LABEL = ['L','M','X','J','V','S','D']
+            const dowStats = DOW_LABEL.map((label, i) => {
+              const dowIndex = i === 6 ? 0 : i + 1 // Mon=1…Sun=0
+              const relevant = pastDays.filter(d => d.getDay() === dowIndex)
+              let sched = 0, done = 0
+              relevant.forEach(d => {
+                const ds = dateStr(d)
+                habits.forEach(h => {
+                  if (!isScheduled(h, d)) return
+                  sched++
+                  if (logs.some(l => l.habit_id === h.id && l.date === ds && l.completed)) done++
+                })
+              })
+              const pct = sched > 0 ? Math.round(done / sched * 100) : 0
+              return { label, pct, sched }
+            })
+
+            if (!habits.length) return null
+
+            // ── SVG helpers ───────────────────────────────────────────────────
+            const W = 340, H = 100, PAD = { t: 8, r: 8, b: 24, l: 28 }
+            const chartW = W - PAD.l - PAD.r
+            const chartH = H - PAD.t - PAD.b
+
+            // Line chart path for daily trend
+            const maxDone = Math.max(...dailyData.map(d => d.done), 1)
+            const linePoints = dailyData.map((d, i) => {
+              const x = PAD.l + (i / Math.max(dailyData.length - 1, 1)) * chartW
+              const y = PAD.t + chartH - (d.done / maxDone) * chartH
+              return `${x},${y}`
+            }).join(' ')
+            const areaPath = dailyData.length > 1
+              ? `M ${PAD.l},${PAD.t + chartH} ` +
+                dailyData.map((d, i) => {
+                  const x = PAD.l + (i / (dailyData.length - 1)) * chartW
+                  const y = PAD.t + chartH - (d.done / maxDone) * chartH
+                  return `L ${x},${y}`
+                }).join(' ') +
+                ` L ${PAD.l + chartW},${PAD.t + chartH} Z`
+              : ''
+
+            return (
+              <div className="mt-8">
+                <p className="text-xs font-medium uppercase tracking-widest mb-4" style={{ color: '#3a3a3a' }}>Habit Reports</p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+
+                  {/* ── Chart 1: Tasa por hábito ── */}
+                  <div style={{ backgroundColor: BG2, borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px' }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: '#6e6e73', marginBottom: 14 }}>Completado por hábito</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {habitStats.map(({ habit, pct, done, scheduled }) => (
+                        <div key={habit.id}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: habit.color, flexShrink: 0 }} />
+                              <span style={{ fontSize: 11, color: '#f5f5f7', fontWeight: 500, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{habit.name}</span>
+                            </div>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#6e6e73' }}>{done}/{scheduled}</span>
+                          </div>
+                          <div style={{ height: 4, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${pct}%`, borderRadius: 4, backgroundColor: habit.color, opacity: 0.85, transition: 'width 0.5s ease' }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ── Chart 2: Tendencia diaria ── */}
+                  <div style={{ backgroundColor: BG2, borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px' }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: '#6e6e73', marginBottom: 8 }}>Tendencia diaria</p>
+                    {dailyData.length < 2 ? (
+                      <p style={{ fontSize: 11, color: '#3a3a3a', marginTop: 24, textAlign: 'center' }}>Sin datos suficientes</p>
+                    ) : (
+                      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible' }}>
+                        {/* Y axis ticks */}
+                        {[0, Math.round(maxDone / 2), maxDone].map((v, i) => {
+                          const y = PAD.t + chartH - (v / maxDone) * chartH
+                          return (
+                            <g key={i}>
+                              <line x1={PAD.l - 4} y1={y} x2={PAD.l + chartW} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+                              <text x={PAD.l - 6} y={y + 4} textAnchor="end" fontSize="8" fill="#3a3a3a">{v}</text>
+                            </g>
+                          )
+                        })}
+                        {/* Area fill */}
+                        {areaPath && <path d={areaPath} fill="rgba(255,255,255,0.04)" />}
+                        {/* Line */}
+                        <polyline points={linePoints} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        {/* Dots */}
+                        {dailyData.map((d, i) => {
+                          const x = PAD.l + (i / (dailyData.length - 1)) * chartW
+                          const y = PAD.t + chartH - (d.done / maxDone) * chartH
+                          return <circle key={i} cx={x} cy={y} r="2.5" fill="#f5f5f7" />
+                        })}
+                        {/* X axis labels: first, mid, last */}
+                        {[0, Math.floor((dailyData.length - 1) / 2), dailyData.length - 1].map(i => {
+                          const x = PAD.l + (i / (dailyData.length - 1)) * chartW
+                          return <text key={i} x={x} y={H - 6} textAnchor="middle" fontSize="8" fill="#3a3a3a">{dailyData[i]?.day}</text>
+                        })}
+                      </svg>
+                    )}
+                  </div>
+
+                  {/* ── Chart 3: Día de la semana ── */}
+                  <div style={{ backgroundColor: BG2, borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px' }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: '#6e6e73', marginBottom: 8 }}>Rendimiento por día</p>
+                    <svg width="100%" viewBox={`0 0 ${W} ${H}`}>
+                      {/* Y grid */}
+                      {[0, 50, 100].map(v => {
+                        const y = PAD.t + chartH - (v / 100) * chartH
+                        return (
+                          <g key={v}>
+                            <line x1={PAD.l} y1={y} x2={PAD.l + chartW} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+                            <text x={PAD.l - 6} y={y + 4} textAnchor="end" fontSize="8" fill="#3a3a3a">{v}</text>
+                          </g>
+                        )
+                      })}
+                      {/* Bars */}
+                      {dowStats.map(({ label, pct, sched }, i) => {
+                        const barW  = chartW / 7 - 4
+                        const x     = PAD.l + i * (chartW / 7) + 2
+                        const barH  = (pct / 100) * chartH
+                        const y     = PAD.t + chartH - barH
+                        const alpha = sched === 0 ? 0.08 : 0.7
+                        return (
+                          <g key={i}>
+                            <rect x={x} y={PAD.t} width={barW} height={chartH} rx="3" fill="rgba(255,255,255,0.03)" />
+                            {sched > 0 && <rect x={x} y={y} width={barW} height={barH} rx="3" fill={`rgba(245,245,247,${alpha})`} />}
+                            <text x={x + barW / 2} y={H - 6} textAnchor="middle" fontSize="8" fill={sched > 0 ? '#6e6e73' : '#3a3a3a'}>{label}</text>
+                            {sched > 0 && pct > 0 && (
+                              <text x={x + barW / 2} y={y - 3} textAnchor="middle" fontSize="7" fill="#4a4a4a">{pct}%</text>
+                            )}
+                          </g>
+                        )
+                      })}
+                    </svg>
+                  </div>
+
+                </div>
+              </div>
+            )
+          })()}
+
           </>
         )}
       </main>
