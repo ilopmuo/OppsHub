@@ -129,6 +129,9 @@ function HabitHeatmap({ habits, allLogs, TODAY }) {
   return (
     <div style={{ backgroundColor: '#111', borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px' }}>
       <p style={{ fontSize: 11, fontWeight: 600, color: '#6e6e73', marginBottom: 12 }}>Actividad anual</p>
+      <p style={{ fontSize: 10, color: '#ff9f0a', marginBottom: 8 }}>
+        DEBUG — hábitos: {habits.length} | logs: {allLogs.length} | días con datos: {Object.keys(heatData).length} | días con color: {Object.values(heatData).filter(d => d.pct > 0).length}
+      </p>
       <div style={{ overflowX: 'auto' }}>
         <svg width={totalW} height={totalH} style={{ display: 'block' }}>
           {monthLabels.map(({ wi, label }) => (
