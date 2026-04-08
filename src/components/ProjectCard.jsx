@@ -53,7 +53,7 @@ export default function ProjectCard({ project, onClick, index = 0 }) {
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="w-full text-left rounded-2xl p-5 transition-all duration-200"
+      className="w-full text-left rounded-2xl p-5 transition-all duration-200 flex flex-col justify-start"
       style={{
         backgroundColor: hovered ? '#161616' : '#111111',
         border: `1px solid ${
