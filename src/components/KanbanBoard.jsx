@@ -40,14 +40,14 @@ function KanbanCard({ task, onDelete, onClickTask, wasDraggingRef, overlay = fal
 
   return (
     <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
+      ref={overlay ? undefined : setNodeRef}
+      {...(overlay ? {} : attributes)}
+      {...(overlay ? {} : listeners)}
       onClick={() => { if (!overlay && !wasDraggingRef?.current) onClickTask?.(task) }}
       className="group rounded-xl p-3.5 select-none"
       style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
+        transform: overlay ? undefined : CSS.Transform.toString(transform),
+        transition: overlay ? undefined : transition,
         opacity: isDragging ? 0.35 : 1,
         cursor: overlay ? 'grabbing' : 'grab',
         backgroundColor: overlay ? '#222' : '#1a1a1a',
