@@ -139,38 +139,73 @@ export default function Habits() {
       <main className="max-w-[1400px] mx-auto px-6 py-10 page-enter">
 
         {/* ── Page header ── */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-widest mb-2" style={{ color: '#3a3a3a' }}>Hábitos</p>
-            <div className="flex items-center gap-2">
-              <button onClick={prevMonth}
-                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
-                style={{ color: '#6e6e73' }}
-                onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#f5f5f7' }}
-                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6e6e73' }}
-              ><ChevronLeft className="w-4 h-4" /></button>
+        {(() => {
+          // Month progress: scheduled vs completed up to today
+          const pastDays = days.filter(d => dateStr(d) <= TODAY)
+          let totalScheduled = 0, totalDone = 0
+          for (const d of pastDays) {
+            const ds = dateStr(d)
+            for (const h of habits) {
+              if (!isScheduled(h, d)) continue
+              totalScheduled++
+              if (logs.some(l => l.habit_id === h.id && l.date === ds && l.completed)) totalDone++
+            }
+          }
+          const pct = totalScheduled > 0 ? Math.round((totalDone / totalScheduled) * 100) : 0
+          const pctColor = pct >= 80 ? '#30d158' : pct >= 50 ? '#ff9f0a' : '#ff453a'
 
-              <h1 className="text-3xl font-bold tracking-tight" style={{ color: '#f5f5f7', letterSpacing: '-0.02em', minWidth: 260 }}>
-                {MONTH_NAMES[month]} <span style={{ color: '#4a4a4a' }}>{year}</span>
-              </h1>
+          return (
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest mb-2" style={{ color: '#3a3a3a' }}>Hábitos</p>
+                <div className="flex items-center gap-2">
+                  <button onClick={prevMonth}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                    style={{ color: '#6e6e73' }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#f5f5f7' }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6e6e73' }}
+                  ><ChevronLeft className="w-4 h-4" /></button>
 
-              <button onClick={nextMonth}
-                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
-                style={{ color: '#6e6e73' }}
-                onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#f5f5f7' }}
-                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6e6e73' }}
-              ><ChevronRight className="w-4 h-4" /></button>
+                  <h1 className="text-3xl font-bold tracking-tight" style={{ color: '#f5f5f7', letterSpacing: '-0.02em', minWidth: 260 }}>
+                    {MONTH_NAMES[month]} <span style={{ color: '#4a4a4a' }}>{year}</span>
+                  </h1>
+
+                  <button onClick={nextMonth}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                    style={{ color: '#6e6e73' }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#f5f5f7' }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6e6e73' }}
+                  ><ChevronRight className="w-4 h-4" /></button>
+                </div>
+              </div>
+
+              {/* ── Month progress ── */}
+              {!loading && totalScheduled > 0 && (
+                <div style={{ flex: 1, maxWidth: 260, margin: '0 32px' }}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span style={{ fontSize: 10, fontWeight: 600, color: '#3a3a3a', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Progreso del mes</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: pctColor }}>{pct}%</span>
+                  </div>
+                  <div style={{ height: 4, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${pct}%`, borderRadius: 4, backgroundColor: pctColor, transition: 'width 0.6s ease' }} />
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span style={{ fontSize: 10, color: '#3a3a3a' }}>{totalDone} completadas</span>
+                    <span style={{ fontSize: 10, color: '#3a3a3a' }}>{totalScheduled} programadas</span>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => { setEditHabit(null); setShowModal(true) }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.97]"
+                style={{ backgroundColor: '#f5f5f7', color: '#000' }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fff'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f5f5f7'}
+              ><Plus className="w-4 h-4" /> Nuevo hábito</button>
             </div>
-          </div>
-
-          <button
-            onClick={() => { setEditHabit(null); setShowModal(true) }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.97]"
-            style={{ backgroundColor: '#f5f5f7', color: '#000' }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fff'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f5f5f7'}
-          ><Plus className="w-4 h-4" /> Nuevo hábito</button>
-        </div>
+          )
+        })()}
 
         {/* ── Loading ── */}
         {loading ? (
