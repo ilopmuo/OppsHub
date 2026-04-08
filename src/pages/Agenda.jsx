@@ -1,424 +1,458 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import toast from 'react-hot-toast'
-import { Loader2, ChevronRight, Calendar, List, ChevronLeft } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 import NavBar from '../components/NavBar'
 import StatusBadge from '../components/StatusBadge'
+import toast from 'react-hot-toast'
+import { ChevronLeft, ChevronRight, Plus, Check, Trash2, X, ExternalLink } from 'lucide-react'
 
-const PRIORITY_CONFIG = {
-  high:   { label: 'Alta',  color: '#ff453a', bg: 'rgba(255,69,58,0.08)',   border: 'rgba(255,69,58,0.18)' },
-  medium: { label: 'Media', color: '#ff9f0a', bg: 'rgba(255,159,10,0.08)',  border: 'rgba(255,159,10,0.18)' },
-  low:    { label: 'Baja',  color: '#6e6e73', bg: 'rgba(110,110,115,0.08)', border: 'rgba(110,110,115,0.18)' },
-}
-
-const STATUS_CYCLE = { todo: 'in_progress', in_progress: 'done', done: 'todo' }
-
-function formatDate(date) {
-  if (!date) return null
-  return new Date(date + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
-}
-
-function isOverdue(date) {
-  if (!date) return false
-  return new Date(date + 'T00:00:00') < new Date(new Date().toDateString())
-}
-
-function taskSortKey(t) {
-  const overdue = isOverdue(t.due_date) && t.status !== 'done' ? 0 : 1
-  const priority = { high: 0, medium: 1, low: 2 }[t.priority] ?? 1
-  const date = t.due_date ? new Date(t.due_date).getTime() : Infinity
-  return [overdue, priority, date]
-}
-
-function StatusDot({ status, onChange }) {
-  const isDone = status === 'done'
-  const isProgress = status === 'in_progress'
-  return (
-    <button
-      onClick={e => { e.stopPropagation(); onChange(STATUS_CYCLE[status]) }}
-      className="w-4 h-4 rounded-full shrink-0 flex items-center justify-center transition-all mt-0.5"
-      style={{
-        backgroundColor: isDone ? '#f5f5f7' : 'transparent',
-        border: `1.5px solid ${isDone ? '#f5f5f7' : isProgress ? '#ff9f0a' : 'rgba(255,255,255,0.2)'}`,
-      }}
-      onMouseEnter={e => { if (!isDone) e.currentTarget.style.borderColor = 'rgba(255,255,255,0.5)' }}
-      onMouseLeave={e => { if (!isDone) e.currentTarget.style.borderColor = isDone ? '#f5f5f7' : isProgress ? '#ff9f0a' : 'rgba(255,255,255,0.2)' }}
-    >
-      {isDone && <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="#000" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
-      {isProgress && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#ff9f0a' }} />}
-    </button>
-  )
-}
-
-const FILTERS = [
-  { key: 'active', label: 'Activas' },
-  { key: 'todo', label: 'Por hacer' },
-  { key: 'in_progress', label: 'En progreso' },
-  { key: 'all', label: 'Todas' },
-]
-
-const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+// ── Constants ─────────────────────────────────────────────────────────────────
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-const PRIORITY_DOT = { high: '#ff453a', medium: '#ff9f0a', low: '#6e6e73' }
+const DAYS   = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
 
-function CalendarView({ projects, onNavigate }) {
-  const today = new Date()
-  const [current, setCurrent] = useState({ year: today.getFullYear(), month: today.getMonth() })
+const PRIORITY_COLOR = { high: '#ff453a', medium: '#ff9f0a', low: '#6e6e73' }
+const PRIORITY_LABEL = { high: 'Alta', medium: 'Media', low: 'Baja' }
 
-  const allTasks = projects.flatMap(p =>
-    (p.tasks || []).filter(t => t.due_date).map(t => ({ ...t, projectId: p.id, projectName: p.name }))
+function pad(n) { return String(n).padStart(2, '0') }
+function dateKey(y, m, d) { return `${y}-${pad(m + 1)}-${pad(d)}` }
+function today() { const n = new Date(); return dateKey(n.getFullYear(), n.getMonth(), n.getDate()) }
+function isOverdue(date) { return date && date < today() }
+
+function formatFull(ds) {
+  if (!ds) return ''
+  const d = new Date(ds + 'T00:00:00')
+  return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+// ── AddNoteInput ──────────────────────────────────────────────────────────────
+function AddNoteInput({ onAdd, onCancel }) {
+  const [val, setVal] = useState('')
+  const ref = useRef()
+  useEffect(() => { ref.current?.focus() }, [])
+  function submit() { if (val.trim()) { onAdd(val.trim()); setVal('') } }
+  return (
+    <div className="flex items-center gap-1.5 mt-1">
+      <input
+        ref={ref}
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') onCancel() }}
+        placeholder="Nueva nota…"
+        className="flex-1 text-xs outline-none rounded-lg px-2.5 py-1.5"
+        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#f5f5f7', fontFamily: 'inherit' }}
+      />
+      <button onClick={submit}
+        className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+        style={{ background: '#f5f5f7', color: '#000' }}>
+        <Check size={10} strokeWidth={3} />
+      </button>
+      <button onClick={onCancel}
+        className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+        style={{ background: 'rgba(255,255,255,0.08)', color: '#6e6e73' }}>
+        <X size={10} strokeWidth={3} />
+      </button>
+    </div>
   )
+}
 
-  function tasksByDay(day) {
-    const key = `${current.year}-${String(current.month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-    return allTasks.filter(t => t.due_date === key)
-  }
-
-  const firstDay = new Date(current.year, current.month, 1)
-  const daysInMonth = new Date(current.year, current.month + 1, 0).getDate()
-  // Monday-first: getDay() returns 0=Sun, so offset by -1 mod 7
-  const startOffset = (firstDay.getDay() + 6) % 7
-  const cells = Array.from({ length: startOffset + daysInMonth }, (_, i) => i < startOffset ? null : i - startOffset + 1)
-
-  const isToday = (d) => d === today.getDate() && current.month === today.getMonth() && current.year === today.getFullYear()
+// ── Day panel ─────────────────────────────────────────────────────────────────
+function DayPanel({ ds, projectTasks, notes, onAddNote, onToggleNote, onDeleteNote, onClose, onNavigate }) {
+  const [adding, setAdding] = useState(false)
+  const isToday = ds === today()
+  const label = formatFull(ds)
+  const pendingTasks  = projectTasks.filter(t => t.status !== 'done')
+  const pendingNotes  = notes.filter(n => !n.done)
+  const doneNotes     = notes.filter(n => n.done)
 
   return (
-    <div>
-      {/* Month nav */}
-      <div className="flex items-center justify-between mb-5">
-        <button onClick={() => setCurrent(c => {
-          const d = new Date(c.year, c.month - 1)
-          return { year: d.getFullYear(), month: d.getMonth() }
-        })} className="p-1.5 rounded-lg transition-all" style={{ color: '#6e6e73' }}
-          onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
-          onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}>
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        <span className="text-sm font-semibold" style={{ color: '#f5f5f7' }}>
-          {MONTHS[current.month]} {current.year}
-        </span>
-        <button onClick={() => setCurrent(c => {
-          const d = new Date(c.year, c.month + 1)
-          return { year: d.getFullYear(), month: d.getMonth() }
-        })} className="p-1.5 rounded-lg transition-all" style={{ color: '#6e6e73' }}
-          onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
-          onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}>
-          <ChevronRight className="w-4 h-4" />
+    <div style={{
+      width: 300, minWidth: 300, flexShrink: 0,
+      background: '#0a0a0a',
+      borderLeft: '1px solid rgba(255,255,255,0.07)',
+      display: 'flex', flexDirection: 'column',
+      borderRadius: '0 20px 20px 0',
+    }}>
+      {/* Header */}
+      <div className="px-5 py-4 flex items-start justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span style={{ fontSize: 26, fontWeight: 900, color: '#f5f5f7', letterSpacing: '-0.03em', lineHeight: 1 }}>
+              {parseInt(ds.split('-')[2])}
+            </span>
+            {isToday && (
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: '#f5f5f7', color: '#000', fontWeight: 700 }}>Hoy</span>
+            )}
+          </div>
+          <p style={{ fontSize: 11, color: '#4a4a4a', fontWeight: 500, textTransform: 'capitalize' }}>{label}</p>
+          {(pendingTasks.length > 0 || pendingNotes.length > 0) && (
+            <p style={{ fontSize: 11, color: '#6e6e73', marginTop: 4 }}>
+              {pendingTasks.length + pendingNotes.length} pendiente{pendingTasks.length + pendingNotes.length !== 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
+        <button onClick={onClose}
+          className="w-7 h-7 rounded-full flex items-center justify-center transition-all"
+          style={{ color: '#3a3a3a', background: 'rgba(255,255,255,0.04)' }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#3a3a3a'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}>
+          <X size={13} />
         </button>
       </div>
 
-      {/* Grid */}
-      <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
-        {/* Day headers */}
-        <div className="grid grid-cols-7 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-          {DAYS.map(d => (
-            <div key={d} className="py-2 text-center text-xs font-medium" style={{ color: '#6e6e73' }}>{d}</div>
-          ))}
-        </div>
+      <div className="flex-1 overflow-y-auto px-4 py-4" style={{ maxHeight: 'calc(100vh - 260px)' }}>
 
-        {/* Cells */}
-        <div className="grid grid-cols-7">
-          {cells.map((day, i) => {
-            const tasks = day ? tasksByDay(day) : []
-            const pending = tasks.filter(t => t.status !== 'done')
-            return (
-              <div
-                key={i}
-                className="min-h-[72px] p-1.5 relative"
-                style={{
-                  borderRight: (i + 1) % 7 !== 0 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                  borderBottom: i < cells.length - 7 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                }}
+        {/* Project tasks */}
+        {projectTasks.length > 0 && (
+          <div className="mb-5">
+            <p style={{ fontSize: 10, fontWeight: 600, color: '#3a3a3a', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Tareas de proyecto</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {projectTasks.map(task => (
+                <button
+                  key={task.id}
+                  onClick={() => onNavigate(task.projectId)}
+                  className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all group w-full"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                >
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: PRIORITY_COLOR[task.priority] ?? '#6e6e73', flexShrink: 0, marginTop: 4 }} />
+                  <div className="flex-1 min-w-0">
+                    <p style={{ fontSize: 12, color: task.status === 'done' ? '#3a3a3a' : '#f5f5f7', fontWeight: 500, textDecoration: task.status === 'done' ? 'line-through' : 'none' }} className="truncate">
+                      {task.title}
+                    </p>
+                    <p style={{ fontSize: 10, color: '#3a3a3a', marginTop: 1 }}>{task.projectName}</p>
+                  </div>
+                  <ExternalLink size={10} style={{ color: '#3a3a3a', flexShrink: 0, marginTop: 3 }} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Personal notes */}
+        <div>
+          <p style={{ fontSize: 10, fontWeight: 600, color: '#3a3a3a', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Notas personales</p>
+
+          {notes.length === 0 && !adding && (
+            <p style={{ fontSize: 11, color: '#3a3a3a', marginBottom: 8 }}>Sin notas para este día</p>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {[...pendingNotes, ...doneNotes].map(note => (
+              <div key={note.id}
+                className="group flex items-start gap-2 rounded-lg px-2 py-1.5 transition-all"
+                style={{ background: 'transparent' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
-                {day && (
-                  <>
-                    <span
-                      className="text-xs w-5 h-5 flex items-center justify-center rounded-full mb-1 font-medium"
-                      style={{
-                        backgroundColor: isToday(day) ? '#f5f5f7' : 'transparent',
-                        color: isToday(day) ? '#000' : pending.length > 0 ? '#f5f5f7' : '#3a3a3a',
-                      }}
-                    >
-                      {day}
-                    </span>
-                    <div className="space-y-0.5">
-                      {tasks.slice(0, 3).map(t => (
-                        <button
-                          key={t.id}
-                          onClick={() => onNavigate(t.projectId)}
-                          className="w-full text-left px-1.5 py-0.5 rounded text-xs truncate transition-all"
-                          style={{
-                            backgroundColor: t.status === 'done' ? 'rgba(255,255,255,0.04)' : `${PRIORITY_DOT[t.priority]}22`,
-                            color: t.status === 'done' ? '#3a3a3a' : '#f5f5f7',
-                            textDecoration: t.status === 'done' ? 'line-through' : 'none',
-                          }}
-                          title={`${t.title} · ${t.projectName}`}
-                        >
-                          {t.title}
-                        </button>
-                      ))}
-                      {tasks.length > 3 && (
-                        <p className="text-xs px-1" style={{ color: '#6e6e73' }}>+{tasks.length - 3} más</p>
-                      )}
-                    </div>
-                  </>
-                )}
+                <button
+                  onClick={() => onToggleNote(note.id, note.done)}
+                  className="w-4 h-4 rounded flex items-center justify-center shrink-0 mt-0.5 transition-all"
+                  style={{ border: `1.5px solid ${note.done ? '#f5f5f7' : 'rgba(255,255,255,0.2)'}`, background: note.done ? '#f5f5f7' : 'transparent' }}
+                >
+                  {note.done && <Check size={9} color="#000" strokeWidth={3} />}
+                </button>
+                <span style={{ flex: 1, fontSize: 12, color: note.done ? '#3a3a3a' : '#f5f5f7', textDecoration: note.done ? 'line-through' : 'none', fontWeight: 500, wordBreak: 'break-word' }}>
+                  {note.text}
+                </span>
+                <button
+                  onClick={() => onDeleteNote(note.id)}
+                  className="w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                  style={{ color: '#3a3a3a' }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#ff453a'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#3a3a3a'}
+                >
+                  <Trash2 size={10} />
+                </button>
               </div>
-            )
-          })}
+            ))}
+          </div>
+
+          {adding && (
+            <AddNoteInput onAdd={t => { onAddNote(ds, t); setAdding(false) }} onCancel={() => setAdding(false)} />
+          )}
         </div>
+      </div>
+
+      {/* Add button */}
+      <div className="px-4 pb-4 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <button
+          onClick={() => setAdding(true)}
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs transition-all"
+          style={{ background: adding ? 'rgba(255,255,255,0.04)' : '#f5f5f7', color: adding ? '#6e6e73' : '#000', fontWeight: 700, border: adding ? '1px dashed rgba(255,255,255,0.1)' : 'none' }}
+        >
+          <Plus size={13} />
+          Añadir nota
+        </button>
       </div>
     </div>
   )
 }
 
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function Agenda() {
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
+  const { user }  = useAuth()
+  const now       = new Date()
+
+  const [year, setYear]       = useState(now.getFullYear())
+  const [month, setMonth]     = useState(now.getMonth())
   const [projects, setProjects] = useState([])
+  const [notes, setNotes]     = useState([])   // calendar_notes for current month
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('active')
-  const [view, setView] = useState('list')
-  const [assigneeFilter, setAssigneeFilter] = useState('')
+  const [selected, setSelected] = useState(dateKey(now.getFullYear(), now.getMonth(), now.getDate()))
 
-  useEffect(() => { fetchData() }, [])
+  // Derived
+  const firstDow   = (new Date(year, month, 1).getDay() + 6) % 7  // Mon=0
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const cells      = Array.from({ length: firstDow + daysInMonth }, (_, i) => i < firstDow ? null : i - firstDow + 1)
 
-  async function fetchData() {
+  const allProjectTasks = projects.flatMap(p =>
+    (p.tasks || []).filter(t => t.due_date).map(t => ({ ...t, projectId: p.id, projectName: p.name }))
+  )
+
+  function tasksByDay(ds) { return allProjectTasks.filter(t => t.due_date === ds) }
+  function notesByDay(ds)  { return notes.filter(n => n.date === ds).sort((a, b) => a.position - b.position) }
+
+  // Fetch
+  useEffect(() => { fetchAll() }, [year, month]) // eslint-disable-line
+
+  async function fetchAll() {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*, tasks(*, assignee:assignee_id(id, email, display_name))')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      toast.error('Error al cargar tareas')
-    } else {
-      setProjects(data || [])
-    }
+    const first = dateKey(year, month, 1)
+    const last  = dateKey(year, month, daysInMonth)
+    const [{ data: proj }, { data: n }] = await Promise.all([
+      supabase.from('projects').select('*, tasks(*)').order('created_at', { ascending: false }),
+      supabase.from('calendar_notes').select('*').eq('user_id', user.id).gte('date', first).lte('date', last).order('position'),
+    ])
+    setProjects(proj || [])
+    setNotes(n || [])
     setLoading(false)
   }
 
-  async function handleChangeStatus(projectId, taskId, newStatus) {
-    const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', taskId)
-    if (!error) {
-      setProjects(prev => prev.map(p =>
-        p.id === projectId
-          ? { ...p, tasks: p.tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t) }
-          : p
-      ))
-    }
+  // Notes CRUD
+  async function addNote(ds, text) {
+    const position = notes.filter(n => n.date === ds).length
+    const { data, error } = await supabase
+      .from('calendar_notes')
+      .insert({ user_id: user.id, date: ds, text, done: false, position })
+      .select().single()
+    if (!error && data) setNotes(prev => [...prev, data])
+    else if (error) toast.error('Error al guardar nota')
   }
 
-  function filterTasks(tasks) {
-    if (!tasks) return []
-    let filtered = tasks
-    if (filter === 'active') filtered = filtered.filter(t => t.status !== 'done' && t.status !== 'backlog')
-    else if (filter === 'todo') filtered = filtered.filter(t => t.status === 'todo')
-    else if (filter === 'in_progress') filtered = filtered.filter(t => t.status === 'in_progress')
-    if (assigneeFilter) filtered = filtered.filter(t => (t.assignee?.id || t.assignee_id) === assigneeFilter)
-    return filtered
+  async function toggleNote(id, done) {
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, done: !done } : n))
+    const { error } = await supabase.from('calendar_notes').update({ done: !done }).eq('id', id)
+    if (error) { toast.error('Error'); setNotes(prev => prev.map(n => n.id === id ? { ...n, done } : n)) }
   }
 
-  // Collect unique assignees across all projects
-  const allAssignees = []
-  const seenIds = new Set()
-  for (const p of projects) {
-    for (const t of (p.tasks || [])) {
-      if (t.assignee?.id && !seenIds.has(t.assignee.id)) {
-        seenIds.add(t.assignee.id)
-        allAssignees.push(t.assignee)
-      }
-    }
+  async function deleteNote(id) {
+    setNotes(prev => prev.filter(n => n.id !== id))
+    await supabase.from('calendar_notes').delete().eq('id', id)
   }
 
-  const STATUS_ORDER = { blocked: 0, at_risk: 1, on_track: 2 }
-  const visibleProjects = projects
-    .map(p => ({ ...p, filteredTasks: filterTasks(p.tasks).sort((a, b) => {
-      const [ao, ap, ad] = taskSortKey(a)
-      const [bo, bp, bd] = taskSortKey(b)
-      return ao - bo || ap - bp || ad - bd
-    })}))
-    .filter(p => p.filteredTasks.length > 0)
-    .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
+  // Navigation
+  function prevMonth() { if (month === 0) { setYear(y => y - 1); setMonth(11) } else setMonth(m => m - 1) }
+  function nextMonth() { if (month === 11) { setYear(y => y + 1); setMonth(0) } else setMonth(m => m + 1) }
+  function goToday()   { const n = new Date(); setYear(n.getFullYear()); setMonth(n.getMonth()); setSelected(dateKey(n.getFullYear(), n.getMonth(), n.getDate())) }
 
-  const totalActive = projects.reduce((acc, p) => acc + (p.tasks || []).filter(t => t.status !== 'done').length, 0)
-  const totalInProgress = projects.reduce((acc, p) => acc + (p.tasks || []).filter(t => t.status === 'in_progress').length, 0)
+  const todayKey = today()
+  const selectedTasks = selected ? tasksByDay(selected) : []
+  const selectedNotes = selected ? notesByDay(selected) : []
+
+  // Stats
+  const monthTasks  = allProjectTasks.filter(t => t.due_date >= dateKey(year, month, 1) && t.due_date <= dateKey(year, month, daysInMonth))
+  const pendingMonth = monthTasks.filter(t => t.status !== 'done').length
+  const overdueMonth = monthTasks.filter(t => isOverdue(t.due_date) && t.status !== 'done').length
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#000000' }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#000' }}>
       <NavBar />
 
-      <main className="max-w-3xl mx-auto px-6 py-12 page-enter">
+      <main className="max-w-5xl mx-auto px-6 py-10 page-enter">
+
         {/* Header */}
-        <div className="mb-8">
-          <p className="text-xs font-medium uppercase tracking-widest mb-2" style={{ color: '#3a3a3a' }}>
-            Vista global
-          </p>
-          <h1 className="text-4xl font-bold tracking-tight mb-3" style={{ color: '#f5f5f7', letterSpacing: '-0.02em' }}>
-            Agenda
-          </h1>
-          <div className="flex items-center gap-3 text-sm">
-            <span style={{ color: '#6e6e73' }}>{totalActive} tarea{totalActive !== 1 ? 's' : ''} pendiente{totalActive !== 1 ? 's' : ''}</span>
-            {totalInProgress > 0 && (
-              <>
-                <span style={{ color: '#3a3a3a' }}>·</span>
-                <span style={{ color: '#ff9f0a' }}>{totalInProgress} en progreso</span>
-              </>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-widest mb-2" style={{ color: '#3a3a3a' }}>Calendario</p>
+            <div className="flex items-center gap-2">
+              <button onClick={prevMonth}
+                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                style={{ color: '#6e6e73' }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#f5f5f7' }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6e6e73' }}>
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <h1 className="text-3xl font-bold tracking-tight" style={{ color: '#f5f5f7', letterSpacing: '-0.02em', minWidth: 240 }}>
+                {MONTHS[month]} <span style={{ color: '#4a4a4a' }}>{year}</span>
+              </h1>
+              <button onClick={nextMonth}
+                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                style={{ color: '#6e6e73' }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#f5f5f7' }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6e6e73' }}>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {overdueMonth > 0 && (
+              <span style={{ fontSize: 12, color: '#ff453a', fontWeight: 600 }}>
+                {overdueMonth} vencida{overdueMonth !== 1 ? 's' : ''}
+              </span>
+            )}
+            {pendingMonth > 0 && (
+              <span style={{ fontSize: 12, color: '#6e6e73', fontWeight: 500 }}>
+                {pendingMonth} pendiente{pendingMonth !== 1 ? 's' : ''} este mes
+              </span>
+            )}
+            <button
+              onClick={goToday}
+              className="text-xs px-3.5 py-1.5 rounded-xl transition-all font-medium"
+              style={{ background: 'rgba(255,255,255,0.08)', color: '#f5f5f7' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+            >
+              Hoy
+            </button>
+          </div>
+        </div>
+
+        {/* Calendar + panel */}
+        <div
+          className="flex rounded-2xl overflow-hidden"
+          style={{ border: '1px solid rgba(255,255,255,0.07)', background: '#111' }}
+        >
+          {/* Grid */}
+          <div className="flex-1 min-w-0">
+            {/* Day headers */}
+            <div className="grid grid-cols-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              {DAYS.map(d => (
+                <div key={d} className="py-2.5 text-center" style={{ fontSize: 10, fontWeight: 600, color: '#3a3a3a', letterSpacing: '0.08em' }}>
+                  {d.toUpperCase()}
+                </div>
+              ))}
+            </div>
+
+            {/* Cells */}
+            {loading ? (
+              <div className="flex items-center justify-center" style={{ height: 320 }}>
+                <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: '#3a3a3a', borderTopColor: '#f5f5f7' }} />
+              </div>
+            ) : (
+              <div className="grid grid-cols-7">
+                {cells.map((day, i) => {
+                  if (!day) return (
+                    <div key={i} style={{ minHeight: 80, borderRight: (i + 1) % 7 !== 0 ? '1px solid rgba(255,255,255,0.04)' : 'none', borderBottom: i < cells.length - 7 ? '1px solid rgba(255,255,255,0.04)' : 'none' }} />
+                  )
+
+                  const ds        = dateKey(year, month, day)
+                  const dayTasks  = tasksByDay(ds)
+                  const dayNotes  = notesByDay(ds)
+                  const isToday   = ds === todayKey
+                  const isSel     = ds === selected
+                  const hasPending = dayTasks.some(t => t.status !== 'done') || dayNotes.some(n => !n.done)
+                  const hasOverdue = dayTasks.some(t => isOverdue(t.due_date) && t.status !== 'done')
+
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => setSelected(isSel ? null : ds)}
+                      className="cursor-pointer transition-all"
+                      style={{
+                        minHeight: 80, padding: '8px 6px 6px',
+                        borderRight: (i + 1) % 7 !== 0 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                        borderBottom: i < cells.length - 7 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                        background: isSel ? 'rgba(255,255,255,0.05)' : isToday ? 'rgba(255,255,255,0.025)' : 'transparent',
+                      }}
+                      onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
+                      onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = isToday ? 'rgba(255,255,255,0.025)' : 'transparent' }}
+                    >
+                      {/* Day number */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          width: 22, height: 22, borderRadius: '50%',
+                          fontSize: 12, fontWeight: isToday ? 800 : hasPending ? 600 : 400,
+                          background: isToday ? '#f5f5f7' : 'transparent',
+                          color: isToday ? '#000' : hasPending ? '#f5f5f7' : '#3a3a3a',
+                        }}>
+                          {day}
+                        </span>
+                        {hasOverdue && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#ff453a' }} />}
+                      </div>
+
+                      {/* Task chips */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {dayTasks.slice(0, 2).map(t => (
+                          <div key={t.id} style={{
+                            fontSize: 9, fontWeight: 600, lineHeight: '13px',
+                            padding: '1px 5px', borderRadius: 4,
+                            background: t.status === 'done' ? 'rgba(255,255,255,0.04)' : `${PRIORITY_COLOR[t.priority] ?? '#6e6e73'}22`,
+                            color: t.status === 'done' ? '#3a3a3a' : '#f5f5f7',
+                            textDecoration: t.status === 'done' ? 'line-through' : 'none',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            borderLeft: `2px solid ${t.status === 'done' ? 'rgba(255,255,255,0.08)' : PRIORITY_COLOR[t.priority] ?? '#6e6e73'}`,
+                          }}>
+                            {t.title}
+                          </div>
+                        ))}
+                        {dayNotes.slice(0, dayTasks.length >= 2 ? 0 : 2 - dayTasks.length).map(n => (
+                          <div key={n.id} style={{
+                            fontSize: 9, fontWeight: 500, lineHeight: '13px',
+                            padding: '1px 5px', borderRadius: 4,
+                            background: 'rgba(255,255,255,0.04)',
+                            color: n.done ? '#3a3a3a' : '#6e6e73',
+                            textDecoration: n.done ? 'line-through' : 'none',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            borderLeft: '2px solid rgba(255,255,255,0.1)',
+                          }}>
+                            {n.text}
+                          </div>
+                        ))}
+                        {(dayTasks.length + dayNotes.length) > 2 && (
+                          <p style={{ fontSize: 9, color: '#3a3a3a', paddingLeft: 5 }}>+{dayTasks.length + dayNotes.length - 2} más</p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
-        </div>
 
-        {/* Controls */}
-        <div className="flex flex-wrap items-center gap-3 mb-8">
-          <div className="flex gap-0.5 w-fit rounded-xl p-1" style={{ backgroundColor: '#111111' }}>
-            {FILTERS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => { setFilter(key); setView('list') }}
-                className="px-3.5 py-1.5 text-sm rounded-lg transition-all font-medium"
-                style={{
-                  backgroundColor: view === 'list' && filter === key ? '#2a2a2a' : 'transparent',
-                  color: view === 'list' && filter === key ? '#f5f5f7' : '#6e6e73',
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {allAssignees.length > 0 && (
-            <select
-              value={assigneeFilter}
-              onChange={e => setAssigneeFilter(e.target.value)}
-              className="text-sm rounded-xl px-3 py-2 outline-none"
-              style={{
-                backgroundColor: '#111111',
-                color: assigneeFilter ? '#f5f5f7' : '#6e6e73',
-                border: assigneeFilter ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.04)',
-              }}
-            >
-              <option value="">Por persona</option>
-              {allAssignees.map(a => (
-                <option key={a.id} value={a.id}>{a.display_name || a.email}</option>
-              ))}
-            </select>
+          {/* Day panel */}
+          {selected && (
+            <DayPanel
+              ds={selected}
+              projectTasks={selectedTasks}
+              notes={selectedNotes}
+              onAddNote={addNote}
+              onToggleNote={toggleNote}
+              onDeleteNote={deleteNote}
+              onClose={() => setSelected(null)}
+              onNavigate={id => navigate(`/project/${id}`)}
+            />
           )}
+        </div>
 
-          <div className="flex gap-0.5 rounded-xl p-1 ml-auto" style={{ backgroundColor: '#111111' }}>
-            <button onClick={() => setView('list')}
-              className="p-1.5 rounded-lg transition-all"
-              style={{ backgroundColor: view === 'list' ? '#2a2a2a' : 'transparent', color: view === 'list' ? '#f5f5f7' : '#6e6e73' }}>
-              <List className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={() => setView('calendar')}
-              className="p-1.5 rounded-lg transition-all"
-              style={{ backgroundColor: view === 'calendar' ? '#2a2a2a' : 'transparent', color: view === 'calendar' ? '#f5f5f7' : '#6e6e73' }}>
-              <Calendar className="w-3.5 h-3.5" />
-            </button>
+        {/* Legend */}
+        <div className="flex items-center gap-4 mt-4">
+          {Object.entries(PRIORITY_COLOR).map(([k, c]) => (
+            <div key={k} className="flex items-center gap-1.5">
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: c + '44', borderLeft: `2px solid ${c}` }} />
+              <span style={{ fontSize: 10, color: '#3a3a3a', fontWeight: 500 }}>{PRIORITY_LABEL[k]}</span>
+            </div>
+          ))}
+          <div className="flex items-center gap-1.5">
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: 'rgba(255,255,255,0.04)', borderLeft: '2px solid rgba(255,255,255,0.1)' }} />
+            <span style={{ fontSize: 10, color: '#3a3a3a', fontWeight: 500 }}>Nota personal</span>
           </div>
         </div>
 
-        {/* Calendar view */}
-        {!loading && view === 'calendar' && (
-          <CalendarView projects={projects} onNavigate={id => navigate(`/project/${id}`)} />
-        )}
-
-        {/* List view */}
-        {view === 'list' && loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#6e6e73' }} />
-          </div>
-        ) : view === 'list' && visibleProjects.length === 0 ? (
-          <div className="rounded-2xl py-20 text-center" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center" style={{ backgroundColor: 'rgba(48,209,88,0.08)', border: '1px solid rgba(48,209,88,0.18)' }}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#30d158" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path className="milestone-tick" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <p className="font-semibold mb-1.5 text-sm" style={{ color: '#f5f5f7' }}>Todo al día</p>
-            <p className="text-sm" style={{ color: '#6e6e73' }}>No hay tareas pendientes con este filtro</p>
-          </div>
-        ) : view === 'list' ? (
-          <div className="space-y-8">
-            {visibleProjects.map(project => (
-              <div key={project.id}>
-                {/* Project header */}
-                <button
-                  onClick={() => navigate(`/project/${project.id}`)}
-                  className="w-full flex items-center justify-between gap-3 mb-3 group"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <h2 className="font-semibold text-base truncate transition-colors"
-                      style={{ color: '#f5f5f7' }}
-                      onMouseEnter={e => e.target.style.color = '#6e6e73'}
-                      onMouseLeave={e => e.target.style.color = '#f5f5f7'}
-                    >
-                      {project.name}
-                    </h2>
-                    <StatusBadge status={project.status} />
-                    <span className="text-xs shrink-0" style={{ color: '#6e6e73' }}>
-                      {project.type === 'maintenance' ? 'Mant.' : 'Impl.'}
-                    </span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 shrink-0 opacity-0 group-hover:opacity-100 transition-all"
-                    style={{ color: '#6e6e73' }} />
-                </button>
-
-                {/* Tasks */}
-                <div className="space-y-1.5">
-                  {project.filteredTasks.map(task => {
-                    const p = PRIORITY_CONFIG[task.priority]
-                    const isDone = task.status === 'done'
-                    const overdue = isOverdue(task.due_date) && !isDone
-
-                    return (
-                      <div
-                        key={task.id}
-                        className="flex items-start gap-3 px-4 py-3 rounded-xl transition-all"
-                        style={{
-                          backgroundColor: '#111111',
-                          border: '1px solid rgba(255,255,255,0.06)',
-                          opacity: isDone ? 0.45 : 1,
-                        }}
-                      >
-                        <StatusDot
-                          status={task.status}
-                          onChange={s => handleChangeStatus(project.id, task.id, s)}
-                        />
-
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm" style={{
-                            color: isDone ? '#6e6e73' : '#f5f5f7',
-                            textDecoration: isDone ? 'line-through' : 'none',
-                          }}>
-                            {task.title}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
-                              style={{ backgroundColor: p.bg, color: p.color, border: `1px solid ${p.border}` }}>
-                              {p.label}
-                            </span>
-                            {task.status === 'in_progress' && (
-                              <span className="text-xs" style={{ color: '#ff9f0a' }}>En progreso</span>
-                            )}
-                            {task.due_date && (
-                              <span className="flex items-center gap-1 text-xs"
-                                style={{ color: overdue ? '#ff453a' : '#6e6e73' }}>
-                                <Calendar className="w-3 h-3" />
-                                {formatDate(task.due_date)}
-                                {overdue && ' · Vencida'}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
       </main>
     </div>
   )
