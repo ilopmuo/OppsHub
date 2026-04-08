@@ -465,6 +465,7 @@ export default function ProjectDetail() {
                 )}
               </>
             )}
+          <ProjectDetailReports project={project} tasks={tasks} milestones={milestones} />
           </div>
 
           {/* ── RIGHT: Sidebar ── */}
@@ -618,8 +619,6 @@ export default function ProjectDetail() {
             <ActivityLog projectId={id} />
           </div>
         </div>
-
-        <ProjectDetailReports project={project} tasks={tasks} milestones={milestones} />
       </main>
 
       {showTaskModal && (
