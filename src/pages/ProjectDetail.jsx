@@ -449,7 +449,7 @@ export default function ProjectDetail() {
                         : 'Sin tareas'}
                     </p>
                     {filter !== 'done' && (
-                      <button onClick={() => openAddTask('todo')} className="mt-3 text-sm transition-colors"
+                      <button onClick={() => openAddTask(filter === 'all' ? 'todo' : filter)} className="mt-3 text-sm transition-colors"
                         style={{ color: '#6e6e73' }}
                         onMouseEnter={e => e.target.style.color = '#f5f5f7'}
                         onMouseLeave={e => e.target.style.color = '#6e6e73'}>
