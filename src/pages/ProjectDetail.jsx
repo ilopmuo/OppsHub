@@ -115,10 +115,15 @@ export default function ProjectDetail() {
       ? await supabase.from('profiles').select('id, email, display_name, avatar_url').in('id', userIds)
       : { data: [] }
     const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]))
+    const seen = new Set()
     const all = [
       owner ? owner : null,
       ...(pm || []).map(m => profileMap[m.user_id]).filter(Boolean),
-    ].filter(Boolean)
+    ].filter(Boolean).filter(m => {
+      if (seen.has(m.id)) return false
+      seen.add(m.id)
+      return true
+    })
     setMembers(all)
   }
 
