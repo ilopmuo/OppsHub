@@ -84,11 +84,9 @@ const BG     = '#111111'
 
 function HabitHeatmap({ habits, allLogs, TODAY }) {
   const [tooltip, setTooltip] = useState(null)
-  const WEEKS = 52, CELL = 11, GAP = 2
-  const totalW = WEEKS * (CELL + GAP)
-  const totalH = 7 * (CELL + GAP) + 20
+  const CELL = 11, GAP = 2
 
-  const heatStart = new Date(); heatStart.setDate(heatStart.getDate() - WEEKS * 7 + 1)
+  const heatStart = new Date(); heatStart.setDate(heatStart.getDate() - 52 * 7 + 1)
   const heatStartStr = dateStr(heatStart)
 
   const heatData = {}
@@ -103,10 +101,14 @@ function HabitHeatmap({ habits, allLogs, TODAY }) {
     cursor.setDate(cursor.getDate() + 1)
   }
 
+  // Align grid start to Monday, then calculate enough weeks to reach TODAY
+  const gridStart = new Date(heatStart)
+  gridStart.setDate(gridStart.getDate() - (gridStart.getDay() + 6) % 7)
+  const weeksNeeded = Math.ceil((new Date() - gridStart) / (7 * 86400000)) + 1
+
   const weeks = []
-  const sc = new Date(heatStart)
-  sc.setDate(sc.getDate() - (sc.getDay() + 6) % 7) // align to Monday
-  for (let w = 0; w < WEEKS; w++) {
+  const sc = new Date(gridStart)
+  for (let w = 0; w < weeksNeeded; w++) {
     const col = []
     for (let d = 0; d < 7; d++) {
       const ds = dateStr(sc)
@@ -116,6 +118,9 @@ function HabitHeatmap({ habits, allLogs, TODAY }) {
     }
     weeks.push(col)
   }
+
+  const totalW = weeksNeeded * (CELL + GAP)
+  const totalH = 7 * (CELL + GAP) + 20
 
   const monthLabels = []
   weeks.forEach((col, wi) => {
@@ -129,9 +134,6 @@ function HabitHeatmap({ habits, allLogs, TODAY }) {
   return (
     <div style={{ backgroundColor: '#111', borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px' }}>
       <p style={{ fontSize: 11, fontWeight: 600, color: '#6e6e73', marginBottom: 12 }}>Actividad anual</p>
-      <p style={{ fontSize: 10, color: '#ff9f0a', marginBottom: 8 }}>
-        DEBUG — hábitos: {habits.length} | logs: {allLogs.length} | días con datos: {Object.keys(heatData).length} | días con color: {Object.values(heatData).filter(d => d.pct > 0).length}
-      </p>
       <div style={{ overflowX: 'auto' }}>
         <svg width={totalW} height={totalH} style={{ display: 'block' }}>
           {monthLabels.map(({ wi, label }) => (
