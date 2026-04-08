@@ -32,6 +32,7 @@ export default function NewTaskModal({ projectId, defaultStatus = 'todo', member
     e.preventDefault()
     if (!title.trim()) return
     setSaving(true)
+    const finalAssigneeId = assigneeId || user.id
     const { data, error } = await supabase
       .from('tasks')
       .insert({
@@ -43,11 +44,16 @@ export default function NewTaskModal({ projectId, defaultStatus = 'todo', member
         due_date: dueDate || null,
         status: defaultStatus,
         done: defaultStatus === 'done',
-        assignee_id: assigneeId || user.id,
+        assignee_id: finalAssigneeId,
       })
-      .select('*, assignee:assignee_id(id, email, display_name)')
+      .select('*')
       .single()
-    if (error) { toast.error('Error al crear la tarea') } else { onCreated(data) }
+    if (error) {
+      toast.error('Error al crear la tarea')
+    } else {
+      const assignee = members.find(m => m.id === finalAssigneeId) || null
+      onCreated({ ...data, assignee })
+    }
     setSaving(false)
   }
 
