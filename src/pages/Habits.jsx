@@ -899,8 +899,8 @@ export default function Habits() {
                             <rect x={x} y={PAD.t} width={barW} height={chartH} rx="3" fill="rgba(255,255,255,0.03)" />
                             {sched > 0 && <rect x={x} y={y} width={barW} height={Math.max(barH, 0)} rx="3" fill={`rgba(48,209,88,${sched === 0 ? 0.08 : 0.15 + (pct / 100) * 0.75})`} />}
                             <text x={x + barW / 2} y={H - 6} textAnchor="middle" fontSize="8" fill={sched > 0 ? '#6e6e73' : '#3a3a3a'}>{label}</text>
-                            {sched > 0 && (
-                              <text x={x + barW / 2} y={y - 3} textAnchor="middle" fontSize="7" fill="#4a4a4a">{done}/{sched}</text>
+                            {sched > 0 && pct > 0 && (
+                              <text x={x + barW / 2} y={y - 3} textAnchor="middle" fontSize="7" fill="#4a4a4a">{pct}%</text>
                             )}
                           </g>
                         )
