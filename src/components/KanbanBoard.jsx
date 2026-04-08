@@ -33,26 +33,23 @@ function isOverdue(date) {
   return new Date(date + 'T00:00:00') < new Date(new Date().toDateString())
 }
 
-/* ── Card ── */
-function KanbanCard({ task, onDelete, onClickTask, wasDraggingRef, overlay = false }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
+/* ── Card content (pure UI, no dnd hooks) ── */
+function CardContent({ task, isOverlay = false, onDelete, onClickTask, wasDraggingRef,
+  dragRef, dragAttributes, dragListeners, isDragging }) {
   const p = PRIORITY_CONFIG[task.priority]
-
   return (
     <div
-      ref={overlay ? undefined : setNodeRef}
-      {...(overlay ? {} : attributes)}
-      {...(overlay ? {} : listeners)}
-      onClick={() => { if (!overlay && !wasDraggingRef?.current) onClickTask?.(task) }}
+      ref={dragRef}
+      {...dragAttributes}
+      {...dragListeners}
+      onClick={() => { if (!isOverlay && !wasDraggingRef?.current) onClickTask?.(task) }}
       className="group rounded-xl p-3.5 select-none"
       style={{
-        transform: overlay ? undefined : CSS.Transform.toString(transform),
-        transition: overlay ? undefined : transition,
         opacity: isDragging ? 0.35 : 1,
-        cursor: overlay ? 'grabbing' : 'grab',
-        backgroundColor: overlay ? '#222' : '#1a1a1a',
-        border: `1px solid ${overlay ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.07)'}`,
-        boxShadow: overlay ? '0 12px 40px rgba(0,0,0,0.6)' : 'none',
+        cursor: isOverlay ? 'grabbing' : 'grab',
+        backgroundColor: isOverlay ? '#222' : '#1a1a1a',
+        border: `1px solid ${isOverlay ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.07)'}`,
+        boxShadow: isOverlay ? '0 12px 40px rgba(0,0,0,0.6)' : 'none',
         touchAction: 'none',
       }}
     >
@@ -63,10 +60,10 @@ function KanbanCard({ task, onDelete, onClickTask, wasDraggingRef, overlay = fal
         }}>
           {task.title}
         </p>
-        {task.description && !overlay && (
+        {task.description && !isOverlay && (
           <p className="text-xs mt-0.5 line-clamp-2" style={{ color: '#6e6e73' }}>{task.description}</p>
         )}
-        {!overlay && (
+        {!isOverlay && (
           <button
             onPointerDown={e => e.stopPropagation()}
             onClick={e => { e.stopPropagation(); onDelete(task.id) }}
@@ -100,6 +97,30 @@ function KanbanCard({ task, onDelete, onClickTask, wasDraggingRef, overlay = fal
       </div>
     </div>
   )
+}
+
+/* ── Sortable card (with dnd hooks) ── */
+function KanbanCard({ task, onDelete, onClickTask, wasDraggingRef }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
+  return (
+    <div style={{ transform: CSS.Transform.toString(transform), transition }}>
+      <CardContent
+        task={task}
+        dragRef={setNodeRef}
+        dragAttributes={attributes}
+        dragListeners={listeners}
+        isDragging={isDragging}
+        onDelete={onDelete}
+        onClickTask={onClickTask}
+        wasDraggingRef={wasDraggingRef}
+      />
+    </div>
+  )
+}
+
+/* ── Overlay card (no dnd hooks) ── */
+function KanbanCardOverlay({ task }) {
+  return <CardContent task={task} isOverlay />
 }
 
 /* ── Column ── */
@@ -230,7 +251,7 @@ export default function KanbanBoard({ tasks, onUpdateStatus, onDelete, onAddTask
       </div>
 
       <DragOverlay>
-        {activeTask && <KanbanCard task={activeTask} overlay />}
+        {activeTask && <KanbanCardOverlay task={activeTask} />}
       </DragOverlay>
     </DndContext>
   )
