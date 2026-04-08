@@ -36,6 +36,54 @@ function isScheduled(habit, day) {
   return habit.type === 'daily' || (habit.days_of_week || []).includes(day.getDay())
 }
 
+// ── Streak helpers ────────────────────────────────────────────────────────────
+function computeStreaks(habit, allLogs, todayStr) {
+  const done = new Set(allLogs.filter(l => l.habit_id === habit.id && l.completed).map(l => l.date))
+  const limit = new Date(); limit.setFullYear(limit.getFullYear() - 1)
+
+  // Current streak: walk backwards from today
+  let current = 0
+  const cursor = new Date()
+  while (cursor >= limit) {
+    const ds = dateStr(cursor)
+    if (isScheduled(habit, cursor)) {
+      if (done.has(ds)) { current++ }
+      else if (ds < todayStr) { break }
+    }
+    cursor.setDate(cursor.getDate() - 1)
+  }
+
+  // Best streak: walk forward through all past days
+  let best = 0, run = 0
+  const start = new Date(limit)
+  const fwd = new Date(start)
+  while (dateStr(fwd) <= todayStr) {
+    const ds = dateStr(fwd)
+    if (isScheduled(habit, fwd)) {
+      if (done.has(ds)) { run++; best = Math.max(best, run) }
+      else if (ds < todayStr) { run = 0 }
+    }
+    fwd.setDate(fwd.getDate() + 1)
+  }
+
+  return { current, best }
+}
+
+// at-risk: scheduled today and not completed
+function isAtRisk(habit, allLogs, todayStr) {
+  const done = new Set(allLogs.filter(l => l.habit_id === habit.id && l.completed).map(l => l.date))
+  const today = new Date()
+  if (isScheduled(habit, today) && !done.has(todayStr)) return true
+  return false
+}
+
+// streak broken: scheduled yesterday and missed
+function isStreakBroken(habit, allLogs, todayStr) {
+  const done = new Set(allLogs.filter(l => l.habit_id === habit.id && l.completed).map(l => l.date))
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
+  return isScheduled(habit, yesterday) && !done.has(dateStr(yesterday))
+}
+
 const COL_W  = 38   // px per day column
 const NAME_W = 200  // px for habit name column
 const BG     = '#111111'
@@ -47,6 +95,7 @@ export default function Habits() {
   const [month, setMonth]       = useState(now.getMonth())
   const [habits, setHabits]     = useState([])
   const [logs, setLogs]         = useState([])
+  const [allLogs, setAllLogs]   = useState([])
   const [loading, setLoading]   = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editHabit, setEditHabit] = useState(null)
@@ -57,6 +106,7 @@ export default function Habits() {
   const TODAY      = dateStr(now)
 
   useEffect(() => { fetchData() }, [year, month]) // eslint-disable-line
+  useEffect(() => { fetchAllLogs() }, [])         // eslint-disable-line
 
   async function fetchData() {
     setLoading(true)
@@ -69,6 +119,14 @@ export default function Habits() {
     setHabits(h || [])
     setLogs(l || [])
     setLoading(false)
+  }
+
+  async function fetchAllLogs() {
+    const since = new Date(); since.setFullYear(since.getFullYear() - 1)
+    const { data } = await supabase
+      .from('habit_logs').select('*')
+      .gte('date', dateStr(since)).eq('completed', true)
+    setAllLogs(data || [])
   }
 
   function getLog(habitId, day) {
@@ -92,14 +150,19 @@ export default function Habits() {
     const existing = logs.find(l => l.habit_id === habit.id && l.date === ds)
     if (existing?.completed) {
       setLogs(p => p.filter(l => !(l.habit_id === habit.id && l.date === ds)))
+      setAllLogs(p => p.filter(l => !(l.habit_id === habit.id && l.date === ds)))
       supabase.from('habit_logs').delete().eq('habit_id', habit.id).eq('date', ds)
     } else {
       const tmp = { id: `tmp-${habit.id}-${ds}`, habit_id: habit.id, user_id: user.id, date: ds, completed: true }
       setLogs(p => [...p.filter(l => !(l.habit_id === habit.id && l.date === ds)), tmp])
+      setAllLogs(p => [...p.filter(l => !(l.habit_id === habit.id && l.date === ds)), tmp])
       const { data } = await supabase.from('habit_logs')
         .upsert({ habit_id: habit.id, user_id: user.id, date: ds, completed: true }, { onConflict: 'habit_id,date' })
         .select().single()
-      if (data) setLogs(p => [...p.filter(l => l.id !== tmp.id && !(l.habit_id === habit.id && l.date === ds)), data])
+      if (data) {
+        setLogs(p => [...p.filter(l => l.id !== tmp.id && !(l.habit_id === habit.id && l.date === ds)), data])
+        setAllLogs(p => [...p.filter(l => l.id !== tmp.id && !(l.habit_id === habit.id && l.date === ds)), data])
+      }
     }
   }
 
@@ -109,6 +172,7 @@ export default function Habits() {
     if (!error) {
       setHabits(p => p.filter(h => h.id !== habit.id))
       setLogs(p => p.filter(l => l.habit_id !== habit.id))
+      setAllLogs(p => p.filter(l => l.habit_id !== habit.id))
       toast.success('Hábito eliminado')
     }
   }
@@ -208,6 +272,48 @@ export default function Habits() {
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fff'}
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f5f5f7'}
               ><Plus className="w-4 h-4" /> Nuevo hábito</button>
+            </div>
+          )
+        })()}
+
+        {/* ── Stats pills ── */}
+        {!loading && habits.length > 0 && (() => {
+          const perfectDays = days.filter(d => {
+            const ds = dateStr(d)
+            if (ds > TODAY) return false
+            const scheduled = habits.filter(h => isScheduled(h, d))
+            if (!scheduled.length) return false
+            return scheduled.every(h => logs.some(l => l.habit_id === h.id && l.date === ds && l.completed))
+          }).length
+          const atRiskCount = habits.filter(h => isAtRisk(h, allLogs, TODAY)).length
+          const brokenCount = habits.filter(h => isStreakBroken(h, allLogs, TODAY)).length
+          return (
+            <div className="flex items-center gap-3 mb-6">
+              <div style={{ backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 18 }}>⭐</span>
+                <div>
+                  <p style={{ fontSize: 20, fontWeight: 800, color: '#f5f5f7', lineHeight: 1 }}>{perfectDays}</p>
+                  <p style={{ fontSize: 10, color: '#3a3a3a', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 2 }}>Días perfectos</p>
+                </div>
+              </div>
+              {atRiskCount > 0 && (
+                <div style={{ backgroundColor: '#111', border: '1px solid rgba(255,180,0,0.2)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 18 }}>⚠️</span>
+                  <div>
+                    <p style={{ fontSize: 20, fontWeight: 800, color: '#ff9f0a', lineHeight: 1 }}>{atRiskCount}</p>
+                    <p style={{ fontSize: 10, color: '#3a3a3a', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 2 }}>Pendientes hoy</p>
+                  </div>
+                </div>
+              )}
+              {brokenCount > 0 && (
+                <div style={{ backgroundColor: '#111', border: '1px solid rgba(255,69,58,0.2)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 18 }}>💔</span>
+                  <div>
+                    <p style={{ fontSize: 20, fontWeight: 800, color: '#ff453a', lineHeight: 1 }}>{brokenCount}</p>
+                    <p style={{ fontSize: 10, color: '#3a3a3a', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 2 }}>Rachas rotas</p>
+                  </div>
+                </div>
+              )}
             </div>
           )
         })()}
@@ -412,6 +518,8 @@ export default function Habits() {
                 {habits.map((habit, hi) => {
                   const isHovered = hovered === habit.id
                   const isLast    = hi === habits.length - 1
+                  const atRisk    = isAtRisk(habit, allLogs, TODAY)
+                  const broken    = isStreakBroken(habit, allLogs, TODAY)
                   return (
                     <tr
                       key={habit.id}
@@ -434,8 +542,10 @@ export default function Habits() {
                             <span style={{
                               fontSize: 13, color: '#f5f5f7',
                               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                              maxWidth: 110,
+                              maxWidth: 90,
                             }}>{habit.name}</span>
+                            {broken && <span title="Racha rota ayer" style={{ fontSize: 11, lineHeight: 1 }}>💔</span>}
+                            {!broken && atRisk && <span title="Pendiente hoy" style={{ fontSize: 11, lineHeight: 1 }}>⚠️</span>}
                           </div>
 
                           {/* Edit / delete shown on row hover */}
@@ -684,6 +794,125 @@ export default function Habits() {
                   </div>
 
                 </div>
+
+                {/* ── Second row: Rachas + Heatmap ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginTop: 12 }}>
+
+                  {/* ── Chart 4: Rachas por hábito ── */}
+                  <div style={{ backgroundColor: BG2, borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px' }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: '#6e6e73', marginBottom: 14 }}>Rachas</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {habits.map(h => {
+                        const { current, best } = computeStreaks(h, allLogs, TODAY)
+                        return (
+                          <div key={h.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: h.color, flexShrink: 0 }} />
+                              <span style={{ fontSize: 11, color: '#f5f5f7', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>{h.name}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                              <div style={{ textAlign: 'center' }}>
+                                <p style={{ fontSize: 14, fontWeight: 800, color: current > 0 ? '#f5f5f7' : '#3a3a3a', lineHeight: 1 }}>{current}</p>
+                                <p style={{ fontSize: 8, color: '#3a3a3a', marginTop: 1 }}>actual</p>
+                              </div>
+                              <div style={{ width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+                              <div style={{ textAlign: 'center' }}>
+                                <p style={{ fontSize: 14, fontWeight: 800, color: '#4a4a4a', lineHeight: 1 }}>{best}</p>
+                                <p style={{ fontSize: 8, color: '#3a3a3a', marginTop: 1 }}>récord</p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* ── Chart 5: Heatmap anual ── */}
+                  {(() => {
+                    const WEEKS = 52
+                    const CELL  = 11
+                    const GAP   = 2
+                    const totalW = WEEKS * (CELL + GAP)
+                    const totalH = 7 * (CELL + GAP) + 20
+
+                    // Build map: date → pct
+                    const heatData = {}
+                    const heatStart = new Date(); heatStart.setDate(heatStart.getDate() - WEEKS * 7 + 1)
+
+                    const cursor2 = new Date(heatStart)
+                    while (dateStr(cursor2) <= TODAY) {
+                      const ds = dateStr(cursor2)
+                      const scheduled = habits.filter(h => isScheduled(h, cursor2))
+                      if (scheduled.length) {
+                        const done = scheduled.filter(h => allLogs.some(l => l.habit_id === h.id && l.date === ds && l.completed)).length
+                        heatData[ds] = done / scheduled.length
+                      }
+                      cursor2.setDate(cursor2.getDate() + 1)
+                    }
+
+                    // Build week columns (Mon=0 at top)
+                    const weeks = []
+                    const startCursor = new Date(heatStart)
+                    // Align to Monday
+                    const startDow = (startCursor.getDay() + 6) % 7
+                    startCursor.setDate(startCursor.getDate() - startDow)
+                    for (let w = 0; w < WEEKS; w++) {
+                      const col = []
+                      for (let d = 0; d < 7; d++) {
+                        const ds = dateStr(startCursor)
+                        col.push({ ds, pct: heatData[ds] ?? null, isFuture: ds > TODAY, isOutRange: ds < dateStr(heatStart) })
+                        startCursor.setDate(startCursor.getDate() + 1)
+                      }
+                      weeks.push(col)
+                    }
+
+                    // Month labels
+                    const monthLabels = []
+                    weeks.forEach((col, wi) => {
+                      const firstReal = col.find(c => !c.isOutRange && !c.isFuture)
+                      if (firstReal) {
+                        const d = new Date(firstReal.ds)
+                        if (d.getDate() <= 7) monthLabels.push({ wi, label: MONTH_NAMES[d.getMonth()].slice(0, 3) })
+                      }
+                    })
+
+                    return (
+                      <div style={{ backgroundColor: BG2, borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px' }}>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: '#6e6e73', marginBottom: 12 }}>Actividad anual</p>
+                        <div style={{ overflowX: 'auto' }}>
+                          <svg width={totalW} height={totalH} style={{ display: 'block' }}>
+                            {/* Month labels */}
+                            {monthLabels.map(({ wi, label }) => (
+                              <text key={wi} x={wi * (CELL + GAP)} y={10} fontSize="8" fill="#3a3a3a">{label}</text>
+                            ))}
+                            {/* Cells */}
+                            {weeks.map((col, wi) =>
+                              col.map(({ ds, pct, isFuture, isOutRange }, di) => {
+                                const x = wi * (CELL + GAP)
+                                const y = 14 + di * (CELL + GAP)
+                                let fill = 'rgba(255,255,255,0.04)'
+                                if (!isFuture && !isOutRange && pct !== null) {
+                                  const alpha = pct === 0 ? 0.06 : 0.1 + pct * 0.7
+                                  fill = `rgba(245,245,247,${alpha.toFixed(2)})`
+                                }
+                                return <rect key={ds} x={x} y={y} width={CELL} height={CELL} rx="2" fill={fill} />
+                              })
+                            )}
+                          </svg>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
+                          <span style={{ fontSize: 8, color: '#3a3a3a' }}>Menos</span>
+                          {[0.06, 0.2, 0.45, 0.65, 0.85].map((a, i) => (
+                            <div key={i} style={{ width: CELL, height: CELL, borderRadius: 2, backgroundColor: `rgba(245,245,247,${a})` }} />
+                          ))}
+                          <span style={{ fontSize: 8, color: '#3a3a3a' }}>Más</span>
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                </div>
+
               </div>
             )
           })()}
