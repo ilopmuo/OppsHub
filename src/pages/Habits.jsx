@@ -82,6 +82,120 @@ const COL_W  = 38   // px per day column
 const NAME_W = 200  // px for habit name column
 const BG     = '#111111'
 
+function HabitHeatmap({ habits, allLogs, TODAY }) {
+  const [tooltip, setTooltip] = useState(null)
+  const WEEKS = 52, CELL = 11, GAP = 2
+  const totalW = WEEKS * (CELL + GAP)
+  const totalH = 7 * (CELL + GAP) + 20
+
+  const heatStart = new Date(); heatStart.setDate(heatStart.getDate() - WEEKS * 7 + 1)
+  const heatStartStr = dateStr(heatStart)
+
+  const heatData = {}
+  const cursor = new Date(heatStart)
+  while (dateStr(cursor) <= TODAY) {
+    const ds = dateStr(cursor)
+    const scheduled = habits.filter(h => isScheduled(h, cursor))
+    if (scheduled.length) {
+      const done = scheduled.filter(h => allLogs.some(l => l.habit_id === h.id && l.date === ds)).length
+      heatData[ds] = { pct: done / scheduled.length, done, sched: scheduled.length }
+    }
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  const weeks = []
+  const sc = new Date(heatStart)
+  sc.setDate(sc.getDate() - (sc.getDay() + 6) % 7) // align to Monday
+  for (let w = 0; w < WEEKS; w++) {
+    const col = []
+    for (let d = 0; d < 7; d++) {
+      const ds = dateStr(sc)
+      const entry = heatData[ds]
+      col.push({ ds, pct: entry?.pct ?? null, done: entry?.done ?? 0, sched: entry?.sched ?? 0, isFuture: ds > TODAY, isOutRange: ds < heatStartStr })
+      sc.setDate(sc.getDate() + 1)
+    }
+    weeks.push(col)
+  }
+
+  const monthLabels = []
+  weeks.forEach((col, wi) => {
+    const firstReal = col.find(c => !c.isOutRange && !c.isFuture)
+    if (firstReal) {
+      const d = new Date(firstReal.ds + 'T00:00:00')
+      if (d.getDate() <= 7) monthLabels.push({ wi, label: MONTH_NAMES[d.getMonth()].slice(0, 3) })
+    }
+  })
+
+  return (
+    <div style={{ backgroundColor: '#111', borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px' }}>
+      <p style={{ fontSize: 11, fontWeight: 600, color: '#6e6e73', marginBottom: 12 }}>Actividad anual</p>
+      <div style={{ overflowX: 'auto' }}>
+        <svg width={totalW} height={totalH} style={{ display: 'block' }}>
+          {monthLabels.map(({ wi, label }) => (
+            <text key={wi} x={wi * (CELL + GAP)} y={10} fontSize="8" fill="#3a3a3a">{label}</text>
+          ))}
+          {weeks.map((col, wi) =>
+            col.map(({ ds, pct, done, sched, isFuture, isOutRange }, di) => {
+              const x = wi * (CELL + GAP)
+              const y = 14 + di * (CELL + GAP)
+              let fill = 'rgba(255,255,255,0.04)'
+              if (!isFuture && !isOutRange && pct !== null) {
+                const alpha = pct === 0 ? 0.07 : 0.12 + pct * 0.72
+                fill = `rgba(245,245,247,${alpha.toFixed(2)})`
+              }
+              const interactive = !isFuture && !isOutRange && pct !== null
+              return (
+                <rect
+                  key={ds}
+                  x={x} y={y}
+                  width={CELL} height={CELL}
+                  rx="2"
+                  fill={fill}
+                  style={{ cursor: interactive ? 'default' : 'default' }}
+                  onMouseEnter={interactive ? e => setTooltip({ ds, done, sched, x: e.clientX, y: e.clientY }) : undefined}
+                  onMouseMove={interactive ? e => setTooltip(t => t ? { ...t, x: e.clientX, y: e.clientY } : null) : undefined}
+                  onMouseLeave={interactive ? () => setTooltip(null) : undefined}
+                />
+              )
+            })
+          )}
+        </svg>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
+        <span style={{ fontSize: 8, color: '#3a3a3a' }}>Menos</span>
+        {[0.07, 0.22, 0.46, 0.66, 0.84].map((a, i) => (
+          <div key={i} style={{ width: CELL, height: CELL, borderRadius: 2, backgroundColor: `rgba(245,245,247,${a})` }} />
+        ))}
+        <span style={{ fontSize: 8, color: '#3a3a3a' }}>Más</span>
+      </div>
+      {tooltip && (
+        <div style={{
+          position: 'fixed',
+          left: tooltip.x + 14,
+          top: tooltip.y - 44,
+          backgroundColor: '#1c1c1e',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 8,
+          padding: '6px 10px',
+          fontSize: 11,
+          pointerEvents: 'none',
+          zIndex: 9999,
+          whiteSpace: 'nowrap',
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+        }}>
+          <span style={{ color: '#6e6e73' }}>
+            {new Date(tooltip.ds + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </span>
+          <span style={{ color: '#f5f5f7', fontWeight: 600 }}>{tooltip.done}/{tooltip.sched}</span>
+          <span style={{ color: '#6e6e73' }}>{Math.round((tooltip.done / tooltip.sched) * 100)}%</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Habits() {
   const { user } = useAuth()
   const now = new Date()
@@ -825,88 +939,7 @@ export default function Habits() {
                   </div>
 
                   {/* ── Chart 5: Heatmap anual ── */}
-                  {(() => {
-                    const WEEKS = 52
-                    const CELL  = 11
-                    const GAP   = 2
-                    const totalW = WEEKS * (CELL + GAP)
-                    const totalH = 7 * (CELL + GAP) + 20
-
-                    // Build map: date → pct
-                    const heatData = {}
-                    const heatStart = new Date(); heatStart.setDate(heatStart.getDate() - WEEKS * 7 + 1)
-
-                    const cursor2 = new Date(heatStart)
-                    while (dateStr(cursor2) <= TODAY) {
-                      const ds = dateStr(cursor2)
-                      const scheduled = habits.filter(h => isScheduled(h, cursor2))
-                      if (scheduled.length) {
-                        const done = scheduled.filter(h => allLogs.some(l => l.habit_id === h.id && l.date === ds && l.completed)).length
-                        heatData[ds] = done / scheduled.length
-                      }
-                      cursor2.setDate(cursor2.getDate() + 1)
-                    }
-
-                    // Build week columns (Mon=0 at top)
-                    const weeks = []
-                    const startCursor = new Date(heatStart)
-                    // Align to Monday
-                    const startDow = (startCursor.getDay() + 6) % 7
-                    startCursor.setDate(startCursor.getDate() - startDow)
-                    for (let w = 0; w < WEEKS; w++) {
-                      const col = []
-                      for (let d = 0; d < 7; d++) {
-                        const ds = dateStr(startCursor)
-                        col.push({ ds, pct: heatData[ds] ?? null, isFuture: ds > TODAY, isOutRange: ds < dateStr(heatStart) })
-                        startCursor.setDate(startCursor.getDate() + 1)
-                      }
-                      weeks.push(col)
-                    }
-
-                    // Month labels
-                    const monthLabels = []
-                    weeks.forEach((col, wi) => {
-                      const firstReal = col.find(c => !c.isOutRange && !c.isFuture)
-                      if (firstReal) {
-                        const d = new Date(firstReal.ds)
-                        if (d.getDate() <= 7) monthLabels.push({ wi, label: MONTH_NAMES[d.getMonth()].slice(0, 3) })
-                      }
-                    })
-
-                    return (
-                      <div style={{ backgroundColor: BG2, borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px' }}>
-                        <p style={{ fontSize: 11, fontWeight: 600, color: '#6e6e73', marginBottom: 12 }}>Actividad anual</p>
-                        <div style={{ overflowX: 'auto' }}>
-                          <svg width={totalW} height={totalH} style={{ display: 'block' }}>
-                            {/* Month labels */}
-                            {monthLabels.map(({ wi, label }) => (
-                              <text key={wi} x={wi * (CELL + GAP)} y={10} fontSize="8" fill="#3a3a3a">{label}</text>
-                            ))}
-                            {/* Cells */}
-                            {weeks.map((col, wi) =>
-                              col.map(({ ds, pct, isFuture, isOutRange }, di) => {
-                                const x = wi * (CELL + GAP)
-                                const y = 14 + di * (CELL + GAP)
-                                let fill = 'rgba(255,255,255,0.04)'
-                                if (!isFuture && !isOutRange && pct !== null) {
-                                  const alpha = pct === 0 ? 0.06 : 0.1 + pct * 0.7
-                                  fill = `rgba(245,245,247,${alpha.toFixed(2)})`
-                                }
-                                return <rect key={ds} x={x} y={y} width={CELL} height={CELL} rx="2" fill={fill} />
-                              })
-                            )}
-                          </svg>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
-                          <span style={{ fontSize: 8, color: '#3a3a3a' }}>Menos</span>
-                          {[0.06, 0.2, 0.45, 0.65, 0.85].map((a, i) => (
-                            <div key={i} style={{ width: CELL, height: CELL, borderRadius: 2, backgroundColor: `rgba(245,245,247,${a})` }} />
-                          ))}
-                          <span style={{ fontSize: 8, color: '#3a3a3a' }}>Más</span>
-                        </div>
-                      </div>
-                    )
-                  })()}
+                  <HabitHeatmap habits={habits} allLogs={allLogs} TODAY={TODAY} />
 
                 </div>
 
