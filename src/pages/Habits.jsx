@@ -138,10 +138,10 @@ function HabitHeatmap({ habits, allLogs, TODAY }) {
             col.map(({ ds, pct, done, sched, isFuture, isOutRange }, di) => {
               const x = wi * (CELL + GAP)
               const y = 14 + di * (CELL + GAP)
-              let fill = 'rgba(255,255,255,0.04)'
+              let fill = 'rgba(255,255,255,0.05)'
               if (!isFuture && !isOutRange && pct !== null) {
-                const alpha = pct === 0 ? 0.07 : 0.12 + pct * 0.72
-                fill = `rgba(245,245,247,${alpha.toFixed(2)})`
+                if (pct === 0) fill = 'rgba(255,255,255,0.06)'
+                else fill = `rgba(48,209,88,${(0.18 + pct * 0.82).toFixed(2)})`
               }
               const interactive = !isFuture && !isOutRange && pct !== null
               return (
@@ -163,8 +163,8 @@ function HabitHeatmap({ habits, allLogs, TODAY }) {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
         <span style={{ fontSize: 8, color: '#3a3a3a' }}>Menos</span>
-        {[0.07, 0.22, 0.46, 0.66, 0.84].map((a, i) => (
-          <div key={i} style={{ width: CELL, height: CELL, borderRadius: 2, backgroundColor: `rgba(245,245,247,${a})` }} />
+        {[0.06, 0.36, 0.54, 0.72, 1].map((a, i) => (
+          <div key={i} style={{ width: CELL, height: CELL, borderRadius: 2, backgroundColor: i === 0 ? 'rgba(255,255,255,0.06)' : `rgba(48,209,88,${a})` }} />
         ))}
         <span style={{ fontSize: 8, color: '#3a3a3a' }}>Más</span>
       </div>
