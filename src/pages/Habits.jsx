@@ -107,8 +107,8 @@ export default function Habits() {
     const first = dateStr(days[0])
     const last  = dateStr(days[days.length - 1])
     const [{ data: h }, { data: l }] = await Promise.all([
-      supabase.from('habits').select('*').order('created_at'),
-      supabase.from('habit_logs').select('*').gte('date', first).lte('date', last),
+      supabase.from('habits').select('*').eq('user_id', user.id).order('created_at'),
+      supabase.from('habit_logs').select('*').eq('user_id', user.id).gte('date', first).lte('date', last),
     ])
     setHabits(h || [])
     setLogs(l || [])
@@ -119,7 +119,7 @@ export default function Habits() {
     const since = new Date(); since.setFullYear(since.getFullYear() - 1)
     const { data } = await supabase
       .from('habit_logs').select('*')
-      .gte('date', dateStr(since)).eq('completed', true)
+      .eq('user_id', user.id).gte('date', dateStr(since)).eq('completed', true)
     setAllLogs(data || [])
   }
 
@@ -143,17 +143,32 @@ export default function Habits() {
     if (ds > TODAY) return
     const existing = logs.find(l => l.habit_id === habit.id && l.date === ds)
     if (existing?.completed) {
+      // Optimistic remove
       setLogs(p => p.filter(l => !(l.habit_id === habit.id && l.date === ds)))
       setAllLogs(p => p.filter(l => !(l.habit_id === habit.id && l.date === ds)))
-      supabase.from('habit_logs').delete().eq('habit_id', habit.id).eq('date', ds)
+      const { error } = await supabase
+        .from('habit_logs').delete()
+        .eq('habit_id', habit.id)
+        .eq('user_id', user.id)
+        .eq('date', ds)
+      if (error) {
+        // Rollback and refetch
+        toast.error('Error al desmarcar')
+        fetchData()
+        fetchAllLogs()
+      }
     } else {
       const tmp = { id: `tmp-${habit.id}-${ds}`, habit_id: habit.id, user_id: user.id, date: ds, completed: true }
       setLogs(p => [...p.filter(l => !(l.habit_id === habit.id && l.date === ds)), tmp])
       setAllLogs(p => [...p.filter(l => !(l.habit_id === habit.id && l.date === ds)), tmp])
-      const { data } = await supabase.from('habit_logs')
+      const { data, error } = await supabase.from('habit_logs')
         .upsert({ habit_id: habit.id, user_id: user.id, date: ds, completed: true }, { onConflict: 'habit_id,date' })
         .select().single()
-      if (data) {
+      if (error) {
+        toast.error('Error al marcar')
+        setLogs(p => p.filter(l => l.id !== tmp.id))
+        setAllLogs(p => p.filter(l => l.id !== tmp.id))
+      } else if (data) {
         setLogs(p => [...p.filter(l => l.id !== tmp.id && !(l.habit_id === habit.id && l.date === ds)), data])
         setAllLogs(p => [...p.filter(l => l.id !== tmp.id && !(l.habit_id === habit.id && l.date === ds)), data])
       }
