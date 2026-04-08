@@ -203,7 +203,7 @@ export default function Habits() {
               .map(h => ({ habit: h, count: logs.filter(l => l.habit_id === h.id && l.completed).length }))
               .filter(x => x.count > 0)
               .sort((a, b) => b.count - a.count)
-              .slice(0, 5)
+              .slice(0, 3)
             if (!top.length) return null
             return (
               <div className="mb-3 flex items-center gap-4 flex-wrap">
