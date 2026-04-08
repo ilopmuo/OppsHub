@@ -769,7 +769,7 @@ export default function Habits() {
               return { day: d.getDate(), done, sched, pct: sched > 0 ? done / sched : 0 }
             })
 
-            // ── Data: avg completion % by day of week (current month) ──────────
+            // ── Data: completion % by day of week (current month, uses allLogs) ──
             const DOW_LABEL = ['L','M','X','J','V','S','D']
             const dowStats = DOW_LABEL.map((label, i) => {
               const dowIndex = i === 6 ? 0 : i + 1 // Mon=1…Sun=0
@@ -780,11 +780,11 @@ export default function Habits() {
                 habits.forEach(h => {
                   if (!isScheduled(h, d)) return
                   sched++
-                  if (logs.some(l => l.habit_id === h.id && l.date === ds && l.completed)) done++
+                  if (allLogs.some(l => l.habit_id === h.id && l.date === ds)) done++
                 })
               })
               const pct = sched > 0 ? Math.round(done / sched * 100) : 0
-              return { label, pct, sched }
+              return { label, pct, sched, done }
             })
 
             if (!habits.length) return null
@@ -889,19 +889,18 @@ export default function Habits() {
                         )
                       })}
                       {/* Bars */}
-                      {dowStats.map(({ label, pct, sched }, i) => {
+                      {dowStats.map(({ label, pct, sched, done }, i) => {
                         const barW  = chartW / 7 - 4
                         const x     = PAD.l + i * (chartW / 7) + 2
                         const barH  = (pct / 100) * chartH
                         const y     = PAD.t + chartH - barH
-                        const alpha = sched === 0 ? 0.08 : 0.7
                         return (
                           <g key={i}>
                             <rect x={x} y={PAD.t} width={barW} height={chartH} rx="3" fill="rgba(255,255,255,0.03)" />
-                            {sched > 0 && <rect x={x} y={y} width={barW} height={barH} rx="3" fill={`rgba(245,245,247,${alpha})`} />}
+                            {sched > 0 && <rect x={x} y={y} width={barW} height={Math.max(barH, 0)} rx="3" fill={`rgba(48,209,88,${sched === 0 ? 0.08 : 0.15 + (pct / 100) * 0.75})`} />}
                             <text x={x + barW / 2} y={H - 6} textAnchor="middle" fontSize="8" fill={sched > 0 ? '#6e6e73' : '#3a3a3a'}>{label}</text>
-                            {sched > 0 && pct > 0 && (
-                              <text x={x + barW / 2} y={y - 3} textAnchor="middle" fontSize="7" fill="#4a4a4a">{pct}%</text>
+                            {sched > 0 && (
+                              <text x={x + barW / 2} y={y - 3} textAnchor="middle" fontSize="7" fill="#4a4a4a">{done}/{sched}</text>
                             )}
                           </g>
                         )
