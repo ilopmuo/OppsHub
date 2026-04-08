@@ -95,7 +95,7 @@ export default function ProjectMembers({ projectId, projectOwnerId }) {
 
   const allMembers = [
     ownerProfile ? { profile: ownerProfile, role: 'owner', id: 'owner' } : null,
-    ...members,
+    ...members.filter(m => m.profile?.id !== projectOwnerId),
   ].filter(Boolean)
 
   return (
