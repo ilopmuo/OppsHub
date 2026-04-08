@@ -105,12 +105,28 @@ export default function ProjectCard({ project, onClick, index = 0 }) {
             </div>
           )}
 
-          {/* Task progress */}
+          {/* Task counts + progress */}
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center gap-2 text-xs">
+              <Circle className="w-3.5 h-3.5 shrink-0" style={{ color: '#6e6e73' }} />
+              <span style={{ color: '#6e6e73' }}>Tareas abiertas</span>
+              <span className="ml-auto font-semibold"
+                style={{ color: pendingCount > 5 ? '#ff453a' : pendingCount > 0 ? '#ff9f0a' : '#30d158' }}>
+                {pendingCount}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <CheckCircle className="w-3.5 h-3.5 shrink-0" style={{ color: '#6e6e73' }} />
+              <span style={{ color: '#6e6e73' }}>Tareas cerradas</span>
+              <span className="ml-auto font-semibold" style={{ color: '#6e6e73' }}>
+                {totalCount - pendingCount}
+              </span>
+            </div>
+          </div>
           {totalCount > 0 && (
             <div className="mb-4">
               <div className="flex justify-between mb-1.5">
                 <span className="text-xs" style={{ color: '#6e6e73' }}>{progress}% completado</span>
-                <span className="text-xs" style={{ color: '#3a3a3a' }}>{totalCount - pendingCount}/{totalCount}</span>
               </div>
               <div className="h-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
                 <div className="h-full rounded-full transition-all duration-700"
