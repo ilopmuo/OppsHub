@@ -77,12 +77,6 @@ function isAtRisk(habit, allLogs, todayStr) {
   return false
 }
 
-// streak broken: scheduled yesterday and missed
-function isStreakBroken(habit, allLogs, todayStr) {
-  const done = new Set(allLogs.filter(l => l.habit_id === habit.id && l.completed).map(l => l.date))
-  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
-  return isScheduled(habit, yesterday) && !done.has(dateStr(yesterday))
-}
 
 const COL_W  = 38   // px per day column
 const NAME_W = 200  // px for habit name column
@@ -286,7 +280,6 @@ export default function Habits() {
             return scheduled.every(h => logs.some(l => l.habit_id === h.id && l.date === ds && l.completed))
           }).length
           const atRiskCount = habits.filter(h => isAtRisk(h, allLogs, TODAY)).length
-          const brokenCount = habits.filter(h => isStreakBroken(h, allLogs, TODAY)).length
           return (
             <div className="flex items-center gap-3 mb-6">
               <div style={{ backgroundColor: '#111', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -302,15 +295,6 @@ export default function Habits() {
                   <div>
                     <p style={{ fontSize: 20, fontWeight: 800, color: '#ff9f0a', lineHeight: 1 }}>{atRiskCount}</p>
                     <p style={{ fontSize: 10, color: '#3a3a3a', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 2 }}>Pendientes hoy</p>
-                  </div>
-                </div>
-              )}
-              {brokenCount > 0 && (
-                <div style={{ backgroundColor: '#111', border: '1px solid rgba(255,69,58,0.2)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>💔</span>
-                  <div>
-                    <p style={{ fontSize: 20, fontWeight: 800, color: '#ff453a', lineHeight: 1 }}>{brokenCount}</p>
-                    <p style={{ fontSize: 10, color: '#3a3a3a', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 2 }}>Rachas rotas</p>
                   </div>
                 </div>
               )}
@@ -519,7 +503,6 @@ export default function Habits() {
                   const isHovered = hovered === habit.id
                   const isLast    = hi === habits.length - 1
                   const atRisk    = isAtRisk(habit, allLogs, TODAY)
-                  const broken    = isStreakBroken(habit, allLogs, TODAY)
                   return (
                     <tr
                       key={habit.id}
@@ -544,8 +527,7 @@ export default function Habits() {
                               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                               maxWidth: 90,
                             }}>{habit.name}</span>
-                            {broken && <span title="Racha rota ayer" style={{ fontSize: 11, lineHeight: 1 }}>💔</span>}
-                            {!broken && atRisk && <span title="Pendiente hoy" style={{ fontSize: 11, lineHeight: 1 }}>⚠️</span>}
+                            {atRisk && <span title="Pendiente hoy" style={{ fontSize: 11, lineHeight: 1 }}>⚠️</span>}
                           </div>
 
                           {/* Edit / delete shown on row hover */}
