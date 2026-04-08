@@ -15,6 +15,7 @@ import NavBar from '../components/NavBar'
 import ProjectMembers from '../components/ProjectMembers'
 import ActivityLog from '../components/ActivityLog'
 import ProjectNotificationSettings from '../components/ProjectNotificationSettings'
+import ProjectDetailReports from '../components/ProjectDetailReports'
 import { notify } from '../lib/notify'
 
 async function logActivity(projectId, userId, action, metadata = {}) {
@@ -612,6 +613,8 @@ export default function ProjectDetail() {
             <ActivityLog projectId={id} />
           </div>
         </div>
+
+        <ProjectDetailReports project={project} tasks={tasks} milestones={milestones} />
       </main>
 
       {showTaskModal && (
