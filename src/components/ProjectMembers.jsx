@@ -33,14 +33,27 @@ export default function ProjectMembers({ projectId, projectOwnerId }) {
   async function fetchMembers() {
     const [{ data: pm }, { data: owner }] = await Promise.all([
       supabase.from('project_members')
-        .select('id, role, joined_at, profile:user_id(id, email, display_name)')
+        .select('id, role, joined_at, profile:user_id(id, email, display_name, avatar_url)')
         .eq('project_id', projectId),
-      supabase.from('profiles').select('id, email, display_name').eq('id', projectOwnerId).single(),
+      supabase.from('profiles').select('id, email, display_name, avatar_url').eq('id', projectOwnerId).single(),
     ])
     setOwnerProfile(owner)
     setMembers(pm || [])
     setLoading(false)
   }
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`project_members:${projectId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'project_members',
+        filter: `project_id=eq.${projectId}`,
+      }, () => fetchMembers())
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [projectId])
 
   async function generateInvite() {
     setGenerating(true)
@@ -120,9 +133,11 @@ export default function ProjectMembers({ projectId, projectOwnerId }) {
         <div className="space-y-2">
           {allMembers.map(m => (
             <div key={m.id} className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                style={{ backgroundColor: avatarColor(m.profile?.email), color: '#000' }}>
-                {initials(m.profile?.email)}
+              <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold shrink-0"
+                style={{ backgroundColor: m.profile?.avatar_url ? '#000' : avatarColor(m.profile?.email), color: '#000' }}>
+                {m.profile?.avatar_url
+                  ? <img src={m.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                  : initials(m.profile?.email)}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm truncate" style={{ color: '#f5f5f7' }}>
