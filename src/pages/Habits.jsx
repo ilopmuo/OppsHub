@@ -769,18 +769,23 @@ export default function Habits() {
               return { day: d.getDate(), done, sched, pct: sched > 0 ? done / sched : 0 }
             })
 
-            // ── Data: avg completion % by day of week (0=Mon…6=Sun) ──────────
+            // ── Data: avg completion % by day of week — uses past year ──────────
+            const yearStart = new Date(); yearStart.setDate(yearStart.getDate() - 52 * 7 + 1)
+            const yearDays = []
+            const _dc = new Date(yearStart)
+            while (dateStr(_dc) <= TODAY) { yearDays.push(new Date(_dc)); _dc.setDate(_dc.getDate() + 1) }
+
             const DOW_LABEL = ['L','M','X','J','V','S','D']
             const dowStats = DOW_LABEL.map((label, i) => {
               const dowIndex = i === 6 ? 0 : i + 1 // Mon=1…Sun=0
-              const relevant = pastDays.filter(d => d.getDay() === dowIndex)
+              const relevant = yearDays.filter(d => d.getDay() === dowIndex)
               let sched = 0, done = 0
               relevant.forEach(d => {
                 const ds = dateStr(d)
                 habits.forEach(h => {
                   if (!isScheduled(h, d)) return
                   sched++
-                  if (logs.some(l => l.habit_id === h.id && l.date === ds && l.completed)) done++
+                  if (allLogs.some(l => l.habit_id === h.id && l.date === ds)) done++
                 })
               })
               const pct = sched > 0 ? Math.round(done / sched * 100) : 0
