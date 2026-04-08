@@ -196,8 +196,49 @@ export default function Habits() {
           </div>
 
         ) : (
+          <>
+          {/* ── Top Habits ── */}
+          {(() => {
+            const top = habits
+              .map(h => ({ habit: h, count: logs.filter(l => l.habit_id === h.id && l.completed).length }))
+              .filter(x => x.count > 0)
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 5)
+            if (!top.length) return null
+            return (
+              <div className="mb-6" style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', backgroundColor: BG, overflow: 'hidden' }}>
+                <div style={{ padding: '14px 20px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: '#3a3a3a', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Top Habits</p>
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ padding: '8px 20px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: '#3a3a3a', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Hábito</th>
+                      <th style={{ padding: '8px 20px', textAlign: 'right', fontSize: 10, fontWeight: 600, color: '#3a3a3a', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {top.map(({ habit, count }, i) => (
+                      <tr key={habit.id} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '10px 20px' }}>
+                          <div className="flex items-center gap-2">
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#4a4a4a' }}>{i + 1}</span>
+                            <div style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: habit.color, flexShrink: 0 }} />
+                            <span style={{ fontSize: 13, color: '#f5f5f7', fontWeight: 500 }}>{habit.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 20px', textAlign: 'right' }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: habit.color }}>{count}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          })()}
 
-          /* ── Main grid ── */
+          {/* ── Main grid ── */}
           <div style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', overflowX: 'auto' }}>
             <table style={{
               borderCollapse: 'separate',
@@ -458,6 +499,7 @@ export default function Habits() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </main>
 
