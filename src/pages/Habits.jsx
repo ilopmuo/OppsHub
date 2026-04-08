@@ -141,9 +141,8 @@ export default function Habits() {
         {/* ── Page header ── */}
         {(() => {
           // Month progress: scheduled vs completed up to today
-          const pastDays = days.filter(d => dateStr(d) <= TODAY)
           let totalScheduled = 0, totalDone = 0
-          for (const d of pastDays) {
+          for (const d of days) {
             const ds = dateStr(d)
             for (const h of habits) {
               if (!isScheduled(h, d)) continue
