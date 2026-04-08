@@ -6,6 +6,7 @@ import { Plus, AlertTriangle, TrendingUp, CheckSquare } from 'lucide-react'
 import ProjectCard from '../components/ProjectCard'
 import NewProjectModal from '../components/NewProjectModal'
 import NavBar from '../components/NavBar'
+import ProjectReports from '../components/ProjectReports'
 
 function useCountUp(target) {
   const [val, setVal] = useState(0)
@@ -241,6 +242,8 @@ export default function Dashboard() {
             ))}
           </div>
         )}
+
+        <ProjectReports projects={projects} />
       </main>
 
       {showModal && (
