@@ -26,32 +26,63 @@ function formatFull(ds) {
 }
 
 // ── AddNoteInput ──────────────────────────────────────────────────────────────
+const PRIORITIES = [
+  { key: 'low',    label: 'Baja',  color: '#6e6e73' },
+  { key: 'medium', label: 'Media', color: '#ff9f0a' },
+  { key: 'high',   label: 'Alta',  color: '#ff453a' },
+]
+
 function AddNoteInput({ onAdd, onCancel }) {
-  const [val, setVal] = useState('')
+  const [val, setPriority_val] = useState('')
+  const [priority, setPriority] = useState('low')
   const ref = useRef()
   useEffect(() => { ref.current?.focus() }, [])
-  function submit() { if (val.trim()) { onAdd(val.trim()); setVal('') } }
+  function submit() { if (val.trim()) { onAdd(val.trim(), priority); setPriority_val('') } }
   return (
-    <div className="flex items-center gap-1.5 mt-1">
+    <div className="flex flex-col gap-2 mt-1 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
       <input
         ref={ref}
         value={val}
-        onChange={e => setVal(e.target.value)}
+        onChange={e => setPriority_val(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') onCancel() }}
         placeholder="Nueva nota…"
-        className="flex-1 text-xs outline-none rounded-lg px-2.5 py-1.5"
+        className="text-xs outline-none rounded-lg px-2.5 py-1.5 w-full"
         style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#f5f5f7', fontFamily: 'inherit' }}
       />
-      <button onClick={submit}
-        className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-        style={{ background: '#f5f5f7', color: '#000' }}>
-        <Check size={10} strokeWidth={3} />
-      </button>
-      <button onClick={onCancel}
-        className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-        style={{ background: 'rgba(255,255,255,0.08)', color: '#6e6e73' }}>
-        <X size={10} strokeWidth={3} />
-      </button>
+      <div className="flex items-center justify-between">
+        {/* Priority selector */}
+        <div className="flex items-center gap-1">
+          {PRIORITIES.map(p => (
+            <button
+              key={p.key}
+              onClick={() => setPriority(p.key)}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all"
+              style={{
+                fontWeight: 600,
+                fontFamily: 'inherit',
+                background: priority === p.key ? `${p.color}22` : 'transparent',
+                color: priority === p.key ? p.color : '#3a3a3a',
+                border: `1px solid ${priority === p.key ? p.color + '55' : 'transparent'}`,
+              }}
+            >
+              <div style={{ width: 5, height: 5, borderRadius: '50%', background: p.color }} />
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button onClick={onCancel}
+            className="w-6 h-6 rounded-lg flex items-center justify-center"
+            style={{ background: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}>
+            <X size={10} strokeWidth={3} />
+          </button>
+          <button onClick={submit}
+            className="w-6 h-6 rounded-lg flex items-center justify-center"
+            style={{ background: '#f5f5f7', color: '#000' }}>
+            <Check size={10} strokeWidth={3} />
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -149,7 +180,7 @@ function DayPanel({ ds, projectTasks, notes, onAddNote, onToggleNote, onDeleteNo
                 <button
                   onClick={() => onToggleNote(note.id, note.done)}
                   className="w-4 h-4 rounded flex items-center justify-center shrink-0 mt-0.5 transition-all"
-                  style={{ border: `1.5px solid ${note.done ? '#f5f5f7' : 'rgba(255,255,255,0.2)'}`, background: note.done ? '#f5f5f7' : 'transparent' }}
+                  style={{ border: `1.5px solid ${note.done ? '#f5f5f7' : (PRIORITY_COLOR[note.priority] ?? 'rgba(255,255,255,0.2)')}`, background: note.done ? '#f5f5f7' : 'transparent' }}
                 >
                   {note.done && <Check size={9} color="#000" strokeWidth={3} />}
                 </button>
@@ -170,7 +201,7 @@ function DayPanel({ ds, projectTasks, notes, onAddNote, onToggleNote, onDeleteNo
           </div>
 
           {adding && (
-            <AddNoteInput onAdd={t => { onAddNote(ds, t); setAdding(false) }} onCancel={() => setAdding(false)} />
+            <AddNoteInput onAdd={(t, p) => { onAddNote(ds, t, p); setAdding(false) }} onCancel={() => setAdding(false)} />
           )}
         </div>
       </div>
@@ -232,11 +263,11 @@ export default function Agenda() {
   }
 
   // Notes CRUD
-  async function addNote(ds, text) {
+  async function addNote(ds, text, priority = 'low') {
     const position = notes.filter(n => n.date === ds).length
     const { data, error } = await supabase
       .from('calendar_notes')
-      .insert({ user_id: user.id, date: ds, text, done: false, position })
+      .insert({ user_id: user.id, date: ds, text, done: false, position, priority })
       .select().single()
     if (!error && data) setNotes(prev => [...prev, data])
     else if (error) toast.error('Error al guardar nota')
@@ -404,11 +435,11 @@ export default function Agenda() {
                           <div key={n.id} style={{
                             fontSize: 9, fontWeight: 500, lineHeight: '13px',
                             padding: '1px 5px', borderRadius: 4,
-                            background: 'rgba(255,255,255,0.04)',
+                            background: n.done ? 'rgba(255,255,255,0.04)' : `${PRIORITY_COLOR[n.priority] ?? '#6e6e73'}18`,
                             color: n.done ? '#3a3a3a' : '#6e6e73',
                             textDecoration: n.done ? 'line-through' : 'none',
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            borderLeft: '2px solid rgba(255,255,255,0.1)',
+                            borderLeft: `2px solid ${n.done ? 'rgba(255,255,255,0.08)' : (PRIORITY_COLOR[n.priority] ?? 'rgba(255,255,255,0.15)')}`,
                           }}>
                             {n.text}
                           </div>

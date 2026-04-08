@@ -5,9 +5,13 @@ CREATE TABLE IF NOT EXISTS calendar_notes (
   date       DATE NOT NULL,
   text       TEXT NOT NULL,
   done       BOOLEAN NOT NULL DEFAULT FALSE,
+  priority   TEXT NOT NULL DEFAULT 'low',
   position   INT NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- If the table already exists, add the column:
+ALTER TABLE calendar_notes ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'low';
 
 CREATE INDEX IF NOT EXISTS calendar_notes_user_date ON calendar_notes (user_id, date);
 
