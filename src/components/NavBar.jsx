@@ -56,16 +56,8 @@ const NAV = [
 export default function NavBar({ breadcrumb }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [showSearch, setShowSearch] = useState(false)
-  const [profile, setProfile] = useState(null)
-
-  useEffect(() => {
-    if (user) {
-      supabase.from('profiles').select('display_name, avatar_url').eq('id', user.id).single()
-        .then(({ data }) => setProfile(data))
-    }
-  }, [user])
 
   useEffect(() => {
     function onKey(e) {
