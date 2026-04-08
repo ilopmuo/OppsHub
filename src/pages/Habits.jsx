@@ -769,22 +769,22 @@ export default function Habits() {
               return { day: d.getDate(), done, sched, pct: sched > 0 ? done / sched : 0 }
             })
 
-            // ── Data: completion % by day of week (current month, uses allLogs) ──
+            // ── Data: completion % by day of week — most recent occurrence ──────
             const DOW_LABEL = ['L','M','X','J','V','S','D']
             const dowStats = DOW_LABEL.map((label, i) => {
               const dowIndex = i === 6 ? 0 : i + 1 // Mon=1…Sun=0
               const relevant = pastDays.filter(d => d.getDay() === dowIndex)
+              if (!relevant.length) return { label, pct: 0, sched: 0 }
+              const d = relevant[relevant.length - 1] // most recent occurrence
+              const ds = dateStr(d)
               let sched = 0, done = 0
-              relevant.forEach(d => {
-                const ds = dateStr(d)
-                habits.forEach(h => {
-                  if (!isScheduled(h, d)) return
-                  sched++
-                  if (allLogs.some(l => l.habit_id === h.id && l.date === ds)) done++
-                })
+              habits.forEach(h => {
+                if (!isScheduled(h, d)) return
+                sched++
+                if (allLogs.some(l => l.habit_id === h.id && l.date === ds)) done++
               })
               const pct = sched > 0 ? Math.round(done / sched * 100) : 0
-              return { label, pct, sched, done }
+              return { label, pct, sched }
             })
 
             if (!habits.length) return null
