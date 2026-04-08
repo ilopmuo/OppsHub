@@ -206,34 +206,16 @@ export default function Habits() {
               .slice(0, 5)
             if (!top.length) return null
             return (
-              <div className="mb-6" style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', backgroundColor: BG, overflow: 'hidden' }}>
-                <div style={{ padding: '14px 20px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: '#3a3a3a', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Top Habits</p>
-                </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ padding: '8px 20px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: '#3a3a3a', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Hábito</th>
-                      <th style={{ padding: '8px 20px', textAlign: 'right', fontSize: 10, fontWeight: 600, color: '#3a3a3a', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {top.map(({ habit, count }, i) => (
-                      <tr key={habit.id} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                        <td style={{ padding: '10px 20px' }}>
-                          <div className="flex items-center gap-2">
-                            <span style={{ fontSize: 11, fontWeight: 700, color: '#4a4a4a' }}>{i + 1}</span>
-                            <div style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: habit.color, flexShrink: 0 }} />
-                            <span style={{ fontSize: 13, color: '#f5f5f7', fontWeight: 500 }}>{habit.name}</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: '10px 20px', textAlign: 'right' }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: habit.color }}>{count}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="mb-3 flex items-center gap-4 flex-wrap">
+                <span style={{ fontSize: 10, fontWeight: 600, color: '#3a3a3a', letterSpacing: '0.08em', textTransform: 'uppercase', flexShrink: 0 }}>Top</span>
+                {top.map(({ habit, count }, i) => (
+                  <div key={habit.id} className="flex items-center gap-1.5">
+                    <span style={{ fontSize: 10, color: '#3a3a3a', fontWeight: 600 }}>{i + 1}.</span>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: habit.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: '#6e6e73', fontWeight: 500 }}>{habit.name}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: habit.color }}>{count}</span>
+                  </div>
+                ))}
               </div>
             )
           })()}
