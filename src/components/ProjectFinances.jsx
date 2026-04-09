@@ -62,7 +62,7 @@ function InlineNum({ value, onChange, onBlur, color = '#f5f5f7', accent = 'rgba(
   )
 }
 
-export default function ProjectFinances({ projectId, endDate }) {
+export default function ProjectFinances({ projectId, startDate, endDate }) {
   // ── State ─────────────────────────────────────────────────────────────────
   const [resources,      setResources]      = useState([])
   // planned[`${rid}_${weekIso}`] = estimated hours
@@ -256,9 +256,18 @@ export default function ProjectFinances({ projectId, endDate }) {
     return total
   }
 
-  // ── Remaining weeks for header ────────────────────────────────────────────
-  const endMon = endDate ? weekMonday(new Date(endDate + 'T12:00:00')) : null
+  // ── Temporal progress (based on project dates, not cost) ─────────────────
+  const startMon  = startDate ? weekMonday(new Date(startDate + 'T12:00:00')) : null
+  const endMon    = endDate   ? weekMonday(new Date(endDate   + 'T12:00:00')) : null
+  const totalWeeks     = (startMon && endMon) ? Math.max(1, Math.round((endMon - startMon) / (7 * 24 * 60 * 60 * 1000))) : 0
   const remainingWeeks = endMon ? Math.max(0, Math.round((endMon - weekMonday()) / (7 * 24 * 60 * 60 * 1000))) : 0
+
+  function pctProgressAt(weekStr) {
+    if (!startMon || !endMon || totalWeeks === 0) return null
+    const rowMon     = weekMonday(new Date(weekStr + 'T12:00:00'))
+    const elapsed    = Math.max(0, Math.round((rowMon - startMon) / (7 * 24 * 60 * 60 * 1000)))
+    return Math.min(100, elapsed / totalWeeks * 100)
+  }
 
   if (loading) return <div style={{ height: 300, borderRadius: 16, backgroundColor: '#111' }} />
 
@@ -337,7 +346,7 @@ export default function ProjectFinances({ projectId, endDate }) {
                 const etcBilling  = tPresupuesto - billed
                 const totalEffort = etd + etc
                 const resultEtc   = tPresupuesto - totalEffort
-                const pctProgress = totalEffort > 0 ? etd / totalEffort * 100 : 0
+                const pctProgress = pctProgressAt(weekStr)   // temporal: weeks elapsed / total weeks
                 const pctOff      = tPresupuesto > 0 ? resultEtc / tPresupuesto * 100 : 0
 
                 const pos = c => c >= 0 ? '#30d158' : '#ff453a'
@@ -382,7 +391,7 @@ export default function ProjectFinances({ projectId, endDate }) {
                       {billed > 0 ? `${beToDate >= 0 ? '+' : ''}${fmtFull(beToDate, currency)}` : '—'}
                     </td>
                     <td style={{ ...CELL, textAlign: 'right' }}>
-                      {totalEffort > 0 ? `${pctProgress.toFixed(2)}%` : <span style={{ color: '#3a3a3a' }}>—</span>}
+                      {pctProgress !== null ? `${pctProgress.toFixed(1)}%` : <span style={{ color: '#3a3a3a' }}>—</span>}
                     </td>
                     <td style={{ ...CELL, textAlign: 'right', color: '#6e6e73' }}>
                       {etc > 0 ? fmtFull(etc, currency) : <span style={{ color: '#3a3a3a' }}>—</span>}
@@ -396,11 +405,11 @@ export default function ProjectFinances({ projectId, endDate }) {
                     <td style={{ ...CELL, textAlign: 'right', fontWeight: 600 }}>
                       {tPresupuesto > 0 ? fmtFull(tPresupuesto, currency) : <span style={{ color: '#3a3a3a' }}>—</span>}
                     </td>
-                    <td style={{ ...CELL, textAlign: 'right', color: totalEffort > 0 ? pos(resultEtc) : '#3a3a3a', fontWeight: 700 }}>
-                      {totalEffort > 0 ? `${resultEtc >= 0 ? '+' : ''}${fmtFull(resultEtc, currency)}` : '—'}
+                    <td style={{ ...CELL, textAlign: 'right', color: tPresupuesto > 0 ? pos(resultEtc) : '#3a3a3a', fontWeight: 700 }}>
+                      {tPresupuesto > 0 ? `${resultEtc >= 0 ? '+' : ''}${fmtFull(resultEtc, currency)}` : '—'}
                     </td>
-                    <td style={{ ...CELL, textAlign: 'right', color: totalEffort > 0 ? pos(pctOff) : '#3a3a3a', fontWeight: 700 }}>
-                      {totalEffort > 0 ? `${pctOff.toFixed(2)}%` : '—'}
+                    <td style={{ ...CELL, textAlign: 'right', color: tPresupuesto > 0 ? pos(pctOff) : '#3a3a3a', fontWeight: 700 }}>
+                      {tPresupuesto > 0 ? `${pctOff.toFixed(2)}%` : '—'}
                     </td>
                   </tr>
                 )

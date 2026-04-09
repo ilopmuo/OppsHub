@@ -425,6 +425,7 @@ export default function ProjectDetail() {
             {activeTab === 'finances' && (
               <ProjectFinances
                 projectId={id}
+                startDate={project.start_date || null}
                 endDate={project.deadline || project.renewal_date || null}
               />
             )}
