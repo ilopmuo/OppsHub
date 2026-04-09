@@ -422,7 +422,12 @@ export default function ProjectDetail() {
               ))}
             </div>
 
-            {activeTab === 'finances' && <ProjectFinances projectId={id} />}
+            {activeTab === 'finances' && (
+              <ProjectFinances
+                projectId={id}
+                endDate={project.deadline || project.renewal_date || null}
+              />
+            )}
 
             {activeTab === 'tasks' && (
             <><div className="flex items-center justify-between mb-4">
