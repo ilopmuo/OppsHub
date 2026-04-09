@@ -79,7 +79,7 @@ function isAtRisk(habit, allLogs, todayStr) {
 
 
 const COL_W  = 38   // px per day column
-const NAME_W = 200  // px for habit name column
+const NAME_W = 224  // px for habit name column
 const BG     = '#111111'
 
 function HabitHeatmap({ habits, allLogs, TODAY }) {
@@ -653,22 +653,22 @@ export default function Habits() {
                         padding: '10px 20px',
                         transition: 'background-color 0.1s',
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                            <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: habit.color, flexShrink: 0 }} />
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flex: 1 }}>
+                            <div style={{
+                              width: 7, height: 7, borderRadius: '50%', backgroundColor: habit.color, flexShrink: 0,
+                              ...(atRisk ? { boxShadow: `0 0 0 2px rgba(255,159,10,0.3)` } : {}),
+                            }} />
                             <span style={{
                               fontSize: 13, color: '#f5f5f7',
                               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                              maxWidth: 90,
+                              flex: 1, minWidth: 0,
                             }}>{habit.name}</span>
-                            {atRisk && <span title="Pendiente hoy" style={{ fontSize: 11, lineHeight: 1 }}>⚠️</span>}
                           </div>
 
                           {/* Edit / delete shown on row hover */}
                           <div style={{
-                            display: 'flex', gap: 2, flexShrink: 0,
-                            opacity: isHovered ? 1 : 0,
-                            transition: 'opacity 0.15s',
+                            display: isHovered ? 'flex' : 'none', gap: 2, flexShrink: 0,
                           }}>
                             <button
                               onClick={() => { setEditHabit(habit); setShowModal(true) }}
