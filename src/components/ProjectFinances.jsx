@@ -40,7 +40,7 @@ function fmtFull(n, cur = '€') {
 export default function ProjectFinances({ projectId }) {
   const [resources,     setResources]     = useState([])
   const [allocations,   setAllocations]   = useState({})  // key: `${resourceId}_${weekIso}` → hours
-  const [financials,    setFinancials]    = useState({ currency: '€', contract_value: 0, invoiced_to_date: 0, effort_to_date: null, etc_effort: 0 })
+  const [financials,    setFinancials]    = useState({ currency: '€', contract_value: 0, invoiced_to_date: 0, effort_to_date: null })
   const [week,          setWeek]          = useState(() => weekMonday())
   const [loading,       setLoading]       = useState(true)
   const [editFinancials, setEditFinancials] = useState(false)
@@ -98,7 +98,6 @@ export default function ProjectFinances({ projectId }) {
       effort_to_date: finForm.effort_to_date !== '' && finForm.effort_to_date != null
         ? parseFloat(finForm.effort_to_date)
         : null,
-      etc_effort: parseFloat(finForm.etc_effort) || 0,
       updated_at: new Date().toISOString(),
     }
     const { error } = await supabase.from('project_financials').upsert(payload, { onConflict: 'project_id' })
@@ -145,26 +144,31 @@ export default function ProjectFinances({ projectId }) {
   // ── Computed metrics ───────────────────────────────────────────────────────
   const currency = financials.currency || '€'
 
-  // Calculated ETD from all allocations
-  const calcEtd = resources.reduce((sum, r) => {
+  // Past/current weeks → ETD; future weeks → ETC (auto)
+  const calcEtdPast = resources.reduce((sum, r) => {
     return sum + Object.entries(allocations)
-      .filter(([k]) => k.startsWith(r.id + '_'))
+      .filter(([k]) => k.startsWith(r.id + '_') && k.slice(r.id.length + 1) <= today)
       .reduce((s, [, h]) => s + h * r.hourly_rate, 0)
   }, 0)
 
-  // ETD = base histórica (manual) + allocations
-  const etdBase      = financials.effort_to_date != null ? Number(financials.effort_to_date) : 0
-  const etd          = etdBase + calcEtd
+  const etcEffort = resources.reduce((sum, r) => {
+    return sum + Object.entries(allocations)
+      .filter(([k]) => k.startsWith(r.id + '_') && k.slice(r.id.length + 1) > today)
+      .reduce((s, [, h]) => s + h * r.hourly_rate, 0)
+  }, 0)
+
+  // ETD = base histórica (manual) + past allocations
+  const etdBase = financials.effort_to_date != null ? Number(financials.effort_to_date) : 0
+  const etd     = etdBase + calcEtdPast
 
   // This week totals (for the resource table)
-  const weekHours = resources.reduce((s, r) => s + (allocations[`${r.id}_${weekIso}`] || 0), 0)
-  const weekCost  = resources.reduce((s, r) => s + (allocations[`${r.id}_${weekIso}`] || 0) * r.hourly_rate, 0)
+  const weekHours  = resources.reduce((s, r) => s + (allocations[`${r.id}_${weekIso}`] || 0), 0)
+  const weekCost   = resources.reduce((s, r) => s + (allocations[`${r.id}_${weekIso}`] || 0) * r.hourly_rate, 0)
   const totalHours = Object.values(allocations).reduce((s, h) => s + h, 0)
 
   // ── Financial table calculations ──────────────────────────────────────────
   const tPresupuesto = financials.contract_value   || 0
   const billed       = financials.invoiced_to_date || 0
-  const etcEffort    = financials.etc_effort        || 0
 
   const beToDate   = billed - etd                          // Billed − ETD
   const etcBilling = tPresupuesto - billed                 // T.Pres − Billed
@@ -187,7 +191,7 @@ export default function ProjectFinances({ projectId }) {
           <span style={{ fontSize: 12, fontWeight: 600, color: '#6e6e73' }}>Finanzas</span>
           {!editFinancials ? (
             <button
-              onClick={() => { setFinForm({ ...financials, effort_to_date: financials.effort_to_date ?? '', etc_effort: financials.etc_effort ?? '' }); setEditFinancials(true) }}
+              onClick={() => { setFinForm({ ...financials, effort_to_date: financials.effort_to_date ?? '' }); setEditFinancials(true) }}
               style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#6e6e73', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
               onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
               onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}
@@ -206,7 +210,6 @@ export default function ProjectFinances({ projectId }) {
             {[
               { k: 'contract_value',   l: 'T. Presupuesto' },
               { k: 'invoiced_to_date', l: 'Billed' },
-              { k: 'etc_effort',       l: 'ETC Effort' },
             ].map(({ k, l }) => (
               <div key={k}>
                 <label style={{ fontSize: 10, fontWeight: 600, color: '#6e6e73', display: 'block', marginBottom: 5 }}>{l}</label>
