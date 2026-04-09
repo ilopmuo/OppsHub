@@ -790,7 +790,7 @@ export default function Habits() {
             if (!habits.length) return null
 
             // ── SVG helpers ───────────────────────────────────────────────────
-            const W = 340, H = 100, PAD = { t: 8, r: 8, b: 24, l: 28 }
+            const W = 340, H = 62, PAD = { t: 4, r: 6, b: 18, l: 24 }
             const chartW = W - PAD.l - PAD.r
             const chartH = H - PAD.t - PAD.b
 
@@ -812,48 +812,78 @@ export default function Habits() {
               : ''
 
             return (
-              <div className="mt-8">
-                <p className="text-xs font-medium uppercase tracking-widest mb-4" style={{ color: '#3a3a3a' }}>Habit Reports</p>
+              <div className="mt-6">
+                <p className="text-xs font-medium uppercase tracking-widest mb-3" style={{ color: '#3a3a3a' }}>Habit Reports</p>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, alignItems: 'start' }}>
+                {/* ── Single row: Completado · Rachas · Charts ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: 10, alignItems: 'start' }}>
 
                   {/* ── Chart 1: Tasa por hábito ── */}
-                  <div style={{ backgroundColor: BG2, borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px' }}>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: '#6e6e73', marginBottom: 14 }}>Completado por hábito</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ backgroundColor: BG2, borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)', padding: '14px 16px' }}>
+                    <p style={{ fontSize: 10, fontWeight: 600, color: '#6e6e73', marginBottom: 12, letterSpacing: '0.04em' }}>Completado</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                       {habitStats.map(({ habit, pct, done, scheduled }) => (
                         <div key={habit.id}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: habit.color, flexShrink: 0 }} />
-                              <span style={{ fontSize: 11, color: '#f5f5f7', fontWeight: 500, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{habit.name}</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <div style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: habit.color, flexShrink: 0 }} />
+                              <span style={{ fontSize: 11, color: '#f5f5f7', fontWeight: 500, maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{habit.name}</span>
                             </div>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: '#6e6e73' }}>{done}/{scheduled}</span>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: '#4a4a4a' }}>{done}/{scheduled}</span>
                           </div>
-                          <div style={{ height: 4, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${pct}%`, borderRadius: 4, backgroundColor: habit.color, opacity: 0.85, transition: 'width 0.5s ease' }} />
+                          <div style={{ height: 3, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${pct}%`, borderRadius: 3, backgroundColor: habit.color, opacity: 0.85, transition: 'width 0.5s ease' }} />
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
 
+                  {/* ── Chart 4: Rachas por hábito ── */}
+                  <div style={{ backgroundColor: BG2, borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)', padding: '14px 16px' }}>
+                    <p style={{ fontSize: 10, fontWeight: 600, color: '#6e6e73', marginBottom: 12, letterSpacing: '0.04em' }}>Rachas</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                      {habits.map(h => {
+                        const { current, best } = computeStreaks(h, allLogs, TODAY)
+                        return (
+                          <div key={h.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                              <div style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: h.color, flexShrink: 0 }} />
+                              <span style={{ fontSize: 11, color: '#f5f5f7', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 80 }}>{h.name}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                              <div style={{ textAlign: 'right' }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: current > 0 ? '#f5f5f7' : '#3a3a3a' }}>{current}</span>
+                                <span style={{ fontSize: 9, color: '#3a3a3a', marginLeft: 2 }}>hoy</span>
+                              </div>
+                              <div style={{ width: 1, height: 14, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+                              <div style={{ textAlign: 'right' }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#4a4a4a' }}>{best}</span>
+                                <span style={{ fontSize: 9, color: '#3a3a3a', marginLeft: 2 }}>max</span>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
                   {/* ── Charts 2 + 3 apilados ── */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
                     {/* ── Chart 2: Tendencia diaria ── */}
-                    <div style={{ backgroundColor: BG2, borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '14px 16px' }}>
-                      <p style={{ fontSize: 11, fontWeight: 600, color: '#6e6e73', marginBottom: 8 }}>Tendencia diaria</p>
+                    <div style={{ backgroundColor: BG2, borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)', padding: '12px 14px' }}>
+                      <p style={{ fontSize: 10, fontWeight: 600, color: '#6e6e73', marginBottom: 6, letterSpacing: '0.04em' }}>Tendencia diaria</p>
                       {dailyData.length < 2 ? (
-                        <p style={{ fontSize: 11, color: '#3a3a3a', marginTop: 16, textAlign: 'center' }}>Sin datos suficientes</p>
+                        <p style={{ fontSize: 10, color: '#3a3a3a', textAlign: 'center', padding: '10px 0' }}>Sin datos suficientes</p>
                       ) : (
-                        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible' }}>
+                        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible', display: 'block' }}>
                           {[0, Math.round(maxDone / 2), maxDone].map((v, i) => {
                             const y = PAD.t + chartH - (v / maxDone) * chartH
                             return (
                               <g key={i}>
                                 <line x1={PAD.l - 4} y1={y} x2={PAD.l + chartW} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-                                <text x={PAD.l - 6} y={y + 4} textAnchor="end" fontSize="8" fill="#3a3a3a">{v}</text>
+                                <text x={PAD.l - 6} y={y + 3} textAnchor="end" fontSize="7" fill="#3a3a3a">{v}</text>
                               </g>
                             )
                           })}
@@ -862,26 +892,26 @@ export default function Habits() {
                           {dailyData.map((d, i) => {
                             const x = PAD.l + (i / (dailyData.length - 1)) * chartW
                             const y = PAD.t + chartH - (d.done / maxDone) * chartH
-                            return <circle key={i} cx={x} cy={y} r="2.5" fill="#f5f5f7" />
+                            return <circle key={i} cx={x} cy={y} r="2" fill="#f5f5f7" />
                           })}
                           {[0, Math.floor((dailyData.length - 1) / 2), dailyData.length - 1].map(i => {
                             const x = PAD.l + (i / (dailyData.length - 1)) * chartW
-                            return <text key={i} x={x} y={H - 6} textAnchor="middle" fontSize="8" fill="#3a3a3a">{dailyData[i]?.day}</text>
+                            return <text key={i} x={x} y={H - 3} textAnchor="middle" fontSize="7" fill="#3a3a3a">{dailyData[i]?.day}</text>
                           })}
                         </svg>
                       )}
                     </div>
 
                     {/* ── Chart 3: Día de la semana ── */}
-                    <div style={{ backgroundColor: BG2, borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '14px 16px' }}>
-                      <p style={{ fontSize: 11, fontWeight: 600, color: '#6e6e73', marginBottom: 8 }}>Rendimiento por día</p>
-                      <svg width="100%" viewBox={`0 0 ${W} ${H}`}>
+                    <div style={{ backgroundColor: BG2, borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)', padding: '12px 14px' }}>
+                      <p style={{ fontSize: 10, fontWeight: 600, color: '#6e6e73', marginBottom: 6, letterSpacing: '0.04em' }}>Rendimiento por día</p>
+                      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
                         {[0, 50, 100].map(v => {
                           const y = PAD.t + chartH - (v / 100) * chartH
                           return (
                             <g key={v}>
                               <line x1={PAD.l} y1={y} x2={PAD.l + chartW} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-                              <text x={PAD.l - 6} y={y + 4} textAnchor="end" fontSize="8" fill="#3a3a3a">{v}</text>
+                              <text x={PAD.l - 6} y={y + 3} textAnchor="end" fontSize="7" fill="#3a3a3a">{v}</text>
                             </g>
                           )
                         })}
@@ -894,9 +924,9 @@ export default function Habits() {
                             <g key={i}>
                               <rect x={x} y={PAD.t} width={barW} height={chartH} rx="3" fill="rgba(255,255,255,0.03)" />
                               {sched > 0 && <rect x={x} y={y} width={barW} height={Math.max(barH, 0)} rx="3" fill={`rgba(48,209,88,${0.15 + (pct / 100) * 0.75})`} />}
-                              <text x={x + barW / 2} y={H - 6} textAnchor="middle" fontSize="8" fill={sched > 0 ? '#6e6e73' : '#3a3a3a'}>{label}</text>
+                              <text x={x + barW / 2} y={H - 3} textAnchor="middle" fontSize="7" fill={sched > 0 ? '#6e6e73' : '#3a3a3a'}>{label}</text>
                               {sched > 0 && pct > 0 && (
-                                <text x={x + barW / 2} y={y - 3} textAnchor="middle" fontSize="7" fill="#4a4a4a">{pct}%</text>
+                                <text x={x + barW / 2} y={y - 2} textAnchor="middle" fontSize="6" fill="#4a4a4a">{pct}%</text>
                               )}
                             </g>
                           )
@@ -907,41 +937,9 @@ export default function Habits() {
                   </div>
                 </div>
 
-                {/* ── Second row: Rachas + Heatmap ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginTop: 12, alignItems: 'start' }}>
-
-                  {/* ── Chart 4: Rachas por hábito ── */}
-                  <div style={{ backgroundColor: BG2, borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px' }}>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: '#6e6e73', marginBottom: 14 }}>Rachas</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {habits.map(h => {
-                        const { current, best } = computeStreaks(h, allLogs, TODAY)
-                        return (
-                          <div key={h.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                              <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: h.color, flexShrink: 0 }} />
-                              <span style={{ fontSize: 11, color: '#f5f5f7', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>{h.name}</span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                              <div style={{ textAlign: 'center' }}>
-                                <p style={{ fontSize: 14, fontWeight: 800, color: current > 0 ? '#f5f5f7' : '#3a3a3a', lineHeight: 1 }}>{current}</p>
-                                <p style={{ fontSize: 8, color: '#3a3a3a', marginTop: 1 }}>actual</p>
-                              </div>
-                              <div style={{ width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.06)' }} />
-                              <div style={{ textAlign: 'center' }}>
-                                <p style={{ fontSize: 14, fontWeight: 800, color: '#4a4a4a', lineHeight: 1 }}>{best}</p>
-                                <p style={{ fontSize: 8, color: '#3a3a3a', marginTop: 1 }}>récord</p>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {/* ── Chart 5: Heatmap anual ── */}
+                {/* ── Heatmap anual — full width ── */}
+                <div style={{ marginTop: 10 }}>
                   <HabitHeatmap habits={habits} allLogs={allLogs} TODAY={TODAY} />
-
                 </div>
 
               </div>
