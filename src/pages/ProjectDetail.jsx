@@ -17,6 +17,7 @@ import ActivityLog from '../components/ActivityLog'
 import ProjectNotificationSettings from '../components/ProjectNotificationSettings'
 import ProjectDetailReports from '../components/ProjectDetailReports'
 import ProjectIconUpload from '../components/ProjectIconUpload'
+import ProjectFinances from '../components/ProjectFinances'
 import { notify } from '../lib/notify'
 
 async function logActivity(projectId, userId, action, metadata = {}) {
@@ -77,6 +78,7 @@ export default function ProjectDetail() {
   const [filter, setFilter] = useState('todo')
   const [taskView, setTaskView] = useState(getTaskView)
   const [editingDetails, setEditingDetails] = useState(false)
+  const [activeTab, setActiveTab] = useState('tasks') // 'tasks' | 'finances'
 
   // Form fields
   const [name, setName] = useState('')
@@ -392,8 +394,37 @@ export default function ProjectDetail() {
         {/* ── Two-column layout ── */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_272px] gap-8 items-start">
 
-          {/* ── LEFT: Tasks (primary) ── */}
+          {/* ── LEFT: Tab content ── */}
           <div>
+            {/* Tab switcher */}
+            <div className="flex items-center gap-1 mb-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 0 }}>
+              {[
+                { id: 'tasks',    label: 'Tareas' },
+                { id: 'finances', label: 'Recursos & Finanzas' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className="px-4 py-2.5 text-sm font-medium transition-all"
+                  style={{
+                    color: activeTab === tab.id ? '#f5f5f7' : '#6e6e73',
+                    borderBottom: activeTab === tab.id ? '1.5px solid #f5f5f7' : '1.5px solid transparent',
+                    marginBottom: -1,
+                    background: 'none', border: 'none',
+                    borderBottomStyle: 'solid',
+                    borderBottomWidth: 1.5,
+                    borderBottomColor: activeTab === tab.id ? '#f5f5f7' : 'transparent',
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                  onMouseEnter={e => { if (activeTab !== tab.id) e.currentTarget.style.color = '#f5f5f7' }}
+                  onMouseLeave={e => { if (activeTab !== tab.id) e.currentTarget.style.color = '#6e6e73' }}
+                >{tab.label}</button>
+              ))}
+            </div>
+
+            {activeTab === 'finances' && <ProjectFinances projectId={id} />}
+
+            {activeTab === 'tasks' && (
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-semibold" style={{ color: '#f5f5f7' }}>Tareas</h2>
@@ -478,6 +509,7 @@ export default function ProjectDetail() {
               </>
             )}
           <ProjectDetailReports project={project} tasks={tasks} milestones={milestones} />
+            )}
           </div>
 
           {/* ── RIGHT: Sidebar ── */}
