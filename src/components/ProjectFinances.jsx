@@ -11,7 +11,10 @@ function weekMonday(date = new Date()) {
   d.setHours(0, 0, 0, 0)
   return d
 }
-function isoDate(d) { return d.toISOString().slice(0, 10) }
+function isoDate(d) {
+  const p = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
 function weekLabel(monday) {
   const sun = new Date(monday); sun.setDate(sun.getDate() + 6)
   const f = d => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
@@ -78,7 +81,8 @@ export default function ProjectFinances({ projectId, endDate }) {
   // local edit buffers (before blur-save)
   const [plannedBuf,     setPlannedBuf]     = useState({})
   const [actualBuf,      setActualBuf]      = useState({})
-  const [billedBuf,      setBilledBuf]      = useState({})
+  // single billed cell being edited: { week: string, value: string } | null
+  const [billedEdit,     setBilledEdit]     = useState(null)
 
   const weekIso = isoDate(week)
   const today   = isoDate(weekMonday())
@@ -155,7 +159,7 @@ export default function ProjectFinances({ projectId, endDate }) {
   async function saveBilled(weekStr, val) {
     const billed = parseFloat(val) || 0
     setWeeklyBilling(p => ({ ...p, [weekStr]: billed }))
-    setBilledBuf(p => { const n = { ...p }; delete n[weekStr]; return n })
+    setBilledEdit(null)
     await supabase.from('project_weekly_financials').upsert(
       { project_id: projectId, week_start: weekStr, billed_cumulative: billed },
       { onConflict: 'project_id,week_start' }
@@ -210,12 +214,12 @@ export default function ProjectFinances({ projectId, endDate }) {
   const tPresupuesto = financials.contract_value || 0
 
   const allWeeks = useMemo(() => {
+    // Only allocations (plan/actual) determine which weeks appear — never weeklyBilling
     const s = new Set([today])
     Object.keys(planned).forEach(k => s.add(k.slice(-10)))
     Object.keys(actual).forEach(k => s.add(k.slice(-10)))
-    Object.keys(weeklyBilling).forEach(k => s.add(k))
     const sorted = [...s].sort()
-    // Fill contiguous from first to today
+    // Fill contiguous weeks from earliest entry to today
     const result = []
     let cur = weekMonday(new Date(sorted[0] + 'T12:00:00'))
     const end = weekMonday(new Date(today + 'T12:00:00'))
@@ -224,7 +228,7 @@ export default function ProjectFinances({ projectId, endDate }) {
       cur = new Date(cur); cur.setDate(cur.getDate() + 7)
     }
     return result
-  }, [planned, actual, weeklyBilling, today])
+  }, [planned, actual, today])
 
   // For a given weekStr: ETD = etdBase + cumulative ACTUAL costs up to that week
   function etdAt(weekStr) {
@@ -321,9 +325,12 @@ export default function ProjectFinances({ projectId, endDate }) {
             </thead>
             <tbody>
               {allWeeks.map(weekStr => {
-                const etd    = etdAt(weekStr)
-                const etc    = etcAt(weekStr)
-                const billed = weekStr in billedBuf ? parseFloat(billedBuf[weekStr]) || 0 : (weeklyBilling[weekStr] || 0)
+                const etd       = etdAt(weekStr)
+                const etc       = etcAt(weekStr)
+                const isEditing = billedEdit?.week === weekStr
+                const billed    = isEditing
+                  ? parseFloat(billedEdit.value) || 0
+                  : (weeklyBilling[weekStr] || 0)
                 const isCur  = weekStr === today
 
                 const beToDate    = billed - etd
@@ -351,11 +358,19 @@ export default function ProjectFinances({ projectId, endDate }) {
                     <td style={{ ...CELL, textAlign: 'right' }}>
                       <input
                         type="number" min="0" step="100"
-                        value={weekStr in billedBuf ? billedBuf[weekStr] : (weeklyBilling[weekStr] || '')}
+                        value={isEditing ? billedEdit.value : (weeklyBilling[weekStr] || '')}
                         placeholder="—"
-                        onChange={e => setBilledBuf(p => ({ ...p, [weekStr]: e.target.value }))}
-                        onFocus={e => { setBilledBuf(p => ({ ...p, [weekStr]: weeklyBilling[weekStr] || '' })); e.target.style.borderColor = 'rgba(255,255,255,0.2)'; e.target.style.backgroundColor = 'rgba(255,255,255,0.07)' }}
-                        onBlur={async e => { e.target.style.borderColor = 'transparent'; e.target.style.backgroundColor = 'transparent'; await saveBilled(weekStr, billedBuf[weekStr] ?? weeklyBilling[weekStr] ?? 0) }}
+                        onChange={e => setBilledEdit({ week: weekStr, value: e.target.value })}
+                        onFocus={e => {
+                          setBilledEdit({ week: weekStr, value: String(weeklyBilling[weekStr] || '') })
+                          e.target.style.borderColor = 'rgba(255,255,255,0.2)'
+                          e.target.style.backgroundColor = 'rgba(255,255,255,0.07)'
+                        }}
+                        onBlur={async e => {
+                          e.target.style.borderColor = 'transparent'
+                          e.target.style.backgroundColor = 'transparent'
+                          await saveBilled(weekStr, billedEdit?.value ?? weeklyBilling[weekStr] ?? 0)
+                        }}
                         onKeyDown={e => e.key === 'Enter' && e.target.blur()}
                         style={{ width: 80, textAlign: 'right', fontSize: 12, fontFamily: 'inherit', backgroundColor: 'transparent', border: '1px solid transparent', borderRadius: 5, padding: '2px 5px', color: weeklyBilling[weekStr] > 0 ? '#f5f5f7' : '#3a3a3a', outline: 'none', transition: 'all 0.15s' }}
                       />
