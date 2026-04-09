@@ -33,11 +33,14 @@ function fmt(n, cur = '€') {
   if (n >= 1000)    return `${(n / 1000).toFixed(1)}k${cur}`
   return `${Number(n).toFixed(0)}${cur}`
 }
+function fmtFull(n, cur = '€') {
+  return `${cur}${Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
 
 export default function ProjectFinances({ projectId }) {
   const [resources,     setResources]     = useState([])
   const [allocations,   setAllocations]   = useState({})  // key: `${resourceId}_${weekIso}` → hours
-  const [financials,    setFinancials]    = useState({ currency: '€', contract_value: 0, invoiced_to_date: 0, effort_to_date: null })
+  const [financials,    setFinancials]    = useState({ currency: '€', contract_value: 0, invoiced_to_date: 0, effort_to_date: null, etc_effort: 0 })
   const [week,          setWeek]          = useState(() => weekMonday())
   const [loading,       setLoading]       = useState(true)
   const [editFinancials, setEditFinancials] = useState(false)
@@ -95,6 +98,7 @@ export default function ProjectFinances({ projectId }) {
       effort_to_date: finForm.effort_to_date !== '' && finForm.effort_to_date != null
         ? parseFloat(finForm.effort_to_date)
         : null,
+      etc_effort: parseFloat(finForm.etc_effort) || 0,
       updated_at: new Date().toISOString(),
     }
     const { error } = await supabase.from('project_financials').upsert(payload, { onConflict: 'project_id' })
@@ -141,92 +145,84 @@ export default function ProjectFinances({ projectId }) {
   // ── Computed metrics ───────────────────────────────────────────────────────
   const currency = financials.currency || '€'
 
-  // Calculated ETD from all allocations (all weeks, past and future)
+  // Calculated ETD from all allocations
   const calcEtd = resources.reduce((sum, r) => {
     return sum + Object.entries(allocations)
       .filter(([k]) => k.startsWith(r.id + '_'))
       .reduce((s, [, h]) => s + h * r.hourly_rate, 0)
   }, 0)
 
-  // ETD = base histórica (manual) + todo lo calculado de allocations
+  // ETD = base histórica (manual) + allocations
   const etdBase      = financials.effort_to_date != null ? Number(financials.effort_to_date) : 0
-  const effortToDate = etdBase + calcEtd
+  const etd          = etdBase + calcEtd
 
-  // This week totals
+  // This week totals (for the resource table)
   const weekHours = resources.reduce((s, r) => s + (allocations[`${r.id}_${weekIso}`] || 0), 0)
   const weekCost  = resources.reduce((s, r) => s + (allocations[`${r.id}_${weekIso}`] || 0) * r.hourly_rate, 0)
-
-  // All-time totals
   const totalHours = Object.values(allocations).reduce((s, h) => s + h, 0)
 
-  const contract  = financials.contract_value || 0
-  const invoiced  = financials.invoiced_to_date || 0
-  const remaining = contract - effortToDate
-  const margin    = contract - effortToDate
-  const burnPct   = contract > 0 ? Math.min(Math.round(effortToDate / contract * 100), 100) : 0
-  const invoicedPct = contract > 0 ? Math.min(Math.round(invoiced / contract * 100), 100) : 0
-  const marginColor = margin >= 0 ? '#30d158' : '#ff453a'
+  // ── Financial table calculations ──────────────────────────────────────────
+  const tPresupuesto = financials.contract_value   || 0
+  const billed       = financials.invoiced_to_date || 0
+  const etcEffort    = financials.etc_effort        || 0
+
+  const beToDate   = billed - etd                          // Billed − ETD
+  const etcBilling = tPresupuesto - billed                 // T.Pres − Billed
+  const totalEffort = etd + etcEffort                      // ETD + ETC Effort
+  const totalBill   = tPresupuesto                         // always = contract
+  const resultEtc   = tPresupuesto - totalEffort           // T.Pres − Total Effort
+  const pctProgress = totalEffort > 0 ? etd / totalEffort * 100 : 0
+  const pctOff      = tPresupuesto > 0 ? resultEtc / tPresupuesto * 100 : 0
 
   if (loading) return <div className="skeleton rounded-2xl" style={{ height: 300 }} />
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-      {/* ── Financial KPIs ────────────────────────────────────────────────── */}
+      {/* ── Financial table ───────────────────────────────────────────────── */}
       <div style={{ backgroundColor: '#111', borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: '#6e6e73' }}>Finanzas</span>
           {!editFinancials ? (
             <button
-              onClick={() => { setFinForm({ ...financials, effort_to_date: financials.effort_to_date ?? '' }); setEditFinancials(true) }}
+              onClick={() => { setFinForm({ ...financials, effort_to_date: financials.effort_to_date ?? '', etc_effort: financials.etc_effort ?? '' }); setEditFinancials(true) }}
               style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#6e6e73', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
               onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
               onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}
-            >
-              <Pencil size={11} /> Editar
-            </button>
+            ><Pencil size={11} /> Editar</button>
           ) : (
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setEditFinancials(false)} style={{ fontSize: 11, color: '#6e6e73', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
-              <button
-                onClick={saveFinancials}
-                style={{ fontSize: 11, fontWeight: 600, color: '#000', background: '#f5f5f7', border: 'none', borderRadius: 7, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
-              >Guardar</button>
+              <button onClick={saveFinancials} style={{ fontSize: 11, fontWeight: 600, color: '#000', background: '#f5f5f7', border: 'none', borderRadius: 7, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>Guardar</button>
             </div>
           )}
         </div>
 
-        {editFinancials ? (
-          <div style={{ padding: '16px 18px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) 80px', gap: 12 }}>
+        {/* Edit form */}
+        {editFinancials && (
+          <div style={{ padding: '16px 18px', display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             {[
-              ['contract_value', 'Contract'],
-              ['invoiced_to_date', 'Invoiced to date'],
-            ].map(([k, l]) => (
+              { k: 'contract_value',   l: 'T. Presupuesto' },
+              { k: 'invoiced_to_date', l: 'Billed' },
+              { k: 'etc_effort',       l: 'ETC Effort' },
+            ].map(({ k, l }) => (
               <div key={k}>
                 <label style={{ fontSize: 10, fontWeight: 600, color: '#6e6e73', display: 'block', marginBottom: 5 }}>{l}</label>
-                <input
-                  style={INPUT} type="number" min="0" step="100"
-                  value={finForm[k] || ''}
+                <input style={INPUT} type="number" min="0" step="100"
+                  value={finForm[k] ?? ''}
                   onChange={e => setFinForm(p => ({ ...p, [k]: e.target.value }))}
-                  placeholder="0"
-                />
+                  placeholder="0" />
               </div>
             ))}
             <div>
-              <label style={{ fontSize: 10, fontWeight: 600, color: '#6e6e73', display: 'block', marginBottom: 5 }}>
-                Coste previo (base)
-              </label>
-              <input
-                style={INPUT} type="number" min="0" step="100"
+              <label style={{ fontSize: 10, fontWeight: 600, color: '#6e6e73', display: 'block', marginBottom: 5 }}>ETD base histórica</label>
+              <input style={INPUT} type="number" min="0" step="100"
                 value={finForm.effort_to_date ?? ''}
                 onChange={e => setFinForm(p => ({ ...p, effort_to_date: e.target.value === '' ? null : e.target.value }))}
-                placeholder="0"
-              />
-              {calcEtd > 0 && (
-                <p style={{ fontSize: 9, color: '#3a3a3a', marginTop: 3 }}>
-                  + {fmt(calcEtd, finForm.currency || '€')} de allocations = {fmt((parseFloat(finForm.effort_to_date) || 0) + calcEtd, finForm.currency || '€')} total
-                </p>
-              )}
+                placeholder="0" />
+              {calcEtd > 0 && <p style={{ fontSize: 9, color: '#3a3a3a', marginTop: 3 }}>+ {fmt(calcEtd, finForm.currency || '€')} allocations</p>}
             </div>
             <div>
               <label style={{ fontSize: 10, fontWeight: 600, color: '#6e6e73', display: 'block', marginBottom: 5 }}>Moneda</label>
@@ -235,53 +231,76 @@ export default function ProjectFinances({ projectId }) {
               </select>
             </div>
           </div>
-        ) : (
-          <div style={{ padding: '16px 18px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
-              {[
-                { label: 'Contract',         val: fmt(contract, currency),                                    sub: 'valor contratado',   color: '#f5f5f7' },
-                { label: 'Effort to date',   val: fmt(effortToDate, currency),  sub: `${burnPct}% del contract`, color: burnPct > 90 ? '#ff453a' : burnPct > 75 ? '#ff9f0a' : '#f5f5f7' },
-                { label: 'Invoiced to date', val: fmt(invoiced, currency),                                   sub: `${invoicedPct}% del contract`, color: '#f5f5f7' },
-                { label: 'Margen restante',  val: (margin >= 0 ? '' : '-') + fmt(Math.abs(margin), currency), sub: margin >= 0 ? 'disponible' : 'en negativo', color: marginColor },
-              ].map(({ label, val, sub, color }) => (
-                <div key={label} style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: '10px 12px' }}>
-                  <p style={{ fontSize: 9, color: '#3a3a3a', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 4 }}>{label}</p>
-                  <p style={{ fontSize: 18, fontWeight: 800, color, lineHeight: 1, marginBottom: 3 }}>{val}</p>
-                  <p style={{ fontSize: 9, color: '#3a3a3a' }}>{sub}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Burn bars */}
-            {contract > 0 && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 9, color: '#3a3a3a', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Burn rate</span>
-                  <span style={{ fontSize: 9, color: '#4a4a4a' }}>{burnPct}% consumido · {invoicedPct}% facturado</span>
-                </div>
-                <div style={{ position: 'relative', height: 6, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 4 }}>
-                  {/* Effort bar */}
-                  <div style={{ position: 'absolute', inset: 0, width: `${burnPct}%`, borderRadius: 6, backgroundColor: burnPct > 90 ? '#ff453a' : burnPct > 75 ? '#ff9f0a' : '#64d2ff', opacity: 0.7, transition: 'width 0.5s' }} />
-                </div>
-                <div style={{ position: 'relative', height: 4, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.04)', overflow: 'hidden' }}>
-                  {/* Invoiced bar */}
-                  <div style={{ position: 'absolute', inset: 0, width: `${invoicedPct}%`, borderRadius: 4, backgroundColor: '#30d158', opacity: 0.7, transition: 'width 0.5s' }} />
-                </div>
-                <div style={{ display: 'flex', gap: 14, marginTop: 6 }}>
-                  {[
-                    { color: '#64d2ff', label: 'Effort to date' },
-                    { color: '#30d158', label: 'Invoiced to date' },
-                  ].map(({ color, label }) => (
-                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <div style={{ width: 8, height: 3, borderRadius: 2, backgroundColor: color, opacity: 0.7 }} />
-                      <span style={{ fontSize: 9, color: '#3a3a3a' }}>{label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
         )}
+
+        {/* Data table */}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+            <thead>
+              <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                {[
+                  'Date', 'T. Presupuesto', 'Billed', 'Effort to date',
+                  'B-E to date', '% Progress', 'ETC Effort', 'ETC Billing',
+                  'Total Effort', 'Total Bill', 'Result ETC', '% OFF',
+                ].map(h => (
+                  <th key={h} style={{ ...TH, textAlign: h === 'Date' ? 'left' : 'right', paddingRight: h === 'Date' ? 14 : 18 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {/* Date */}
+                <td style={{ ...CELL, color: '#6e6e73' }}>
+                  {new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' })}
+                </td>
+                {/* T. Presupuesto */}
+                <td style={{ ...CELL, textAlign: 'right', paddingRight: 18, color: '#f5f5f7', fontWeight: 600 }}>
+                  {fmtFull(tPresupuesto, currency)}
+                </td>
+                {/* Billed */}
+                <td style={{ ...CELL, textAlign: 'right', paddingRight: 18, color: '#f5f5f7' }}>
+                  {fmtFull(billed, currency)}
+                </td>
+                {/* Effort to date */}
+                <td style={{ ...CELL, textAlign: 'right', paddingRight: 18, color: '#f5f5f7' }}>
+                  {fmtFull(etd, currency)}
+                </td>
+                {/* B-E to date */}
+                <td style={{ ...CELL, textAlign: 'right', paddingRight: 18, color: beToDate >= 0 ? '#30d158' : '#ff453a', fontWeight: 600 }}>
+                  {beToDate >= 0 ? '+' : ''}{fmtFull(beToDate, currency)}
+                </td>
+                {/* % Progress */}
+                <td style={{ ...CELL, textAlign: 'right', paddingRight: 18, color: '#f5f5f7' }}>
+                  {pctProgress.toFixed(2)}%
+                </td>
+                {/* ETC Effort */}
+                <td style={{ ...CELL, textAlign: 'right', paddingRight: 18, color: '#f5f5f7' }}>
+                  {fmtFull(etcEffort, currency)}
+                </td>
+                {/* ETC Billing */}
+                <td style={{ ...CELL, textAlign: 'right', paddingRight: 18, color: '#f5f5f7' }}>
+                  {fmtFull(etcBilling, currency)}
+                </td>
+                {/* Total Effort */}
+                <td style={{ ...CELL, textAlign: 'right', paddingRight: 18, color: '#f5f5f7', fontWeight: 600 }}>
+                  {fmtFull(totalEffort, currency)}
+                </td>
+                {/* Total Bill */}
+                <td style={{ ...CELL, textAlign: 'right', paddingRight: 18, color: '#f5f5f7', fontWeight: 600 }}>
+                  {fmtFull(totalBill, currency)}
+                </td>
+                {/* Result ETC */}
+                <td style={{ ...CELL, textAlign: 'right', paddingRight: 18, color: resultEtc >= 0 ? '#30d158' : '#ff453a', fontWeight: 700 }}>
+                  {resultEtc >= 0 ? '+' : ''}{fmtFull(resultEtc, currency)}
+                </td>
+                {/* % OFF */}
+                <td style={{ ...CELL, textAlign: 'right', paddingRight: 18, color: pctOff >= 0 ? '#30d158' : '#ff453a', fontWeight: 700 }}>
+                  {pctOff.toFixed(2)}%
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* ── Resource table ────────────────────────────────────────────────── */}
