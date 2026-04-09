@@ -213,14 +213,15 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
   const etdBase  = financials.effort_to_date != null ? Number(financials.effort_to_date) : 0
   const target   = financials.target_margin   || 20
 
-  // ETD = etdBase + ALL actual hours × rates (cumulative today)
+  // ETD = etdBase + actual hours × rates only for weeks <= today
   const etd = etdBase + resources.reduce((sum, r) =>
     sum + Object.keys(actual)
-      .filter(k => k.startsWith(r.id + '_'))
+      .filter(k => k.startsWith(r.id + '_') && k.slice(r.id.length + 1) <= today)
       .reduce((s, k) => s + (actual[k] || 0) * r.hourly_rate, 0)
   , 0)
 
-  // ETC = planned hours × rates for future weeks until endDate
+  // ETC = planned hours × rates for weeks > today until endDate
+  // Uses actual_hours if available for a future week (partially worked), else planned
   const etcWeeks = useMemo(() => {
     if (!endDate) return 0
     const endIso = isoDate(weekMonday(new Date(endDate + 'T12:00:00')))
@@ -228,11 +229,16 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
     let cur2 = new Date(today + 'T12:00:00'); cur2.setDate(cur2.getDate() + 7)
     while (isoDate(cur2) <= endIso) {
       const wIso = isoDate(cur2)
-      for (const r of resources) total += (planned[`${r.id}_${wIso}`] || 0) * r.hourly_rate
+      for (const r of resources) {
+        const act = actual[`${r.id}_${wIso}`] || 0
+        const plan = planned[`${r.id}_${wIso}`] || 0
+        // If actuals already logged for a future week, use those; otherwise use planned
+        total += (act > 0 ? act : plan) * r.hourly_rate
+      }
       cur2 = new Date(cur2); cur2.setDate(cur2.getDate() + 7)
     }
     return total
-  }, [planned, resources, today, endDate])
+  }, [planned, actual, resources, today, endDate])
 
   // Current metrics
   const currentProfit = billed - etd
@@ -268,9 +274,10 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
   }, [actual, today])
 
   function etdAt(weekStr) {
+    const cap = weekStr <= today ? weekStr : today
     return etdBase + resources.reduce((sum, r) =>
       sum + Object.keys(actual)
-        .filter(k => k.startsWith(r.id + '_') && k.slice(r.id.length + 1) <= weekStr)
+        .filter(k => k.startsWith(r.id + '_') && k.slice(r.id.length + 1) <= cap)
         .reduce((s, k) => s + (actual[k] || 0) * r.hourly_rate, 0)
     , 0)
   }
