@@ -27,6 +27,7 @@ export default function ProjectMembers({ projectId, projectOwnerId }) {
   const [generating, setGenerating] = useState(false)
   const [inviteLink, setInviteLink] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [hoveredId, setHoveredId] = useState(null)
 
   useEffect(() => { fetchMembers() }, [projectId])
 
@@ -138,10 +139,16 @@ export default function ProjectMembers({ projectId, projectOwnerId }) {
           <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#6e6e73' }} />
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1">
           {allMembers.map(m => (
-            <div key={m.id} className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold shrink-0"
+            <div
+              key={m.id}
+              className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition-all"
+              style={{ backgroundColor: hoveredId === m.id ? 'rgba(255,255,255,0.03)' : 'transparent' }}
+              onMouseEnter={() => setHoveredId(m.id)}
+              onMouseLeave={() => setHoveredId(null)}
+            >
+              <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold shrink-0"
                 style={{ backgroundColor: m.profile?.avatar_url ? '#000' : avatarColor(m.profile?.email), color: '#000' }}>
                 {m.profile?.avatar_url
                   ? <img src={m.profile.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -153,14 +160,23 @@ export default function ProjectMembers({ projectId, projectOwnerId }) {
                 </p>
               </div>
               {m.role === 'owner' ? (
-                <Crown className="w-3.5 h-3.5 shrink-0" style={{ color: '#ff9f0a' }} />
+                <Crown className="w-3 h-3 shrink-0" style={{ color: '#ff9f0a', opacity: 0.7 }} />
               ) : isOwner ? (
-                <button onClick={() => removeMember(m.id)}
-                  className="opacity-0 hover:opacity-100 transition-all p-1 rounded"
-                  style={{ color: '#6e6e73' }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#ff453a'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}>
-                  <X className="w-3.5 h-3.5" />
+                <button
+                  onClick={() => removeMember(m.id)}
+                  style={{
+                    width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer',
+                    color: '#6e6e73',
+                    opacity: hoveredId === m.id ? 1 : 0,
+                    transition: 'opacity 0.15s, color 0.15s, background-color 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = '#ff453a'; e.currentTarget.style.backgroundColor = 'rgba(255,69,58,0.12)' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+                  title="Eliminar del proyecto"
+                >
+                  <X className="w-3 h-3" />
                 </button>
               ) : (
                 <span className="text-xs" style={{ color: '#3a3a3a' }}>miembro</span>
