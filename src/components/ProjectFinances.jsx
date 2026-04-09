@@ -37,7 +37,7 @@ function fmt(n, cur = '€') {
 export default function ProjectFinances({ projectId }) {
   const [resources,     setResources]     = useState([])
   const [allocations,   setAllocations]   = useState({})  // key: `${resourceId}_${weekIso}` → hours
-  const [financials,    setFinancials]    = useState({ currency: '€', contract_value: 0, invoiced_to_date: 0 })
+  const [financials,    setFinancials]    = useState({ currency: '€', contract_value: 0, invoiced_to_date: 0, effort_to_date: null })
   const [week,          setWeek]          = useState(() => weekMonday())
   const [loading,       setLoading]       = useState(true)
   const [editFinancials, setEditFinancials] = useState(false)
@@ -92,6 +92,9 @@ export default function ProjectFinances({ projectId }) {
       currency: finForm.currency || '€',
       contract_value: parseFloat(finForm.contract_value) || 0,
       invoiced_to_date: parseFloat(finForm.invoiced_to_date) || 0,
+      effort_to_date: finForm.effort_to_date !== '' && finForm.effort_to_date != null
+        ? parseFloat(finForm.effort_to_date)
+        : null,
       updated_at: new Date().toISOString(),
     }
     const { error } = await supabase.from('project_financials').upsert(payload, { onConflict: 'project_id' })
@@ -138,12 +141,16 @@ export default function ProjectFinances({ projectId }) {
   // ── Computed metrics ───────────────────────────────────────────────────────
   const currency = financials.currency || '€'
 
-  // Effort to date = sum of all allocation costs up to and including current week
-  const effortToDate = resources.reduce((sum, r) => {
+  // Auto-calculated ETD from allocations (past + current week)
+  const calcEtd = resources.reduce((sum, r) => {
     return sum + Object.entries(allocations)
       .filter(([k]) => k.startsWith(r.id + '_') && k.slice(r.id.length + 1) <= today)
       .reduce((s, [, h]) => s + h * r.hourly_rate, 0)
   }, 0)
+
+  // Use manual override if set, otherwise use calculated
+  const effortToDate = financials.effort_to_date != null ? financials.effort_to_date : calcEtd
+  const etdIsManual  = financials.effort_to_date != null
 
   // This week totals
   const weekHours = resources.reduce((s, r) => s + (allocations[`${r.id}_${weekIso}`] || 0), 0)
@@ -171,7 +178,7 @@ export default function ProjectFinances({ projectId }) {
           <span style={{ fontSize: 12, fontWeight: 600, color: '#6e6e73' }}>Finanzas</span>
           {!editFinancials ? (
             <button
-              onClick={() => { setFinForm({ ...financials }); setEditFinancials(true) }}
+              onClick={() => { setFinForm({ ...financials, effort_to_date: financials.effort_to_date ?? '' }); setEditFinancials(true) }}
               style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#6e6e73', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
               onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
               onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}
@@ -206,10 +213,27 @@ export default function ProjectFinances({ projectId }) {
               </div>
             ))}
             <div>
-              <label style={{ fontSize: 10, fontWeight: 600, color: '#6e6e73', display: 'block', marginBottom: 5 }}>Effort to date</label>
-              <div style={{ ...INPUT, backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: '#6e6e73', cursor: 'default' }}>
-                {fmt(effortToDate, currency)}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                <label style={{ fontSize: 10, fontWeight: 600, color: '#6e6e73' }}>Effort to date</label>
+                {calcEtd > 0 && (
+                  <button
+                    onClick={() => setFinForm(p => ({ ...p, effort_to_date: calcEtd }))}
+                    style={{ fontSize: 9, color: '#64d2ff', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
+                    title="Rellenar con el valor calculado de allocations"
+                  >← {fmt(calcEtd, finForm.currency || '€')}</button>
+                )}
               </div>
+              <input
+                style={INPUT} type="number" min="0" step="100"
+                value={finForm.effort_to_date ?? ''}
+                onChange={e => setFinForm(p => ({ ...p, effort_to_date: e.target.value === '' ? null : e.target.value }))}
+                placeholder={calcEtd > 0 ? fmt(calcEtd, finForm.currency || '€') : '0'}
+              />
+              {calcEtd > 0 && (
+                <p style={{ fontSize: 9, color: '#3a3a3a', marginTop: 3 }}>
+                  Calculado: {fmt(calcEtd, finForm.currency || '€')}
+                </p>
+              )}
             </div>
             <div>
               <label style={{ fontSize: 10, fontWeight: 600, color: '#6e6e73', display: 'block', marginBottom: 5 }}>Moneda</label>
@@ -223,7 +247,7 @@ export default function ProjectFinances({ projectId }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
               {[
                 { label: 'Contract',         val: fmt(contract, currency),                                    sub: 'valor contratado',   color: '#f5f5f7' },
-                { label: 'Effort to date',   val: fmt(effortToDate, currency),                               sub: `${burnPct}% del contract`,  color: burnPct > 90 ? '#ff453a' : burnPct > 75 ? '#ff9f0a' : '#f5f5f7' },
+                { label: 'Effort to date',   val: fmt(effortToDate, currency),  sub: `${burnPct}% del contract${etdIsManual ? ' · manual' : ''}`, color: burnPct > 90 ? '#ff453a' : burnPct > 75 ? '#ff9f0a' : '#f5f5f7' },
                 { label: 'Invoiced to date', val: fmt(invoiced, currency),                                   sub: `${invoicedPct}% del contract`, color: '#f5f5f7' },
                 { label: 'Margen restante',  val: (margin >= 0 ? '' : '-') + fmt(Math.abs(margin), currency), sub: margin >= 0 ? 'disponible' : 'en negativo', color: marginColor },
               ].map(({ label, val, sub, color }) => (
