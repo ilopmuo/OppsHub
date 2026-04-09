@@ -425,7 +425,7 @@ export default function ProjectDetail() {
             {activeTab === 'finances' && <ProjectFinances projectId={id} />}
 
             {activeTab === 'tasks' && (
-            <div className="flex items-center justify-between mb-4">
+            <><div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-semibold" style={{ color: '#f5f5f7' }}>Tareas</h2>
                 {tasks.filter(t => t.status !== 'done').length > 0 && (
@@ -509,7 +509,7 @@ export default function ProjectDetail() {
               </>
             )}
           <ProjectDetailReports project={project} tasks={tasks} milestones={milestones} />
-            )}
+            </>)}
           </div>
 
           {/* ── RIGHT: Sidebar ── */}
