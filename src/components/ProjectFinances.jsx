@@ -115,10 +115,24 @@ export default function ProjectFinances({ projectId, endDate }) {
   }
 
   function etcForWeek(weekStr) {
-    const wMon = weekMonday(new Date(weekStr + 'T12:00:00'))
-    const eMon = endDate ? weekMonday(new Date(endDate + 'T12:00:00')) : null
-    const rem  = eMon ? Math.max(0, Math.round((eMon - wMon) / (7 * 24 * 60 * 60 * 1000))) : 0
-    return resources.reduce((sum, r) => sum + (r.planned_weekly_hours || 0) * r.hourly_rate * rem, 0)
+    if (!endDate) return 0
+    const endIso = isoDate(weekMonday(new Date(endDate + 'T12:00:00')))
+    let total = 0
+    // Iterate every week AFTER weekStr until end of project
+    let cur = new Date(weekStr + 'T12:00:00')
+    cur.setDate(cur.getDate() + 7)
+    while (isoDate(cur) <= endIso) {
+      const wIso = isoDate(cur)
+      for (const r of resources) {
+        // Use actual allocation if entered, otherwise planned_weekly_hours as default
+        const hours = allocations[`${r.id}_${wIso}`] !== undefined
+          ? allocations[`${r.id}_${wIso}`]
+          : (r.planned_weekly_hours || 0)
+        total += hours * r.hourly_rate
+      }
+      cur = new Date(cur); cur.setDate(cur.getDate() + 7)
+    }
+    return total
   }
 
   function billedForWeek(weekStr) {
