@@ -451,14 +451,12 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
     ? invoices.reduce((s, i) => s + i.amount, 0)
     : (financials.invoiced_to_date || 0)
 
-  // ETD = etdBase + Σ resources × effectiveHours × rate
-  // effectiveHours: usa weekly actuals si existen; si no, usa hours_to_date como base manual
+  // ETD = etdBase + Σ resources × (hours_to_date + weekly_actuals_up_to_today) × rate
   const etd = etdBase + resources.reduce((sum, r) => {
     const weeklyActuals = Object.keys(actual)
       .filter(k => k.startsWith(r.id + '_') && k.slice(r.id.length + 1) <= today)
-      .reduce((s, k) => s + (Number(actual[k]) || 0), 0)
-    const effectiveHours = weeklyActuals > 0 ? weeklyActuals : Number(r.hours_to_date || 0)
-    return sum + effectiveHours * Number(r.hourly_rate || 0)
+      .reduce((s, k) => s + (actual[k] || 0), 0)
+    return sum + (weeklyActuals + (r.hours_to_date || 0)) * r.hourly_rate
   }, 0)
 
   const etcWeeks = useMemo(() => {
@@ -511,9 +509,8 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
     return etdBase + resources.reduce((sum, r) => {
       const weeklyActuals = Object.keys(actual)
         .filter(k => k.startsWith(r.id + '_') && k.slice(r.id.length + 1) <= cap)
-        .reduce((s, k) => s + (Number(actual[k]) || 0), 0)
-      const effectiveHours = weeklyActuals > 0 ? weeklyActuals : Number(r.hours_to_date || 0)
-      return sum + effectiveHours * Number(r.hourly_rate || 0)
+        .reduce((s, k) => s + (actual[k] || 0), 0)
+      return sum + (weeklyActuals + (r.hours_to_date || 0)) * r.hourly_rate
     }, 0)
   }
 
@@ -542,9 +539,8 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
     for (const r of resources) {
       const weeklyActuals = Object.keys(actual)
         .filter(k => k.startsWith(r.id + '_') && k.slice(r.id.length + 1) <= today)
-        .reduce((s, k) => s + (Number(actual[k]) || 0), 0)
-      const effectiveHours = weeklyActuals > 0 ? weeklyActuals : Number(r.hours_to_date || 0)
-      map[r.id] = effectiveHours * Number(r.hourly_rate || 0)
+        .reduce((s, k) => s + (actual[k] || 0), 0)
+      map[r.id] = (weeklyActuals + (r.hours_to_date || 0)) * r.hourly_rate
     }
     return map
   }, [resources, actual, today])
