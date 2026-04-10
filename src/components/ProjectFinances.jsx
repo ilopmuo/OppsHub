@@ -317,8 +317,9 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
   const [showAddInvoice, setShowAddInvoice] = useState(false)
   const [invoiceForm,    setInvoiceForm]    = useState({ amount: '', invoice_date: '', description: '' })
 
-  const weekIso = isoDate(week)
-  const today   = isoDate(weekMonday())
+  const weekIso    = isoDate(week)
+  const today      = isoDate(new Date())          // fecha real de hoy
+  const todayWeek  = isoDate(weekMonday())        // lunes de la semana actual (para cálculos del grid)
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
@@ -463,7 +464,7 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
     if (!endDate) return 0
     const endIso = isoDate(weekMonday(new Date(endDate + 'T12:00:00')))
     let total = 0
-    let d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() + 7)
+    let d = new Date(todayWeek + 'T12:00:00'); d.setDate(d.getDate() + 7)
     while (isoDate(d) <= endIso) {
       const wIso = isoDate(d)
       for (const r of resources) {
@@ -474,7 +475,7 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
       d = new Date(d); d.setDate(d.getDate() + 7)
     }
     return total
-  }, [planned, actual, resources, today, endDate])
+  }, [planned, actual, resources, todayWeek, endDate])
 
   const currentProfit = billed - etd
   const currentMargin = billed > 0 ? (currentProfit / billed) * 100 : 0
@@ -533,7 +534,7 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
     const endIso = isoDate(weekMonday(new Date(endDate + 'T12:00:00')))
     const result = []
     let running = etd
-    let d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() + 7)
+    let d = new Date(todayWeek + 'T12:00:00'); d.setDate(d.getDate() + 7)
     while (isoDate(d) <= endIso) {
       const wIso = isoDate(d)
       for (const r of resources) {
@@ -545,7 +546,7 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
       d = new Date(d); d.setDate(d.getDate() + 7)
     }
     return result
-  }, [etd, resources, actual, planned, today, endDate])
+  }, [etd, resources, actual, planned, todayWeek, endDate])
 
   const resourceETD = useMemo(() => {
     const map = {}
@@ -564,7 +565,7 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
     const endIso = isoDate(weekMonday(new Date(endDate + 'T12:00:00')))
     for (const r of resources) {
       let total = 0
-      let d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() + 7)
+      let d = new Date(todayWeek + 'T12:00:00'); d.setDate(d.getDate() + 7)
       while (isoDate(d) <= endIso) {
         const wIso = isoDate(d)
         const act  = actual[`${r.id}_${wIso}`]  || 0
@@ -859,8 +860,8 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
               style={{ width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', color: '#6e6e73' }}
               onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'} onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}
             ><ChevronLeft size={13} /></button>
-            <span style={{ fontSize: 11, minWidth: 130, textAlign: 'center', color: weekIso === today ? '#f5f5f7' : '#6e6e73', fontWeight: weekIso === today ? 600 : 400 }}>
-              {weekIso === today ? '● ' : ''}{weekLabel(week)}
+            <span style={{ fontSize: 11, minWidth: 130, textAlign: 'center', color: weekIso === todayWeek ? '#f5f5f7' : '#6e6e73', fontWeight: weekIso === todayWeek ? 600 : 400 }}>
+              {weekIso === todayWeek ? '● ' : ''}{weekLabel(week)}
             </span>
             <button onClick={() => setWeek(w => { const d = new Date(w); d.setDate(d.getDate() + 7); return d })}
               style={{ width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', color: '#6e6e73' }}
