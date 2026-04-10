@@ -515,6 +515,8 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
       result.push(isoDate(d))
       d = new Date(d); d.setDate(d.getDate() + 7)
     }
+    // Añadir la fecha real de hoy como punto final si no coincide con el último lunes
+    if (result.length === 0 || result[result.length - 1] !== today) result.push(today)
     return result
   }, [actual, today, startDate])
 
