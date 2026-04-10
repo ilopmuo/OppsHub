@@ -492,10 +492,11 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
   const timePct    = totalWeeks > 0 ? Math.min(100, elapsed / totalWeeks * 100) : 0
   const remaining  = endMon ? Math.max(0, Math.round((endMon - weekMonday()) / (7 * 864e5))) : 0
 
-  // Chart: past weeks
+  // Chart: past weeks — desde startDate (o primer actual) hasta hoy
   const chartWeeks = useMemo(() => {
     const s = new Set([today])
     Object.keys(actual).forEach(k => s.add(k.slice(-10)))
+    if (startDate) s.add(isoDate(weekMonday(new Date(startDate + 'T12:00:00'))))
     const sorted = [...s].sort()
     const result = []
     let d = weekMonday(new Date(sorted[0] + 'T12:00:00'))
@@ -504,7 +505,7 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
       d = new Date(d); d.setDate(d.getDate() + 7)
     }
     return result
-  }, [actual, today])
+  }, [actual, today, startDate])
 
   function etdAt(weekStr) {
     const cap = weekStr <= today ? weekStr : today
