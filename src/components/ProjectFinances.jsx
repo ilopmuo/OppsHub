@@ -478,6 +478,8 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
 
   const currentProfit = billed - etd
   const currentMargin = billed > 0 ? (currentProfit / billed) * 100 : 0
+  // Margen a día de hoy: (contrato - ETD) / contrato — cuánto margen tengo con lo gastado hasta hoy
+  const todayMargin   = contract > 0 ? ((contract - etd) / contract) * 100 : 0
   const totalCost     = etd + etcWeeks
   const finalProfit   = contract - totalCost
   const finalMargin   = contract > 0 ? (finalProfit / contract) * 100 : 0
@@ -698,9 +700,9 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
               value={billed} max={contract || billed || 1} color="#30d158" />
             <Bar label="Coste total est. / contrato" sublabel={hasBudget ? `${fmt(totalCost, cur)} / ${fmt(contract, cur)}` : '—'}
               value={totalCost} max={contract || totalCost || 1} color={totalCost > contract ? '#ff453a' : '#ff9f0a'} />
-            <Bar label={`Margen acum. vs objetivo ${target}%`} sublabel={billed > 0 ? `${currentMargin.toFixed(1)}%` : '—'}
-              value={Math.max(0, currentMargin)} max={Math.max(target, currentMargin, 1)}
-              color={currentMargin >= target ? '#30d158' : currentMargin >= target / 2 ? '#ff9f0a' : '#ff453a'} />
+            <Bar label={`Margen a hoy vs objetivo ${target}%`} sublabel={hasBudget ? `${todayMargin.toFixed(1)}%` : '—'}
+              value={Math.max(0, todayMargin)} max={Math.max(target, todayMargin, 1)}
+              color={todayMargin >= target ? '#30d158' : todayMargin >= target / 2 ? '#ff9f0a' : '#ff453a'} />
           </div>
         </div>
 
