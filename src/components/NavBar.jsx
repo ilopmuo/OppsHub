@@ -61,6 +61,17 @@ const NAV = [
       </svg>
     ),
   },
+  {
+    label: 'Planes',
+    path: '/plans',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="4" rx="1"/>
+        <rect x="3" y="10" width="12" height="4" rx="1"/>
+        <rect x="3" y="17" width="15" height="4" rx="1"/>
+      </svg>
+    ),
+  },
 ]
 
 export default function NavBar({ breadcrumb }) {
@@ -117,7 +128,8 @@ export default function NavBar({ breadcrumb }) {
             const active = location.pathname === path ||
               (path === '/' && location.pathname.startsWith('/project')) ||
               (path === '/habits' && location.pathname.startsWith('/habits')) ||
-              (path === '/reports' && location.pathname.startsWith('/reports'))
+              (path === '/reports' && location.pathname.startsWith('/reports')) ||
+              (path === '/plans' && location.pathname.startsWith('/plans'))
             return (
               <button
                 key={path}

@@ -107,6 +107,56 @@
   font-family: 'Inter', system-ui, sans-serif;
 }
 
+/* ── Print / PDF export ── */
+@media print {
+  /* Hide nav, sidebar, buttons */
+  header,
+  footer,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Show print-only content */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Force white background for print */
+  body,
+  html {
+    background: white !important;
+    color: #111 !important;
+  }
+
+  /* Gantt area overrides */
+  .gantt-print-area {
+    background: white !important;
+    color: #111 !important;
+    border: none !important;
+  }
+
+  .gantt-print-area * {
+    color: #111 !important;
+  }
+
+  /* Make gantt scroll container expand fully */
+  .gantt-scroll-container {
+    overflow: visible !important;
+    border: 1px solid #eee !important;
+    background: white !important;
+  }
+
+  /* Phase bars keep their colors */
+  .gantt-bar {
+    opacity: 0.85;
+  }
+
+  /* Page break hints */
+  .gantt-print-area {
+    page-break-inside: avoid;
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #0d1b2a; }

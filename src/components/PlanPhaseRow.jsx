@@ -1,0 +1,202 @@
+import { useState, useRef } from 'react'
+import { ChevronDown, ChevronRight, GripVertical } from 'lucide-react'
+import PlanPhaseTaskList from './PlanPhaseTaskList'
+import { daysBetween, addDays } from '../hooks/usePlan'
+
+export default function PlanPhaseRow({
+  phase,
+  planStartDate,
+  totalDays,
+  dayPx,
+  isEditable,
+  onMove,      // (phaseId, deltaDays) => void
+  onResize,    // (phaseId, newEndDate) => void
+  onUpdate,    // (phaseId, fields) => void
+  onAddTask,
+  onUpdateTask,
+  onDeleteTask,
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const dragRef    = useRef(null)
+  const resizeRef  = useRef(null)
+
+  const LABEL_W = 200 // px — must match GanttChart.jsx
+
+  const offset = daysBetween(planStartDate, phase.start_date)
+  const width  = daysBetween(phase.start_date, phase.end_date) + 1
+  const left   = offset * dayPx
+  const barW   = Math.max(width * dayPx, dayPx) // min 1 day wide
+
+  // ── Drag (move) ───────────────────────────────────────────
+  function handleDragStart(e) {
+    if (!isEditable) return
+    e.preventDefault()
+    const startX = e.clientX
+
+    function onMouseMove() {} // visual feedback via cursor only
+
+    function onMouseUp(me) {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      const delta = Math.round((me.clientX - startX) / dayPx)
+      if (delta !== 0) onMove(phase.id, delta)
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }
+
+  // ── Resize ────────────────────────────────────────────────
+  function handleResizeStart(e) {
+    if (!isEditable) return
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX
+
+    function onMouseMove() {} // no-op, we only care about final position
+
+    function onMouseUp(me) {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      const deltaDays = Math.round((me.clientX - startX) / dayPx)
+      if (deltaDays !== 0) {
+        const newEnd = addDays(phase.end_date, deltaDays)
+        // Don't allow end before start
+        if (newEnd >= phase.start_date) {
+          onResize(phase.id, newEnd)
+        }
+      }
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }
+
+  const hasTasks = phase.plan_tasks && phase.plan_tasks.length > 0
+  const doneTasks = (phase.plan_tasks || []).filter(t => t.done).length
+  const totalTasks = (phase.plan_tasks || []).length
+
+  return (
+    <div>
+      {/* Row */}
+      <div className="flex items-center" style={{ height: 44 }}>
+        {/* Label column (fixed) */}
+        <div
+          className="flex items-center gap-2 shrink-0 pr-3"
+          style={{ width: LABEL_W, minWidth: LABEL_W }}
+        >
+          {isEditable && (
+            <div
+              ref={dragRef}
+              className="cursor-grab active:cursor-grabbing p-1 rounded"
+              style={{ color: '#3a3a3a' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#6e6e73'}
+              onMouseLeave={e => e.currentTarget.style.color = '#3a3a3a'}
+            >
+              <GripVertical className="w-3 h-3" />
+            </div>
+          )}
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="flex items-center gap-1.5 min-w-0 flex-1"
+            style={{ color: '#f5f5f7', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          >
+            {totalTasks > 0
+              ? (expanded
+                  ? <ChevronDown className="w-3 h-3 shrink-0" style={{ color: '#6e6e73' }} />
+                  : <ChevronRight className="w-3 h-3 shrink-0" style={{ color: '#6e6e73' }} />)
+              : <span className="w-3 h-3 shrink-0" />
+            }
+            <span
+              className="text-xs truncate"
+              style={{ color: '#f5f5f7', fontWeight: 500 }}
+              title={phase.name}
+            >{phase.name}</span>
+          </button>
+          {phase.hours > 0 && (
+            <span className="text-xs shrink-0 ml-auto" style={{ color: '#6e6e73' }}>
+              {phase.hours}h
+            </span>
+          )}
+        </div>
+
+        {/* Bar area */}
+        <div className="relative flex-1" style={{ height: '100%' }}>
+          {/* The bar */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 rounded-lg flex items-center"
+            style={{
+              left:   left,
+              width:  barW,
+              height: 28,
+              backgroundColor: phase.color || '#bf5af2',
+              opacity: 0.9,
+              cursor: isEditable ? 'grab' : 'default',
+              userSelect: 'none',
+              boxShadow: `0 2px 8px ${phase.color || '#bf5af2'}40`,
+            }}
+            onMouseDown={isEditable ? handleDragStart : undefined}
+            title={`${phase.start_date} → ${phase.end_date}${phase.hours ? ` · ${phase.hours}h` : ''}`}
+          >
+            {/* Phase label inside bar (if bar is wide enough) */}
+            {barW > 80 && (
+              <span
+                className="px-2.5 text-xs font-medium truncate pointer-events-none"
+                style={{ color: '#000', opacity: 0.8 }}
+              >
+                {width}d {phase.hours > 0 ? `· ${phase.hours}h` : ''}
+              </span>
+            )}
+
+            {/* Progress indicator for tasks */}
+            {totalTasks > 0 && barW > 60 && (
+              <div
+                className="absolute bottom-0 left-0 rounded-b-lg"
+                style={{
+                  width: `${(doneTasks / totalTasks) * 100}%`,
+                  height: 3,
+                  backgroundColor: 'rgba(0,0,0,0.4)',
+                }}
+              />
+            )}
+
+            {/* Resize handle */}
+            {isEditable && (
+              <div
+                ref={resizeRef}
+                className="absolute right-0 top-0 bottom-0 w-3 rounded-r-lg flex items-center justify-center"
+                style={{ cursor: 'ew-resize', color: 'rgba(0,0,0,0.5)' }}
+                onMouseDown={handleResizeStart}
+                title="Arrastra para cambiar duración"
+              >
+                <div className="flex gap-px">
+                  <div style={{ width: 1.5, height: 10, backgroundColor: 'currentColor', borderRadius: 1 }} />
+                  <div style={{ width: 1.5, height: 10, backgroundColor: 'currentColor', borderRadius: 1 }} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded tasks */}
+      {expanded && (
+        <div
+          className="ml-0 mb-1"
+          style={{
+            paddingLeft: LABEL_W,
+            borderTop: '1px solid rgba(255,255,255,0.04)',
+          }}
+        >
+          <PlanPhaseTaskList
+            phase={phase}
+            isEditable={isEditable}
+            onAddTask={onAddTask}
+            onUpdateTask={onUpdateTask}
+            onDeleteTask={onDeleteTask}
+          />
+        </div>
+      )}
+    </div>
+  )
+}

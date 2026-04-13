@@ -18,6 +18,7 @@ import ProjectNotificationSettings from '../components/ProjectNotificationSettin
 import ProjectDetailReports from '../components/ProjectDetailReports'
 import ProjectIconUpload from '../components/ProjectIconUpload'
 import ProjectFinances from '../components/ProjectFinances'
+import ProjectPlanTab from '../components/ProjectPlanTab'
 import { notify } from '../lib/notify'
 
 async function logActivity(projectId, userId, action, metadata = {}) {
@@ -401,6 +402,7 @@ export default function ProjectDetail() {
               {[
                 { id: 'tasks',    label: 'Tareas' },
                 { id: 'finances', label: 'Recursos & Finanzas' },
+                { id: 'plan',     label: 'Plan' },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -421,6 +423,10 @@ export default function ProjectDetail() {
                 >{tab.label}</button>
               ))}
             </div>
+
+            {activeTab === 'plan' && (
+              <ProjectPlanTab projectId={id} />
+            )}
 
             {activeTab === 'finances' && (
               <ProjectFinances

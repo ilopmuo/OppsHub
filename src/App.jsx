@@ -9,6 +9,9 @@ import JoinProject from './pages/JoinProject'
 import ProfileSettings from './pages/ProfileSettings'
 import Habits from './pages/Habits'
 import ReportMaker from './pages/ReportMaker'
+import Plans from './pages/Plans'
+import PlanEditor from './pages/PlanEditor'
+import PlanPublicView from './pages/PlanPublicView'
 import { useTheme } from './hooks/useTheme'
 import { useDeadlineNotifications } from './hooks/useDeadlineNotifications'
 import { Loader2 } from 'lucide-react'
@@ -102,7 +105,10 @@ function AppContent() {
         />
         <Route path="/habits" element={<ProtectedRoute><Habits /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute><ReportMaker /></ProtectedRoute>} />
+        <Route path="/plans" element={<ProtectedRoute><Plans /></ProtectedRoute>} />
+        <Route path="/plans/:id" element={<ProtectedRoute><PlanEditor /></ProtectedRoute>} />
         <Route path="/join" element={<JoinProject />} />
+        <Route path="/plans/:token/view" element={<PlanPublicView />} />
         <Route path="/profile" element={<ProtectedRoute><ProfileSettings /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
