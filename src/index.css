@@ -58,6 +58,12 @@
 /* ── Tabular numbers ── */
 .tabular { font-variant-numeric: tabular-nums; }
 
+/* ── Gantt label column resize grip ── */
+.resize-grip-line { transition: background-color 0.15s; }
+[title="Arrastra para ajustar el ancho de la columna"]:hover .resize-grip-line {
+  background-color: rgba(255,255,255,0.25) !important;
+}
+
 /* ── Notification dropdown ── */
 @keyframes dropdown-in {
   from { opacity: 0; transform: translateY(-8px) scale(0.97); }

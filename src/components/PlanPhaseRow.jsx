@@ -8,6 +8,7 @@ export default function PlanPhaseRow({
   planStartDate,
   totalDays,
   dayPx,
+  labelW,
   isEditable,
   onMove,           // (phaseId, deltaDays) => void
   onResize,         // (phaseId, newEndDate) => void
@@ -30,7 +31,7 @@ export default function PlanPhaseRow({
     }
   })
 
-  const LABEL_W = 200 // px — must match GanttChart.jsx
+  const LABEL_W = labelW ?? 200
 
   const offset = daysBetween(planStartDate, phase.start_date)
   const width  = daysBetween(phase.start_date, phase.end_date) + 1
