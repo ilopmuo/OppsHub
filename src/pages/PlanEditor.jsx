@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, PanelRightOpen, PanelRightClose } from 'lucide-react'
 import NavBar from '../components/NavBar'
 import GanttChart from '../components/GanttChart'
 import PlanSidebar from '../components/PlanSidebar'
@@ -24,6 +24,7 @@ export default function PlanEditor() {
   } = usePlan(id)
 
   const [calendarPhase, setCalendarPhase] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   async function handleDeletePlan() {
     const ok = await deletePlan()
@@ -130,59 +131,91 @@ export default function PlanEditor() {
               {plan.client_name}
             </span>
           )}
+
+          <div className="flex-1" />
+
+          <button
+            onClick={() => setSidebarOpen(v => !v)}
+            className="flex items-center gap-1.5 text-xs transition-colors shrink-0"
+            style={{ color: sidebarOpen ? '#bf5af2' : '#6e6e73', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}
+            onMouseEnter={e => { if (!sidebarOpen) e.currentTarget.style.color = '#f5f5f7' }}
+            onMouseLeave={e => { if (!sidebarOpen) e.currentTarget.style.color = '#6e6e73' }}
+            title={sidebarOpen ? 'Cerrar panel' : 'Abrir panel de edición'}
+          >
+            {sidebarOpen
+              ? <PanelRightClose className="w-4 h-4" />
+              : <PanelRightOpen  className="w-4 h-4" />
+            }
+          </button>
         </div>
 
-        {/* Gantt: expands to fit all phases, no internal vertical scroll */}
-        <div className="shrink-0 p-6 gantt-print-area">
-          <GanttChart
-            plan={plan}
-            phases={phases}
-            isEditable={true}
-            snapshots={snapshots}
-            activeSnapshotId={activeSnapshotId}
-            onMove={movePhase}
-            onResize={resizePhase}
-            onUpdatePhase={updatePhase}
-            onOpenCalendar={setCalendarPhase}
-            onAddTask={addTask}
-            onUpdateTask={updateTask}
-            onDeleteTask={deleteTask}
-            onReorderPhases={reorderPhases}
-          />
-        </div>
+        {/* Main content: Gantt + optional sticky side panel */}
+        <div className="flex flex-1 min-h-0" style={{ alignItems: 'flex-start' }}>
 
-        {/* Below-fold: charts + stats */}
-        <div className="shrink-0 no-print">
-          <PlanInsights plan={plan} phases={phases} />
-        </div>
+          {/* Gantt column — expands to fill available width */}
+          <div className="flex-1 min-w-0">
+            <div className="p-6 gantt-print-area">
+              <GanttChart
+                plan={plan}
+                phases={phases}
+                isEditable={true}
+                snapshots={snapshots}
+                activeSnapshotId={activeSnapshotId}
+                onMove={movePhase}
+                onResize={resizePhase}
+                onUpdatePhase={updatePhase}
+                onOpenCalendar={setCalendarPhase}
+                onAddTask={addTask}
+                onUpdateTask={updateTask}
+                onDeleteTask={deleteTask}
+                onReorderPhases={reorderPhases}
+              />
+            </div>
 
-        {/* Below-fold: wide plan editing panel */}
-        <div
-          className="shrink-0 no-print"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
-        >
-          <PlanSidebar
-            wide
-            plan={plan}
-            phases={phases}
-            onUpdatePlan={updatePlan}
-            onUpdatePhase={updatePhase}
-            onAddPhase={addPhase}
-            onDeletePhase={deletePhase}
-            onOpenCalendar={setCalendarPhase}
-            onAddTask={addTask}
-            onUpdateTask={updateTask}
-            onDeleteTask={deleteTask}
-            onDeletePlan={handleDeletePlan}
-            onPrint={handlePrint}
-            onAddMilestone={addMilestone}
-            onReorderPhases={reorderPhases}
-            snapshots={snapshots}
-            activeSnapshotId={activeSnapshotId}
-            onSetActiveSnapshot={setActiveSnapshotId}
-            onCreateSnapshot={createSnapshot}
-            onDeleteSnapshot={deleteSnapshot}
-          />
+            {/* Below-fold: charts + stats */}
+            <div className="no-print">
+              <PlanInsights plan={plan} phases={phases} />
+            </div>
+          </div>
+
+          {/* Collapsible side panel */}
+          <div
+            className="no-print shrink-0"
+            style={{
+              width: sidebarOpen ? 360 : 0,
+              overflow: 'hidden',
+              transition: 'width 0.25s ease',
+              position: 'sticky',
+              top: 44,
+              height: 'calc(100vh - 100px)',
+              borderLeft: sidebarOpen ? '1px solid rgba(255,255,255,0.06)' : 'none',
+              backgroundColor: '#000',
+            }}
+          >
+            <div style={{ width: 360, height: '100%', overflowY: 'auto' }}>
+              <PlanSidebar
+                plan={plan}
+                phases={phases}
+                onUpdatePlan={updatePlan}
+                onUpdatePhase={updatePhase}
+                onAddPhase={addPhase}
+                onDeletePhase={deletePhase}
+                onOpenCalendar={setCalendarPhase}
+                onAddTask={addTask}
+                onUpdateTask={updateTask}
+                onDeleteTask={deleteTask}
+                onDeletePlan={handleDeletePlan}
+                onPrint={handlePrint}
+                onAddMilestone={addMilestone}
+                onReorderPhases={reorderPhases}
+                snapshots={snapshots}
+                activeSnapshotId={activeSnapshotId}
+                onSetActiveSnapshot={setActiveSnapshotId}
+                onCreateSnapshot={createSnapshot}
+                onDeleteSnapshot={deleteSnapshot}
+              />
+            </div>
+          </div>
         </div>
       </main>
 
