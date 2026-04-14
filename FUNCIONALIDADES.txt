@@ -1,0 +1,563 @@
+================================================================================
+                        OPPSHUB - INVENTARIO COMPLETO DE FUNCIONALIDADES
+                                   Actualizado: 14 de Abril 2026
+================================================================================
+
+TECNOLOGÍAS PRINCIPALES
+------------------------
+- React 19.2 (frontend)
+- React Router v7 (routing)
+- Supabase JS (base de datos PostgreSQL + auth en tiempo real)
+- Vite 8 (build tool)
+- Tailwind CSS v4 (estilos)
+- Recharts (gráficas)
+- Lucide React (iconos)
+- React Hot Toast (notificaciones toast)
+- @dnd-kit (drag-and-drop)
+
+
+================================================================================
+1. AUTENTICACIÓN Y GESTIÓN DE USUARIOS
+================================================================================
+
+Autenticación (src/contexts/AuthContext.jsx, src/pages/AuthPage.jsx)
+  - Login / registro con email y contraseña via Supabase Auth
+  - Gestión de sesión persistente
+  - Rutas protegidas con comprobación de autenticación
+  - Creación de perfil de usuario (email, display_name, avatar_url)
+  - Actualización de perfil desde AuthContext
+
+Perfil de Usuario (src/pages/ProfileSettings.jsx)
+  - Edición de nombre visible y avatar
+  - Preferencias de tema (useTheme hook)
+
+
+================================================================================
+2. DASHBOARD Y GESTIÓN DE PROYECTOS
+================================================================================
+
+Dashboard principal (src/pages/Dashboard.jsx)
+  - Vista general de todos los proyectos activos con indicadores de estado
+  - Métricas globales: número de proyectos, tareas pendientes, alertas
+  - Ordenación por estado: Bloqueado → En riesgo → En plazo
+  - Alertas de plazo: proyectos vencidos y próximos (ventana de 7 días)
+  - Animaciones count-up en las métricas
+  - Modal de creación de proyecto
+  - Skeleton loaders para mejor UX
+
+Tarjetas de Proyecto (src/components/ProjectCard.jsx)
+  - Nombre, tipo (Implementación vs Mantenimiento) e icono del proyecto
+  - Badges de estado: on_track, at_risk, blocked
+  - Barra de progreso con porcentaje de tareas completadas
+  - Próxima tarea con indicador de prioridad
+  - Para proyectos de Implementación: fecha límite, tareas abiertas/cerradas
+  - Para proyectos de Mantenimiento: estado SLA, renovación, último contacto
+  - Animaciones escalonadas de entrada
+  - Efectos hover con elevación visual
+
+Detalle de Proyecto (src/pages/ProjectDetail.jsx)
+  - Edición completa: nombre, descripción, estado, fechas
+  - Campos específicos por tipo (implementación: deadline; mantenimiento: renovación, SLA, último contacto)
+  - Pestañas: Tareas, Finanzas, Plan, Informes, Miembros
+  - Subida de icono del proyecto
+  - Eliminación del proyecto
+  - Registro de cambios de estado en el log de actividad
+
+Estadísticas de Proyecto (src/components/ProjectStats.jsx)
+  - Visualización del progreso de tareas con barras animadas
+  - Seguimiento de hitos (completados/total)
+  - Cuenta atrás hasta la fecha límite
+  - Estado del SLA: Cumpliendo, En riesgo, Incumpliendo
+  - Estadísticas específicas para Implementación vs Mantenimiento
+
+Subida de Icono (src/components/ProjectIconUpload.jsx)
+  - Carga y visualización de imagen
+  - Tamaños de avatar configurables
+
+
+================================================================================
+3. GESTIÓN DE TAREAS
+================================================================================
+
+Creación de Tareas (src/components/NewTaskModal.jsx)
+  - Título, descripción, prioridad, fecha límite
+  - Asignación a miembro del equipo
+  - Selección de estado inicial (todo, in_progress, done)
+  - Validación de formulario
+  - Modal responsive para móvil
+
+Vista Lista de Tareas (src/components/TaskList.jsx)
+  - Lista lineal con indicadores de estado
+  - Ciclo de estado con un clic: todo → in_progress → done
+  - Código de color por prioridad (alta/rojo, media/naranja, baja/gris)
+  - Indicadores de tareas vencidas
+  - Visualización del responsable
+  - Descripciones con truncado
+  - Funcionalidad de borrado
+
+Vista Kanban (src/components/KanbanBoard.jsx)
+  - Tablero de cuatro columnas: Backlog, Por hacer, En progreso, Hecho
+  - Arrastrar y soltar con reordenación usando @dnd-kit
+  - Overlay de arrastre para feedback visual
+  - Tarjetas con todos los detalles (prioridad, responsable, fecha)
+  - Botón de borrado con confirmación
+  - Diferenciación visual por estado y colores
+  - Animaciones de arrastre suaves
+
+Modal de Detalle de Tarea (src/components/TaskDetailModal.jsx)
+  - Edición completa: título, descripción, prioridad, fecha límite
+  - Reasignación de responsable
+  - Cambio de estado
+  - Eliminación de tarea
+  - Actualizaciones en tiempo real
+
+Filtrado y Ordenación de Tareas (src/pages/ProjectDetail.jsx)
+  - Filtrar por estado (todo/in_progress/done/todos)
+  - Alternar entre vista lista y kanban
+  - Ordenación por prioridad
+  - Persistencia de preferencia de vista en localStorage
+
+
+================================================================================
+4. GESTIÓN DE HITOS
+================================================================================
+
+Lista de Hitos (src/components/MilestoneList.jsx)
+  - Crear, leer, actualizar y eliminar hitos
+  - Toggle de completado con checkbox
+  - Barra de progreso con porcentaje de completado
+  - Contador de completados/total
+  - Indicación visual de hitos completados
+  - Seguimiento de hitos como métrica clave en estadísticas del proyecto
+
+
+================================================================================
+5. DIAGRAMA DE GANTT Y PLAN
+================================================================================
+
+Diagrama Gantt (src/components/GanttChart.jsx)
+  - Visualización interactiva del diagrama de Gantt
+  - Tres niveles de zoom: Día (40px), Semana (24px), Mes (10px)
+  - Columna de etiquetas redimensionable arrastrando el borde (120px min - 480px max)
+  - Cabeceras de mes con contexto de calendario
+  - Marcadores de semana para orientación adicional
+  - Filas de fase con capacidad de mover arrastrando
+  - Redimensionado de fases desde el borde derecho
+  - Diseño apto para impresión
+  - Comparación con baseline (barras fantasma mostrando la planificación original)
+  - Tooltip al pasar el ratón por nombres de fase truncados
+  - Flechas de dependencia entre fases
+  - Notas por fase
+
+Editor de Plan (src/pages/PlanEditor.jsx)
+  - Interfaz de edición completa con barra lateral
+  - Diagrama de Gantt en el área principal
+  - Barra lateral para gestión de fases y snapshots
+  - Calendario de fase para visualización de días laborables
+  - Funcionalidad de impresión del plan
+  - Disposición de dos columnas con vista dividida
+
+Fases del Plan (src/components/PlanPhaseRow.jsx, src/components/PlanSidebar.jsx)
+  - Nombre, fechas inicio/fin de la fase
+  - Seguimiento de horas de trabajo por fase
+  - Configuración de horas por día (por defecto 8)
+  - Porcentaje de progreso
+  - Estado manual: on_track, at_risk, delayed
+  - Detección automática de estado:
+      ≥100% progreso → En plazo
+      Hoy > fecha fin y progreso < 100% → Retrasado
+      Fase activa con >25% de varianza en progreso → En riesgo
+  - Auto-retraso: desplazamiento automático de fechas al mover/redimensionar
+  - Selección de color de fase (paleta de 7 colores)
+  - Marcado como sprint (previene solapamiento con otras fases)
+  - Distinción hito vs fase (diamante vs círculo)
+  - Lista de tareas dentro de cada fase
+  - Reordenación de fases mediante drag-and-drop
+  - Edición de duración redimensionando la barra
+
+Tareas dentro de Fases (src/components/PlanPhaseTaskList.jsx)
+  - Añadir tareas a fases específicas
+  - Toggle completado/incompleto para tareas de fase
+  - Vista de lista de tareas por fase
+
+Calendario de Fase (src/components/PlanPhaseCalendar.jsx)
+  - Vista mensual del calendario para la duración de la fase
+  - Cálculo de días laborables
+  - Exclusión de festivos (festivos de Madrid + nacionales de España)
+  - Desglose diario de horas
+  - Distinción visual día laborable / no laborable
+
+Lista de Planes (src/pages/Plans.jsx)
+  - Explorar todos los planes del usuario
+  - Tarjetas de plan: nombre, cliente, fecha inicio, nº fases, horas totales
+  - Modal de creación de nuevo plan
+  - Navegar al editor de plan
+  - Visualización del proyecto vinculado con badge
+
+Creación de Plan (src/components/NewPlanModal.jsx)
+  - Nombre del plan, cliente, vínculo con proyecto
+  - Selección de fecha de inicio
+  - Asociación opcional a proyecto
+  - Inicialización del plan con fases en blanco
+
+Snapshots / Baselines (src/hooks/usePlan.js, src/components/PlanSidebar.jsx)
+  - Crear snapshots del estado del plan en cualquier momento
+  - Comparar el plan actual contra snapshots históricos
+  - Visualización de desviación (barras fantasma del baseline en el Gantt)
+  - Activar/desactivar snapshot para comparar
+  - Eliminar snapshots
+  - Historial cronológico de cambios del plan
+
+Vista Pública del Plan (src/pages/PlanPublicView.jsx)
+  - Vista pública basada en token para compartir con clientes
+  - Diagrama de Gantt de solo lectura
+  - Funcionalidad de impresión
+  - Sin autenticación requerida para planes compartidos
+  - Muestra nombre, cliente, fechas, fases y tareas
+
+Cálculo de Días Laborables y Festivos (src/hooks/usePlan.js)
+  - Reconocimiento de festivos de Madrid (17 festivos fijos/móviles)
+  - Conteo de días laborables (lunes a viernes, excluyendo festivos)
+  - Aritmética de fechas con festivos incluidos
+  - Cálculo de Semana Santa usando algoritmo Gregoriano anónimo
+  - Incluye festivos específicos de Madrid (2 de mayo, 9 de noviembre)
+
+
+================================================================================
+6. AGENDA / CALENDARIO
+================================================================================
+
+Vista Calendario (src/pages/Agenda.jsx)
+  - Cuadrícula mensual completa
+  - Resaltado especial del día de hoy
+  - Navegación mes/año con botones anterior/siguiente
+  - Botón "Ir a hoy"
+  - Visualización de tareas y notas en celdas del calendario
+  - Soporte multiempresa con correcta disposición de días
+
+Panel de Día (src/pages/Agenda.jsx - DayPanel)
+  - Panel lateral derecho con detalles del día seleccionado
+  - Fecha en lenguaje natural (ej: "Lunes, 14 de Abril")
+  - Contador de tareas pendientes del día
+  - Lista de tareas del día de todos los proyectos
+  - Indicadores de color por prioridad
+  - Navegación rápida al proyecto desde el panel
+  - Indicadores de estado de tarea (completada/pendiente)
+
+Notas Personales del Calendario (src/pages/Agenda.jsx)
+  - Crear notas personales para días específicos
+  - Asignación de prioridad a notas (alta/media/baja)
+  - Toggle de completado (checkbox)
+  - Eliminación de notas
+  - Notas mostradas en la cuadrícula del calendario
+  - Visualización separada de notas pendientes/completadas en el panel del día
+  - Edición inline con selector de prioridad
+
+Estadísticas de Agenda
+  - Tareas pendientes este mes
+  - Contador de tareas vencidas (resaltado en rojo)
+  - Código de colores multiprioridad en el calendario
+
+
+================================================================================
+7. SEGUIMIENTO DE HÁBITOS
+================================================================================
+
+Gestión de Hábitos (src/pages/Habits.jsx)
+  - Crear hábitos diarios o semanales
+  - Configuración de frecuencia (diaria o días específicos)
+  - Registro de completado de hábitos
+  - Editar y eliminar hábitos
+  - Reordenación de hábitos con drag-and-drop
+
+Mapa de Calor de Hábitos (src/pages/Habits.jsx - HabitHeatmap)
+  - Visualización de actividad de 52 semanas
+  - Intensidad de color basada en porcentaje de completado
+  - Etiquetas de meses para referencia temporal
+  - Celdas distinguen días futuros/pasados/en rango
+  - Renderizado basado en SVG
+
+Cuadrícula Mensual de Hábito (src/pages/Habits.jsx - HabitCalendar)
+  - Vista mensual con semanas como filas
+  - Agrupación lunes-domingo
+  - Checkboxes de completado diario
+  - Indicador de riesgo (programado pero no completado hoy)
+  - Distinción visual días programados vs no programados
+
+Rachas de Hábitos (src/pages/Habits.jsx)
+  - Cálculo de racha actual (días consecutivos completados)
+  - Seguimiento de mejor racha (mayor racha consecutiva)
+  - Ventana de retrovisión de 1 año
+  - Visualización de racha por hábito
+
+
+================================================================================
+8. LOG DE ACTIVIDAD Y NOTIFICACIONES
+================================================================================
+
+Log de Actividad (src/components/ActivityLog.jsx)
+  - Línea de tiempo de actividad del proyecto
+  - Tipos de acción: task_created, task_completed, task_moved, task_deleted, status_changed
+  - Almacenamiento de metadatos (nombres de tarea, cambios de estado)
+  - Visualización cronológica
+  - Atribución de acción al usuario
+
+Panel de Notificaciones (src/components/NotificationsPanel.jsx)
+  - Notificaciones de asignación de tarea
+  - Notificaciones de completado de tarea
+  - Notificaciones de deadline próxima
+  - Notificaciones de nuevo miembro
+  - Notificaciones de cambio de estado
+  - Seguimiento de leído/no leído
+
+Configuración de Notificaciones (src/components/ProjectNotificationSettings.jsx)
+  - Preferencias de notificación por proyecto
+  - Activar/desactivar todas las notificaciones
+  - Toggle selectivo por tipo:
+      - Asignación de tarea
+      - Completado de tarea
+      - Deadline próxima
+      - Nuevo miembro
+      - Cambio de estado
+
+Notificaciones de Deadline (src/hooks/useDeadlineNotifications.js)
+  - Monitoreo de deadlines en segundo plano
+  - Notificaciones toast para deadlines próximas
+  - Ventana de deadline configurable
+
+
+================================================================================
+9. MIEMBROS Y EQUIPO DEL PROYECTO
+================================================================================
+
+Panel de Miembros (src/components/ProjectMembers.jsx)
+  - Visualización del dueño del proyecto con indicador de corona
+  - Lista de todos los miembros del proyecto
+  - Perfiles con avatares/iniciales
+  - Eliminación de miembro (solo propietario)
+  - Sistema de invitación de nuevos miembros
+  - Generación y copia de enlace de invitación
+  - Timestamp de "último unido"
+
+Invitaciones (src/pages/JoinProject.jsx)
+  - Invitaciones al proyecto basadas en token
+  - Aceptar invitación para unirse al proyecto
+  - Asignación automática de rol de miembro
+  - Seguimiento en tabla project_members
+
+Actualizaciones en Tiempo Real de Miembros
+  - Suscripciones en tiempo real de Supabase
+  - Actualizaciones en vivo de la lista de miembros entre usuarios
+
+
+================================================================================
+10. INFORMES Y ANALÍTICAS
+================================================================================
+
+Dashboard de Informes (src/components/ProjectReports.jsx)
+  - Vista global de todos los proyectos
+  - Estadísticas de resumen
+  - Gráficas de distribución de estado
+  - Visualización de tendencias de proyecto
+
+Informes de Detalle (src/components/ProjectDetailReports.jsx)
+  - Tendencias de completado de tareas
+  - Distribución de prioridades
+  - Desglose de estado
+  - Progreso de hitos
+
+Generador de Informes Avanzado (src/pages/ReportMaker.jsx)
+  Seis plantillas de informe:
+  1. Sprint Jira: Tickets completados/en-progreso/bloqueados por sprint
+  2. Rentabilidad: Presupuesto, costes (equipo/herramientas/otros), ingresos, margen
+  3. Horas Invertidas: Distribución por fase/disciplina
+  4. Salud del Cliente: NPS, SLA, tickets abiertos, riesgo de churn
+  5. Velocidad de Sprint: Story points comprometidos vs completados
+  6. Estado del Proyecto: Hitos, progreso de fases, estado RAG
+  - Configuración de informes personalizada
+  - Formularios de entrada de datos por plantilla
+  - Generación de visualizaciones
+  - Capacidad de exportación
+
+Finanzas del Proyecto (src/components/ProjectFinances.jsx)
+  - Seguimiento y configuración del presupuesto
+  - Gestión de costes (equipo, herramientas, otros)
+  - Seguimiento de ingresos/facturas
+  - Cálculo y visualización del margen de beneficio
+  - Seguimiento semanal de ETC (Estimación para Completar)
+  - Comparación de previsión vs real
+  - Gráfica de línea temporal con tendencias de gasto
+  - Soporte de moneda (€ por defecto)
+  - Indicador de salud: En objetivo / En riesgo / Crítico
+  - Visualización del valor del contrato
+  - Gestión y seguimiento de facturas
+  - Análisis de tasa de consumo semanal
+
+
+================================================================================
+11. VINCULACIÓN PLAN-PROYECTO
+================================================================================
+
+Pestaña Plan del Proyecto (src/components/ProjectPlanTab.jsx)
+  - Vincular planes a proyectos
+  - Mostrar plan asociado en los detalles del proyecto
+  - Navegar desde el proyecto al editor de plan
+  - Mostrar datos básicos del plan: nombre, cliente, fases
+
+
+================================================================================
+12. BÚSQUEDA Y NAVEGACIÓN
+================================================================================
+
+Búsqueda Global (src/components/SearchOverlay.jsx)
+  - Búsqueda rápida a través de proyectos y tareas
+  - Activación mediante atajo de teclado (Cmd/Ctrl + K)
+  - Filtrado de resultados
+  - Navegación rápida a elementos
+
+Barra de Navegación (src/components/NavBar.jsx)
+  - Logo y branding
+  - Enlances de navegación: Dashboard, Agenda, Hábitos, Informes, Planes, Perfil
+  - Campana de notificaciones con contador de no leídas
+  - Menú de perfil de usuario
+  - Soporte de migas de pan
+  - Nav móvil responsive
+
+
+================================================================================
+13. ESTADO Y BADGES VISUALES
+================================================================================
+
+Badges de Estado (src/components/StatusBadge.jsx)
+  - En plazo (verde), En riesgo (naranja), Bloqueado (rojo)
+  - Etiquetas en español
+
+Badges SLA (src/components/SLABadge.jsx)
+  - Cumpliendo (verde), En riesgo (naranja), Incumpliendo (rojo)
+
+Colores de Estado del Proyecto
+  - Efectos de borde glow según el estado
+  - Efectos hover de elevación
+  - Intensidad de sombra según urgencia del estado
+
+
+================================================================================
+14. SISTEMA DE DISEÑO Y UI
+================================================================================
+
+Gestión de Tema (src/hooks/useTheme.js)
+  - Tema oscuro (principal, único implementado)
+  - Gestión de variables CSS de color
+  - Soporte para preferencia del sistema
+
+Diseño Responsive
+  - Modales optimizados para móvil (bottom sheet en pantallas pequeñas)
+  - Layouts de cuadrícula responsive (1/2/3 columnas según pantalla)
+  - Targets de interacción táctiles
+  - Tamaños de fuente adaptativos
+
+Paleta de Colores
+  - Texto principal: #f5f5f7
+  - Fondo: #000000 (negro profundo)
+  - Tarjetas: #111111
+  - Bordes: rgba(255,255,255,0.06)
+  - Border radius: 10-20px
+  - Transiciones suaves
+
+Animaciones
+  - Animaciones de entrada en carga de página (clase page-enter)
+  - Animaciones de entrada escalonadas para tarjetas
+  - Transiciones suaves de estado/progreso
+  - Animaciones de entrada/salida de modales
+  - Estados hover con cambios de color
+
+Notificaciones Toast (react-hot-toast)
+  - Éxito (verde), Error (rojo)
+  - Estilo personalizado para tema oscuro
+  - Auto-dismiss con iconos personalizados
+
+
+================================================================================
+15. BASE DE DATOS Y PERSISTENCIA
+================================================================================
+
+Integración Supabase (src/lib/supabase.js)
+  - Backend PostgreSQL
+  - Suscripciones en tiempo real para actualizaciones en vivo
+  - Autenticación via Supabase Auth
+  - Políticas de Row-Level Security (RLS)
+  - Almacenamiento de archivos para iconos de proyecto
+
+Tablas de Base de Datos
+  - projects               - Registros principales de proyectos
+  - tasks                  - Tareas con estado/prioridad
+  - milestones             - Hitos de proyecto
+  - project_plans          - Plantillas/calendarios de plan
+  - plan_phases            - Detalles de fases dentro de planes
+  - plan_tasks             - Tareas dentro de fases
+  - plan_snapshots         - Baselines históricas del plan
+  - calendar_notes         - Notas personales del calendario
+  - habits                 - Definiciones de hábitos
+  - habit_logs             - Registros de completado de hábitos
+  - project_members        - Pertenencia al equipo
+  - project_invitations    - Tokens de invitación
+  - project_activity       - Entradas del log de actividad
+  - notifications          - Registros de notificaciones
+  - project_notification_settings - Preferencias de notificación por usuario
+  - profiles               - Datos del perfil de usuario
+  - project_finances       - Seguimiento financiero
+
+Actualizaciones Optimistas
+  - Actualizaciones inmediatas de UI antes de confirmación del servidor
+  - Rollback en caso de error
+  - Gestión de estado de carga
+
+
+================================================================================
+16. FUNCIONALIDADES AVANZADAS
+================================================================================
+
+Detección Inteligente de Estado de Fase (src/hooks/usePlan.js - computePhaseStatus())
+  - Auto-detección del estado de fase basada en:
+      Porcentaje de progreso real vs planificado
+      Adherencia al calendario (progreso esperado vs real)
+      Hito de completado (100% = en_plazo)
+  - Distingue estado manual del estado auto-detectado
+  - Indicación visual del estado automático
+
+Manejo de Fechas (src/hooks/usePlan.js)
+  - Aritmética de fechas en zona horaria local (formato YYYY-MM-DD)
+  - Conversiones con conciencia de UTC para prevenir cambios de zona horaria
+  - Cálculo de Semana Santa (algoritmo Gregoriano anónimo)
+  - Exclusión de días laborables (fines de semana + festivos)
+
+Funcionalidad de Impresión
+  - CSS específico para impresión (clases print-only, no-print)
+  - Impresión del plan con diagrama Gantt completo
+  - Manipulación del título del documento
+
+Accesibilidad
+  - Estructura HTML semántica
+  - Etiquetas ARIA en elementos interactivos
+  - Soporte de navegación por teclado
+  - Cumplimiento de contraste de color (tema oscuro)
+  - Soporte para lectores de pantalla en móvil
+
+
+================================================================================
+RESUMEN
+================================================================================
+
+  Componentes React:    28+
+  Páginas/Vistas:        9
+  Hooks personalizados:  4 (usePlan, useTheme, useDeadlineNotifications, useAuth)
+  Tablas en BD:         17
+  Tipos de proyecto:     2 (Implementación / Mantenimiento)
+  Vistas de Gantt:       3 (Día / Semana / Mes)
+  Plantillas de informe: 6
+  Tipos de notificación: 5+
+  Colores de fase:       7
+  Festivos soportados:  17+ (Madrid + España)
+  Idioma de la UI:       Español
+
+================================================================================

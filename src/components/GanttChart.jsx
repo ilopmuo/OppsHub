@@ -227,11 +227,12 @@ export default function GanttChart({
                     width: mh.width,
                     borderRight: '1px solid rgba(255,255,255,0.04)',
                     paddingLeft: 8,
+                    overflow: 'hidden',
                   }}
                 >
                   <span
                     className="text-xs font-medium capitalize"
-                    style={{ color: '#6e6e73' }}
+                    style={{ color: '#6e6e73', whiteSpace: 'nowrap' }}
                   >
                     {mh.label}
                   </span>
