@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
-import { workingDaysBetween } from '../hooks/usePlan'
+import { workingDaysBetween, isHoliday } from '../hooks/usePlan'
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -140,11 +140,12 @@ export default function PlanPhaseCalendar({ phase, onClose }) {
                   ))}
 
                   {days.map(date => {
-                    const dateStr  = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
-                    const inRange  = date >= rangeStart && date <= rangeEnd
-                    const dow      = date.getDay()
+                    const dateStr   = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
+                    const inRange   = date >= rangeStart && date <= rangeEnd
+                    const dow       = date.getDay()
                     const isWeekend = dow === 0 || dow === 6
-                    const isWorking = inRange && !isWeekend
+                    const holiday   = isHoliday(dateStr)
+                    const isWorking = inRange && !isWeekend && !holiday
                     const isToday   = dateStr === todayStr
 
                     // Styles
@@ -156,10 +157,15 @@ export default function PlanPhaseCalendar({ phase, onClose }) {
                     const isPartialDay = isWorking && remainder !== 0 && dateStr === lastWorkingDay
 
                     if (isWorking) {
-                      bg         = isPartialDay ? phase.color + '14' : phase.color + '28'  // partial: ~8% opacity
+                      bg         = isPartialDay ? phase.color + '14' : phase.color + '28'
                       color      = '#f5f5f7'
                       borderClr  = isPartialDay ? phase.color + '40' : phase.color + '60'
                       fontWeight = 600
+                    } else if (inRange && holiday && !isWeekend) {
+                      // Holiday inside range: amber tint
+                      bg        = 'rgba(255,159,10,0.08)'
+                      color     = '#ff9f0a'
+                      borderClr = 'rgba(255,159,10,0.2)'
                     } else if (inRange && isWeekend) {
                       // Weekend inside range: visible but clearly inactive
                       color = '#3a3a3a'
@@ -237,13 +243,20 @@ export default function PlanPhaseCalendar({ phase, onClose }) {
           })}
 
           {/* Legend */}
-          <div className="flex items-center gap-4 pt-2 pb-1">
+          <div className="flex items-center gap-3 pt-2 pb-1 flex-wrap">
             <div className="flex items-center gap-1.5">
               <div
                 className="w-3 h-3 rounded"
                 style={{ backgroundColor: phase.color + '28', border: `1px solid ${phase.color}60` }}
               />
-              <span className="text-xs" style={{ color: '#3a3a3a' }}>Día laborable</span>
+              <span className="text-xs" style={{ color: '#3a3a3a' }}>Laborable</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div
+                className="w-3 h-3 rounded"
+                style={{ backgroundColor: 'rgba(255,159,10,0.08)', border: '1px solid rgba(255,159,10,0.2)' }}
+              />
+              <span className="text-xs" style={{ color: '#3a3a3a' }}>Festivo</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded" style={{ backgroundColor: 'transparent', border: '1px solid transparent' }}>

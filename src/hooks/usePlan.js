@@ -13,6 +13,66 @@ function localDateStr(d) {
   return `${y}-${m}-${dd}`
 }
 
+// ── Madrid public holidays ────────────────────────────────────
+// Covers national (Spain) + Comunidad de Madrid festivos.
+// Uses the Anonymous Gregorian algorithm for Easter.
+const _holidayCache = {}
+
+function easterDate(year) {
+  const a = year % 19
+  const b = Math.floor(year / 100)
+  const c = year % 100
+  const d = Math.floor(b / 4)
+  const e = b % 4
+  const f = Math.floor((b + 8) / 25)
+  const g = Math.floor((b - f + 1) / 3)
+  const h = (19 * a + b - d - g + 15) % 30
+  const i = Math.floor(c / 4)
+  const k = c % 4
+  const l = (32 + 2 * e + 2 * i - h - k) % 7
+  const m = Math.floor((a + 11 * h + 22 * l) / 451)
+  const month = Math.floor((h + l - 7 * m + 114) / 31)
+  const day   = ((h + l - 7 * m + 114) % 31) + 1
+  return new Date(year, month - 1, day)
+}
+
+function getMadridHolidays(year) {
+  if (_holidayCache[year]) return _holidayCache[year]
+  const set = new Set()
+  const add = (mo, d) =>
+    set.add(`${year}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`)
+
+  // Nacionales fijos
+  add(1,  1)   // Año Nuevo
+  add(1,  6)   // Reyes Magos
+  add(5,  1)   // Día del Trabajo
+  add(8,  15)  // Asunción de la Virgen
+  add(10, 12)  // Fiesta Nacional de España
+  add(11, 1)   // Todos los Santos
+  add(12, 6)   // Día de la Constitución
+  add(12, 8)   // Inmaculada Concepción
+  add(12, 25)  // Navidad
+
+  // Comunidad de Madrid
+  add(5,  2)   // Día de la Comunidad de Madrid
+  add(11, 9)   // Nuestra Señora de la Almudena
+
+  // Semana Santa (variables)
+  const easter  = easterDate(year)
+  const jueves  = new Date(easter); jueves.setDate(easter.getDate() - 3)
+  const viernes = new Date(easter); viernes.setDate(easter.getDate() - 2)
+  set.add(localDateStr(jueves))   // Jueves Santo
+  set.add(localDateStr(viernes))  // Viernes Santo (nacional)
+
+  _holidayCache[year] = set
+  return set
+}
+
+export function isHoliday(dateStr) {
+  const year = parseInt(dateStr.slice(0, 4), 10)
+  return getMadridHolidays(year).has(dateStr)
+}
+
 export function addDays(dateStr, days) {
   const d = new Date(dateStr + 'T00:00:00')
   d.setDate(d.getDate() + days)
@@ -29,15 +89,16 @@ export function today() {
   return localDateStr(new Date())
 }
 
-// Adds n working days (Mon–Fri) to a date. n=0 returns the same date.
+// Adds n working days (Mon–Fri, skipping Madrid holidays) to a date.
 export function addWorkingDays(dateStr, n) {
   if (n <= 0) return dateStr
   const d = new Date(dateStr + 'T00:00:00')
   let added = 0
   while (added < n) {
     d.setDate(d.getDate() + 1)
-    const dow = d.getDay() // 0=Sun, 6=Sat
-    if (dow !== 0 && dow !== 6) added++
+    const dow = d.getDay()
+    const ds  = localDateStr(d)
+    if (dow !== 0 && dow !== 6 && !isHoliday(ds)) added++
   }
   return localDateStr(d)
 }
@@ -50,7 +111,7 @@ export function calcEndDateFromHours(startDate, hours, hoursPerDay) {
   return addWorkingDays(startDate, workingDays - 1) // start day counts as day 1
 }
 
-// Counts working days (Mon–Fri) occupied by a phase [start, end] inclusive.
+// Counts working days (Mon–Fri, skipping Madrid holidays) in [start, end] inclusive.
 export function workingDaysBetween(startStr, endStr) {
   const start = new Date(startStr + 'T00:00:00')
   const end   = new Date(endStr   + 'T00:00:00')
@@ -59,7 +120,8 @@ export function workingDaysBetween(startStr, endStr) {
   const d = new Date(start)
   while (d <= end) {
     const dow = d.getDay()
-    if (dow !== 0 && dow !== 6) count++
+    const ds  = localDateStr(d)
+    if (dow !== 0 && dow !== 6 && !isHoliday(ds)) count++
     d.setDate(d.getDate() + 1)
   }
   return count
@@ -180,6 +242,8 @@ export default function usePlan(planId) {
       hours:         0,
       hours_per_day: 8,
       is_sprint:     false,
+      progress:      0,
+      status:        'on_track',
       color,
       order_index:   newOrder,
     }

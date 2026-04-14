@@ -81,9 +81,14 @@ export default function PlanPhaseRow({
     window.addEventListener('mouseup', onMouseUp)
   }
 
-  const hasTasks = phase.plan_tasks && phase.plan_tasks.length > 0
-  const doneTasks = (phase.plan_tasks || []).filter(t => t.done).length
+  const hasTasks   = phase.plan_tasks && phase.plan_tasks.length > 0
+  const doneTasks  = (phase.plan_tasks || []).filter(t => t.done).length
   const totalTasks = (phase.plan_tasks || []).length
+  const progress   = phase.progress ?? 0
+  const status     = phase.status ?? 'on_track'
+
+  const STATUS_COLORS = { at_risk: '#ff9f0a', delayed: '#ff453a' }
+  const statusColor   = STATUS_COLORS[status] ?? null
 
   return (
     <div>
@@ -125,6 +130,13 @@ export default function PlanPhaseRow({
           {phase.is_sprint && (
             <Flag className="w-3 h-3 shrink-0" style={{ color: '#ff9f0a' }} title="Sprint — no puede ser solapada" />
           )}
+          {statusColor && (
+            <div
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ backgroundColor: statusColor }}
+              title={status === 'at_risk' ? 'En riesgo' : 'Retrasado'}
+            />
+          )}
           {phase.hours > 0 && (
             <span className="text-xs shrink-0 ml-auto" style={{ color: '#6e6e73' }}>
               {phase.hours}h
@@ -136,19 +148,22 @@ export default function PlanPhaseRow({
         <div className="relative flex-1" style={{ height: '100%' }}>
           {/* The bar */}
           <div
-            className="absolute top-1/2 -translate-y-1/2 rounded-lg flex items-center"
+            className="absolute top-1/2 -translate-y-1/2 rounded-lg flex items-center overflow-hidden"
             style={{
               left:   left,
               width:  barW,
               height: 28,
-              backgroundColor: phase.color || '#bf5af2',
-              opacity: 0.9,
+              background: progress > 0
+                ? `linear-gradient(to right, ${phase.color || '#bf5af2'} ${progress}%, ${phase.color || '#bf5af2'}55 ${progress}%)`
+                : (phase.color || '#bf5af2'),
               cursor: isEditable ? 'grab' : 'default',
               userSelect: 'none',
-              boxShadow: `0 2px 8px ${phase.color || '#bf5af2'}40`,
+              boxShadow: statusColor
+                ? `0 2px 8px ${phase.color || '#bf5af2'}40, inset 0 0 0 1.5px ${statusColor}`
+                : `0 2px 8px ${phase.color || '#bf5af2'}40`,
             }}
             onMouseDown={isEditable ? handleDragStart : undefined}
-            title={`${phase.start_date} → ${phase.end_date}${phase.hours ? ` · ${phase.hours}h` : ''}`}
+            title={`${phase.start_date} → ${phase.end_date}${phase.hours ? ` · ${phase.hours}h` : ''}${progress > 0 ? ` · ${progress}%` : ''}`}
           >
             {/* Phase label inside bar (if bar is wide enough) */}
             {barW > 80 && (
@@ -156,7 +171,7 @@ export default function PlanPhaseRow({
                 className="px-2.5 text-xs font-medium truncate pointer-events-none"
                 style={{ color: '#000', opacity: 0.8 }}
               >
-                {width}d {phase.hours > 0 ? `· ${phase.hours}h` : ''}
+                {width}d {phase.hours > 0 ? `· ${phase.hours}h` : ''}{progress > 0 ? ` · ${progress}%` : ''}
               </span>
             )}
 

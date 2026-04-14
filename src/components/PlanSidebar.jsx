@@ -187,6 +187,51 @@ function PhaseItem({ phase, minStartDate, onUpdatePhase, onDeletePhase, onOpenCa
             </div>
           )
         })()}
+
+        {/* Progress */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs" style={{ color: '#3a3a3a' }}>Progreso</label>
+            <span className="text-xs font-semibold" style={{ color: '#f5f5f7' }}>{phase.progress ?? 0}%</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            value={phase.progress ?? 0}
+            onChange={e => onUpdatePhase(phase.id, { progress: parseInt(e.target.value) })}
+            style={{ width: '100%', accentColor: phase.color }}
+          />
+        </div>
+
+        {/* Status */}
+        <div className="flex gap-1.5">
+          {[
+            { key: 'on_track', label: 'En plazo',   color: '#30d158' },
+            { key: 'at_risk',  label: 'En riesgo',  color: '#ff9f0a' },
+            { key: 'delayed',  label: 'Retrasado',  color: '#ff453a' },
+          ].map(s => {
+            const active = (phase.status ?? 'on_track') === s.key
+            return (
+              <button
+                key={s.key}
+                onClick={() => onUpdatePhase(phase.id, { status: s.key })}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs flex-1 justify-center transition-all"
+                style={{
+                  backgroundColor: active ? s.color + '22' : 'transparent',
+                  color:           active ? s.color : '#3a3a3a',
+                  border:          `1px solid ${active ? s.color + '50' : 'rgba(255,255,255,0.06)'}`,
+                }}
+                onMouseEnter={e => { if (!active) { e.currentTarget.style.color = s.color; e.currentTarget.style.borderColor = s.color + '30' } }}
+                onMouseLeave={e => { if (!active) { e.currentTarget.style.color = '#3a3a3a'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)' } }}
+              >
+                <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                {s.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Color picker */}
