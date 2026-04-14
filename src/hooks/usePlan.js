@@ -19,6 +19,42 @@ export function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
+// Adds n working days (Mon–Fri) to a date. n=0 returns the same date.
+export function addWorkingDays(dateStr, n) {
+  if (n <= 0) return dateStr
+  const d = new Date(dateStr + 'T00:00:00')
+  let added = 0
+  while (added < n) {
+    d.setDate(d.getDate() + 1)
+    const dow = d.getDay() // 0=Sun, 6=Sat
+    if (dow !== 0 && dow !== 6) added++
+  }
+  return d.toISOString().slice(0, 10)
+}
+
+// Returns end_date given a start date, total hours and hours worked per day.
+// Skips weekends. Returns null if inputs are invalid.
+export function calcEndDateFromHours(startDate, hours, hoursPerDay) {
+  if (!startDate || !(hours > 0) || !(hoursPerDay > 0)) return null
+  const workingDays = Math.ceil(hours / hoursPerDay)
+  return addWorkingDays(startDate, workingDays - 1) // start day counts as day 1
+}
+
+// Counts working days (Mon–Fri) occupied by a phase [start, end] inclusive.
+export function workingDaysBetween(startStr, endStr) {
+  const start = new Date(startStr + 'T00:00:00')
+  const end   = new Date(endStr   + 'T00:00:00')
+  if (end < start) return 0
+  let count = 0
+  const d = new Date(start)
+  while (d <= end) {
+    const dow = d.getDay()
+    if (dow !== 0 && dow !== 6) count++
+    d.setDate(d.getDate() + 1)
+  }
+  return count
+}
+
 // ── Cascade: shift all phases after changedIndex by delta days ─
 function cascadeFromIndex(phases, changedIndex, delta) {
   if (delta === 0) return phases
@@ -95,13 +131,14 @@ export default function usePlan(planId) {
     const color    = PHASE_COLORS[phases.length % PHASE_COLORS.length]
 
     const payload = {
-      plan_id:     planId,
-      name:        `Fase ${phases.length + 1}`,
-      start_date:  newStart,
-      end_date:    newEnd,
-      hours:       0,
+      plan_id:      planId,
+      name:         `Fase ${phases.length + 1}`,
+      start_date:   newStart,
+      end_date:     newEnd,
+      hours:        0,
+      hours_per_day: 8,
       color,
-      order_index: newOrder,
+      order_index:  newOrder,
     }
 
     // Optimistic
@@ -129,14 +166,30 @@ export default function usePlan(planId) {
     const idx = phases.findIndex(p => p.id === phaseId)
     if (idx === -1) return
 
+    const current = phases[idx]
+    let updatedFields = { ...fields }
+
+    // Auto-calculate end_date when hours or hours_per_day change
+    const hoursChanged    = fields.hours       !== undefined
+    const hpdChanged      = fields.hours_per_day !== undefined
+    const startChanged    = fields.start_date  !== undefined
+    if (hoursChanged || hpdChanged || startChanged) {
+      const merged = { ...current, ...updatedFields }
+      const newEnd = calcEndDateFromHours(merged.start_date, merged.hours, merged.hours_per_day)
+      if (newEnd) {
+        updatedFields.end_date = newEnd
+        cascade = true // auto-cascade when end_date shifts due to hours change
+      }
+    }
+
     let newPhases = phases.map((p, i) =>
-      i === idx ? { ...p, ...fields } : p
+      i === idx ? { ...p, ...updatedFields } : p
     )
 
     // If end_date changed and cascade enabled, shift subsequent phases
-    if (cascade && fields.end_date) {
+    if (cascade && updatedFields.end_date) {
       const oldEnd = phases[idx].end_date
-      const delta  = daysBetween(oldEnd, fields.end_date)
+      const delta  = daysBetween(oldEnd, updatedFields.end_date)
       newPhases = cascadeFromIndex(newPhases, idx, delta)
     }
 

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, Trash2, ChevronDown, ChevronRight, Link2, Copy, Check, AlertTriangle } from 'lucide-react'
 import PlanPhaseTaskList from './PlanPhaseTaskList'
+import { calcEndDateFromHours, workingDaysBetween } from '../hooks/usePlan'
 import toast from 'react-hot-toast'
 
 const PHASE_COLORS = ['#bf5af2', '#64d2ff', '#30d158', '#ff9f0a', '#ff453a', '#ff6b35', '#0ea5e9']
@@ -69,45 +70,89 @@ function PhaseItem({ phase, onUpdatePhase, onDeletePhase, onAddTask, onUpdateTas
 
       {/* Phase dates & hours */}
       <div
-        className="grid grid-cols-3 gap-2 px-3 pb-3"
+        className="px-3 pb-3 space-y-2"
         style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}
       >
-        <div className="pt-2">
-          <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Inicio</label>
-          <input
-            type="date"
-            value={phase.start_date}
-            onChange={e => onUpdatePhase(phase.id, { start_date: e.target.value }, { cascade: false })}
-            style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
-            onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
-            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
-          />
+        {/* Row 1: dates */}
+        <div className="grid grid-cols-2 gap-2 pt-2">
+          <div>
+            <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Inicio</label>
+            <input
+              type="date"
+              value={phase.start_date}
+              onChange={e => onUpdatePhase(phase.id, { start_date: e.target.value })}
+              style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
+              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+            />
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Fin</label>
+            <input
+              type="date"
+              value={phase.end_date}
+              onChange={e => onUpdatePhase(phase.id, { end_date: e.target.value }, { cascade: true })}
+              style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
+              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+            />
+          </div>
         </div>
-        <div className="pt-2">
-          <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Fin</label>
-          <input
-            type="date"
-            value={phase.end_date}
-            onChange={e => onUpdatePhase(phase.id, { end_date: e.target.value }, { cascade: true })}
-            style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
-            onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
-            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
-          />
+
+        {/* Row 2: hours */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Horas totales</label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={phase.hours || ''}
+              placeholder="0"
+              onChange={e => onUpdatePhase(phase.id, { hours: parseFloat(e.target.value) || 0 })}
+              style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
+              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+            />
+          </div>
+          <div>
+            <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Horas/día</label>
+            <input
+              type="number"
+              min="1"
+              max="24"
+              step="0.5"
+              value={phase.hours_per_day ?? 8}
+              onChange={e => onUpdatePhase(phase.id, { hours_per_day: parseFloat(e.target.value) || 8 })}
+              style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
+              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+            />
+          </div>
         </div>
-        <div className="pt-2">
-          <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Horas</label>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value={phase.hours || ''}
-            placeholder="0"
-            onChange={e => onUpdatePhase(phase.id, { hours: parseFloat(e.target.value) || 0 })}
-            style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
-            onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
-            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
-          />
-        </div>
+
+        {/* Working days info */}
+        {phase.hours > 0 && (phase.hours_per_day ?? 8) > 0 && (() => {
+          const autoEnd = calcEndDateFromHours(phase.start_date, phase.hours, phase.hours_per_day ?? 8)
+          const laborables = workingDaysBetween(phase.start_date, phase.end_date)
+          const autoMatch = autoEnd === phase.end_date
+          return (
+            <div
+              className="flex items-center justify-between px-2 py-1.5 rounded-lg text-xs"
+              style={{
+                backgroundColor: autoMatch ? 'rgba(48,209,88,0.06)' : 'rgba(255,159,10,0.06)',
+                border: `1px solid ${autoMatch ? 'rgba(48,209,88,0.15)' : 'rgba(255,159,10,0.15)'}`,
+              }}
+            >
+              <span style={{ color: '#6e6e73' }}>
+                {Math.ceil(phase.hours / (phase.hours_per_day ?? 8))} días necesarios
+              </span>
+              <span style={{ color: autoMatch ? '#30d158' : '#ff9f0a' }}>
+                {laborables} días laborables
+              </span>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Color picker */}
