@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus, Trash2, ChevronDown, ChevronRight, Link2, Copy, Check, AlertTriangle, Flag, CalendarDays } from 'lucide-react'
 import PlanPhaseTaskList from './PlanPhaseTaskList'
-import { calcEndDateFromHours, workingDaysBetween } from '../hooks/usePlan'
+import { calcEndDateFromHours, workingDaysBetween, addDays } from '../hooks/usePlan'
 import toast from 'react-hot-toast'
 
 const PHASE_COLORS = ['#bf5af2', '#64d2ff', '#30d158', '#ff9f0a', '#ff453a', '#ff6b35', '#0ea5e9']
@@ -18,7 +18,7 @@ const inputStyle = {
   transition: 'border-color 0.15s',
 }
 
-function PhaseItem({ phase, onUpdatePhase, onDeletePhase, onOpenCalendar, onAddTask, onUpdateTask, onDeleteTask }) {
+function PhaseItem({ phase, minStartDate, onUpdatePhase, onDeletePhase, onOpenCalendar, onAddTask, onUpdateTask, onDeleteTask }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -104,6 +104,7 @@ function PhaseItem({ phase, onUpdatePhase, onDeletePhase, onOpenCalendar, onAddT
             <input
               type="date"
               value={phase.start_date}
+              min={minStartDate}
               onChange={e => onUpdatePhase(phase.id, { start_date: e.target.value })}
               style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
               onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
@@ -115,6 +116,7 @@ function PhaseItem({ phase, onUpdatePhase, onDeletePhase, onOpenCalendar, onAddT
             <input
               type="date"
               value={phase.end_date}
+              min={phase.start_date}
               onChange={e => onUpdatePhase(phase.id, { end_date: e.target.value }, { cascade: true })}
               style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
               onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
@@ -326,10 +328,11 @@ export default function PlanSidebar({
         </div>
 
         <div className="space-y-2">
-          {phases.map(phase => (
+          {phases.map((phase, idx) => (
             <PhaseItem
               key={phase.id}
               phase={phase}
+              minStartDate={idx > 0 ? addDays(phases[idx - 1].end_date, 1) : undefined}
               onUpdatePhase={onUpdatePhase}
               onDeletePhase={onDeletePhase}
               onOpenCalendar={onOpenCalendar}
