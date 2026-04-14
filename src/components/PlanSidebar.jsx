@@ -105,7 +105,15 @@ function PhaseItem({ phase, minStartDate, onUpdatePhase, onDeletePhase, onOpenCa
               type="date"
               value={phase.start_date}
               min={phase.is_sprint ? minStartDate : undefined}
-              onChange={e => onUpdatePhase(phase.id, { start_date: e.target.value })}
+              onChange={e => {
+                const val = e.target.value
+                if (!val) return
+                // Sprint: enforce start > prev phase end before calling updatePhase
+                const effective = (phase.is_sprint && minStartDate && val < minStartDate)
+                  ? minStartDate
+                  : val
+                onUpdatePhase(phase.id, { start_date: effective })
+              }}
               style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
               onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
               onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}

@@ -202,6 +202,15 @@ export default function usePlan(planId) {
     const current = phases[idx]
     let updatedFields = { ...fields }
 
+    // Sprint constraint: if this phase is a sprint and its start_date is being
+    // changed, clamp it to the day after the previous phase's end_date.
+    if (updatedFields.start_date !== undefined && current.is_sprint && idx > 0) {
+      const prevEnd = phases[idx - 1].end_date
+      if (updatedFields.start_date <= prevEnd) {
+        updatedFields.start_date = addDays(prevEnd, 1)
+      }
+    }
+
     const hoursChanged = fields.hours         !== undefined
     const hpdChanged   = fields.hours_per_day !== undefined
     const startChanged = fields.start_date    !== undefined
