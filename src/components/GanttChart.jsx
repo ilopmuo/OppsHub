@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import PlanPhaseRow from './PlanPhaseRow'
 import { daysBetween } from '../hooks/usePlan'
@@ -77,13 +77,31 @@ export default function GanttChart({
   onReorderPhases,
   compact = false,
 }) {
-  const [dayPxState, setDayPxState] = useState(18) // default: semana
+  const [dayPxState, setDayPxState] = useState(18)
   const [labelW,     setLabelW]     = useState(LABEL_W_DEFAULT)
+  const hasAutoFitted = useRef(false)
 
   function zoomIn()  { setDayPxState(v => clampDayPx(Math.round(v * 1.4))) }
   function zoomOut() { setDayPxState(v => clampDayPx(Math.round(v / 1.4))) }
   const [resizing, setResizing] = useState(false)
   const scrollRef = useRef(null)
+
+  // Auto-fit: on first render with data, scale so all phases fill the container width
+  useEffect(() => {
+    if (hasAutoFitted.current || compact || !plan || !phases || phases.length === 0) return
+    if (!scrollRef.current) return
+    const containerW = scrollRef.current.clientWidth
+    if (containerW <= 0) return
+    const planStart = plan.start_date
+    const lastEnd = phases.reduce((acc, p) => p.end_date > acc ? p.end_date : acc, planStart)
+    const total = Math.max(daysBetween(planStart, lastEnd) + 1, 14)
+    const fitted = Math.floor((containerW - labelW - 14 * 18) / total) // subtract ~14 days padding
+    if (fitted > 0) {
+      setDayPxState(clampDayPx(fitted))
+      hasAutoFitted.current = true
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan, phases])
 
   const handleLabelResizeStart = useCallback((e) => {
     e.preventDefault()

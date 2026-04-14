@@ -428,6 +428,7 @@ export default function PlanSidebar({
   onSetActiveSnapshot,
   onCreateSnapshot,
   onDeleteSnapshot,
+  wide = false,
 }) {
   const [copied,           setCopied]           = useState(false)
   const [confirmDelete,    setConfirmDelete]     = useState(false)
@@ -468,16 +469,12 @@ export default function PlanSidebar({
 
   const totalHours = phases.reduce((s, p) => s + Number(p.hours || 0), 0)
 
-  return (
+  // ── Section: Plan metadata ────────────────────────────────
+  const metadataCard = (
     <div
-      className="flex flex-col gap-5 overflow-y-auto"
-      style={{ height: '100%', paddingBottom: 24 }}
+      className="rounded-2xl p-4 space-y-3"
+      style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
     >
-      {/* ── Plan metadata ──────────────────────────────────── */}
-      <div
-        className="rounded-2xl p-4 space-y-3"
-        style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
-      >
         <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#6e6e73' }}>
           Detalles del plan
         </h3>
@@ -537,9 +534,11 @@ export default function PlanSidebar({
           </div>
         )}
       </div>
+  )
 
-      {/* ── Phases ────────────────────────────────────────── */}
-      <div>
+  // ── Section: Phases ───────────────────────────────────────
+  const phasesSection = (
+    <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#6e6e73' }}>
             Fases ({phases.length})
@@ -613,12 +612,14 @@ export default function PlanSidebar({
           </button>
         </div>
       </div>
+  )
 
-      {/* ── Plan base (baselines) ─────────────────────────── */}
-      <div
-        className="rounded-2xl p-4 space-y-3"
-        style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
-      >
+  // ── Section: Plan base / snapshots ───────────────────────
+  const baselineCard = (
+    <div
+      className="rounded-2xl p-4 space-y-3"
+      style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
+    >
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -752,12 +753,14 @@ export default function PlanSidebar({
           </p>
         )}
       </div>
+  )
 
-      {/* ── Share ──────────────────────────────────────────── */}
-      <div
-        className="rounded-2xl p-4 space-y-3"
-        style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
-      >
+  // ── Section: Share ────────────────────────────────────────
+  const shareCard = (
+    <div
+      className="rounded-2xl p-4 space-y-3"
+      style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
+    >
         <div className="flex items-center gap-2">
           <Link2 className="w-3.5 h-3.5" style={{ color: '#6e6e73' }} />
           <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#6e6e73' }}>
@@ -800,12 +803,14 @@ export default function PlanSidebar({
           Exportar PDF
         </button>
       </div>
+  )
 
-      {/* ── Danger zone ────────────────────────────────────── */}
-      <div
-        className="rounded-2xl p-4"
-        style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
-      >
+  // ── Section: Danger zone ──────────────────────────────────
+  const dangerCard = (
+    <div
+      className="rounded-2xl p-4"
+      style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
+    >
         {!confirmDelete ? (
           <button
             onClick={() => setConfirmDelete(true)}
@@ -848,6 +853,49 @@ export default function PlanSidebar({
           </div>
         )}
       </div>
+  )
+
+  // ── Wide layout (grid): used when sidebar is below the Gantt ──
+  if (wide) {
+    return (
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '300px 1fr 300px',
+          gap: 20,
+          alignItems: 'start',
+          padding: '28px 28px 40px',
+        }}
+      >
+        {/* Left column: metadata + danger */}
+        <div className="flex flex-col gap-4">
+          {metadataCard}
+          {dangerCard}
+        </div>
+
+        {/* Center column: phases */}
+        {phasesSection}
+
+        {/* Right column: baselines + share */}
+        <div className="flex flex-col gap-4">
+          {baselineCard}
+          {shareCard}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Narrow layout (original): used in right-side panel ────────
+  return (
+    <div
+      className="flex flex-col gap-5 overflow-y-auto"
+      style={{ height: '100%', paddingBottom: 24 }}
+    >
+      {metadataCard}
+      {phasesSection}
+      {baselineCard}
+      {shareCard}
+      {dangerCard}
     </div>
   )
 }
