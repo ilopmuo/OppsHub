@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { ChevronDown, ChevronRight, GripVertical } from 'lucide-react'
+import { ChevronDown, ChevronRight, GripVertical, Flag } from 'lucide-react'
 import PlanPhaseTaskList from './PlanPhaseTaskList'
 import { daysBetween, addDays } from '../hooks/usePlan'
 
@@ -113,6 +113,9 @@ export default function PlanPhaseRow({
               title={phase.name}
             >{phase.name}</span>
           </button>
+          {phase.is_sprint && (
+            <Flag className="w-3 h-3 shrink-0" style={{ color: '#ff9f0a' }} title="Sprint — no puede ser solapada" />
+          )}
           {phase.hours > 0 && (
             <span className="text-xs shrink-0 ml-auto" style={{ color: '#6e6e73' }}>
               {phase.hours}h

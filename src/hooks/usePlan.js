@@ -68,6 +68,37 @@ function cascadeFromIndex(phases, changedIndex, delta) {
   })
 }
 
+// ── Sprint overlap resolution ─────────────────────────────────
+// After any cascade, check each sprint-marked phase against its predecessor.
+// If there's overlap (gap < 1 day), shift the sprint phase (and everything
+// after it) so it starts the day after the predecessor ends.
+export function resolveSprintOverlaps(phases) {
+  const result = phases.map(p => ({ ...p }))
+  for (let i = 1; i < result.length; i++) {
+    if (!result[i].is_sprint) continue
+    const gap = daysBetween(result[i - 1].end_date, result[i].start_date)
+    if (gap < 1) {
+      const delta = 1 - gap
+      for (let j = i; j < result.length; j++) {
+        result[j] = {
+          ...result[j],
+          start_date: addDays(result[j].start_date, delta),
+          end_date:   addDays(result[j].end_date,   delta),
+        }
+      }
+    }
+  }
+  return result
+}
+
+// Returns the phases whose start_date or end_date changed vs. originals.
+function diffPhases(original, updated) {
+  return updated.filter(p => {
+    const o = original.find(x => x.id === p.id)
+    return !o || o.start_date !== p.start_date || o.end_date !== p.end_date
+  })
+}
+
 // ── Main hook ────────────────────────────────────────────────
 export default function usePlan(planId) {
   const [plan,    setPlan]    = useState(null)
@@ -131,14 +162,15 @@ export default function usePlan(planId) {
     const color    = PHASE_COLORS[phases.length % PHASE_COLORS.length]
 
     const payload = {
-      plan_id:      planId,
-      name:         `Fase ${phases.length + 1}`,
-      start_date:   newStart,
-      end_date:     newEnd,
-      hours:        0,
+      plan_id:       planId,
+      name:          `Fase ${phases.length + 1}`,
+      start_date:    newStart,
+      end_date:      newEnd,
+      hours:         0,
       hours_per_day: 8,
+      is_sprint:     false,
       color,
-      order_index:  newOrder,
+      order_index:   newOrder,
     }
 
     // Optimistic
@@ -169,17 +201,37 @@ export default function usePlan(planId) {
     const current = phases[idx]
     let updatedFields = { ...fields }
 
-    // Auto-calculate end_date when hours or hours_per_day change
-    const hoursChanged    = fields.hours       !== undefined
-    const hpdChanged      = fields.hours_per_day !== undefined
-    const startChanged    = fields.start_date  !== undefined
-    if (hoursChanged || hpdChanged || startChanged) {
+    const hoursChanged = fields.hours         !== undefined
+    const hpdChanged   = fields.hours_per_day !== undefined
+    const startChanged = fields.start_date    !== undefined
+    const endChanged   = fields.end_date      !== undefined
+
+    if (hoursChanged || hpdChanged) {
+      // ── Hours → end_date ──────────────────────────────────
       const merged = { ...current, ...updatedFields }
       const newEnd = calcEndDateFromHours(merged.start_date, merged.hours, merged.hours_per_day)
-      if (newEnd) {
-        updatedFields.end_date = newEnd
-        cascade = true // auto-cascade when end_date shifts due to hours change
+      if (newEnd) { updatedFields.end_date = newEnd; cascade = true }
+
+    } else if (startChanged && !endChanged) {
+      // ── Start date moved ──────────────────────────────────
+      const merged = { ...current, ...updatedFields }
+      if (merged.hours > 0 && (merged.hours_per_day ?? 8) > 0) {
+        // Shift end_date to preserve work estimate
+        const newEnd = calcEndDateFromHours(merged.start_date, merged.hours, merged.hours_per_day ?? 8)
+        if (newEnd) { updatedFields.end_date = newEnd; cascade = true }
+      } else {
+        // No hours yet: infer hours from the fixed date range
+        const hpd  = merged.hours_per_day ?? 8
+        const days = workingDaysBetween(merged.start_date, merged.end_date)
+        updatedFields.hours = Math.round(days * hpd * 10) / 10
       }
+
+    } else if (endChanged && !hoursChanged) {
+      // ── End date moved manually → recalculate hours ───────
+      const merged = { ...current, ...updatedFields }
+      const hpd  = merged.hours_per_day ?? 8
+      const days = workingDaysBetween(merged.start_date, merged.end_date)
+      updatedFields.hours = Math.round(days * hpd * 10) / 10
     }
 
     let newPhases = phases.map((p, i) =>
@@ -193,18 +245,23 @@ export default function usePlan(planId) {
       newPhases = cascadeFromIndex(newPhases, idx, delta)
     }
 
-    setPhases(newPhases)
+    // Resolve sprint overlaps after cascade
+    const finalPhases = resolveSprintOverlaps(newPhases)
+    setPhases(finalPhases)
 
-    // Persist: only update affected phases
-    const toUpdate = cascade
-      ? newPhases.slice(idx)
-      : [newPhases[idx]]
-
-    const { error } = await supabase
-      .from('plan_phases')
-      .upsert(toUpdate.map(({ plan_tasks: _, ...ph }) => ph))
-
-    if (error) { toast.error('Error al guardar fase'); fetchPlan() }
+    // Always save the directly updated phase (non-date fields may have changed too).
+    // Also save any other phases whose dates shifted due to cascade / sprint resolution.
+    const toUpdate = finalPhases.filter((p, i) => {
+      if (p.id === phaseId) return true
+      const o = phases.find(x => x.id === p.id)
+      return !o || o.start_date !== p.start_date || o.end_date !== p.end_date
+    })
+    if (toUpdate.length > 0) {
+      const { error } = await supabase
+        .from('plan_phases')
+        .upsert(toUpdate.map(({ plan_tasks: _, ...ph }) => ph))
+      if (error) { toast.error('Error al guardar fase'); fetchPlan() }
+    }
   }
 
   // ── Move phase (drag) ────────────────────────────────────
@@ -234,14 +291,16 @@ export default function usePlan(planId) {
       }
     }
 
-    setPhases(newPhases)
+    const finalPhases = resolveSprintOverlaps(newPhases)
+    setPhases(finalPhases)
 
-    const toUpdate = newPhases.slice(idx)
-    const { error } = await supabase
-      .from('plan_phases')
-      .upsert(toUpdate.map(({ plan_tasks: _, ...ph }) => ph))
-
-    if (error) { toast.error('Error al mover fase'); fetchPlan() }
+    const toUpdate = diffPhases(phases, finalPhases)
+    if (toUpdate.length > 0) {
+      const { error } = await supabase
+        .from('plan_phases')
+        .upsert(toUpdate.map(({ plan_tasks: _, ...ph }) => ph))
+      if (error) { toast.error('Error al mover fase'); fetchPlan() }
+    }
   }
 
   // ── Resize phase (right edge drag) ───────────────────────
@@ -253,8 +312,13 @@ export default function usePlan(planId) {
     const oldEnd  = phase.end_date
     const delta   = daysBetween(oldEnd, newEndDate)
 
+    // Recalculate hours from the new date range
+    const hpd      = phase.hours_per_day ?? 8
+    const days     = workingDaysBetween(phase.start_date, newEndDate)
+    const newHours = Math.round(days * hpd * 10) / 10
+
     let newPhases = phases.map((p, i) =>
-      i === idx ? { ...p, end_date: newEndDate } : p
+      i === idx ? { ...p, end_date: newEndDate, hours: newHours } : p
     )
 
     // Cascade if the new end overlaps with the next phase start
@@ -266,14 +330,16 @@ export default function usePlan(planId) {
       }
     }
 
-    setPhases(newPhases)
+    const finalPhases = resolveSprintOverlaps(newPhases)
+    setPhases(finalPhases)
 
-    const toUpdate = newPhases.slice(idx)
-    const { error } = await supabase
-      .from('plan_phases')
-      .upsert(toUpdate.map(({ plan_tasks: _, ...ph }) => ph))
-
-    if (error) { toast.error('Error al redimensionar fase'); fetchPlan() }
+    const toUpdate = diffPhases(phases, finalPhases)
+    if (toUpdate.length > 0) {
+      const { error } = await supabase
+        .from('plan_phases')
+        .upsert(toUpdate.map(({ plan_tasks: _, ...ph }) => ph))
+      if (error) { toast.error('Error al redimensionar fase'); fetchPlan() }
+    }
   }
 
   // ── Delete phase ─────────────────────────────────────────

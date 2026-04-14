@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronRight, Link2, Copy, Check, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronRight, Link2, Copy, Check, AlertTriangle, Flag } from 'lucide-react'
 import PlanPhaseTaskList from './PlanPhaseTaskList'
 import { calcEndDateFromHours, workingDaysBetween } from '../hooks/usePlan'
 import toast from 'react-hot-toast'
@@ -44,6 +44,18 @@ function PhaseItem({ phase, onUpdatePhase, onDeletePhase, onAddTask, onUpdateTas
           className="flex-1 min-w-0 text-sm font-medium bg-transparent outline-none"
           style={{ color: '#f5f5f7', border: 'none' }}
         />
+
+        {/* Sprint toggle */}
+        <button
+          onClick={() => onUpdatePhase(phase.id, { is_sprint: !phase.is_sprint })}
+          title={phase.is_sprint ? 'Quitar marcador de sprint' : 'Marcar como sprint (no puede ser solapada)'}
+          className="p-1 rounded transition-colors shrink-0"
+          style={{ color: phase.is_sprint ? '#ff9f0a' : '#3a3a3a' }}
+          onMouseEnter={e => e.currentTarget.style.color = phase.is_sprint ? '#ffb340' : '#6e6e73'}
+          onMouseLeave={e => e.currentTarget.style.color = phase.is_sprint ? '#ff9f0a' : '#3a3a3a'}
+        >
+          <Flag className="w-3.5 h-3.5" />
+        </button>
 
         {/* Expand tasks */}
         <button
