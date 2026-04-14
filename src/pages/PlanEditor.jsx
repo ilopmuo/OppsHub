@@ -178,17 +178,29 @@ export default function PlanEditor() {
       <div className="print-only" style={{ display: 'none' }}>
         <div style={{ fontFamily: 'Inter, system-ui, sans-serif', padding: '0 8px' }}>
           {/* Header */}
-          <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '2px solid #ddd', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16 }}>
+          <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '2px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            {/* Plan info */}
             <div>
               <h1 style={{ fontSize: 19, fontWeight: 700, margin: 0, color: '#111' }}>{plan.name}</h1>
               {plan.client_name && (
                 <p style={{ color: '#666', margin: '3px 0 0', fontSize: 12 }}>{plan.client_name}</p>
               )}
+              <div style={{ display: 'flex', gap: 20, marginTop: 4, fontSize: 11, color: '#999' }}>
+                <span>{plan.start_date} — {printLastEnd}</span>
+                {printTotalHours > 0 && <span>{printTotalHours}h planificadas</span>}
+                <span>{phases.length} fase{phases.length !== 1 ? 's' : ''}</span>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 20, fontSize: 11, color: '#888', whiteSpace: 'nowrap' }}>
-              <span>{plan.start_date} — {printLastEnd}</span>
-              {printTotalHours > 0 && <span>{printTotalHours}h planificadas</span>}
-              <span>{phases.length} fase{phases.length !== 1 ? 's' : ''}</span>
+            {/* OppsHub branding */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 44 44" fill="none">
+                <rect width="44" height="44" rx="10" fill="#1a1a1a"/>
+                <rect x="10" y="10" width="10" height="10" rx="2" fill="white"/>
+                <rect x="24" y="10" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
+                <rect x="10" y="24" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
+                <rect x="24" y="24" width="10" height="10" rx="2" fill="white"/>
+              </svg>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#333', letterSpacing: '-0.01em' }}>OppsHub</span>
             </div>
           </div>
           {/* Gantt scaled to fit the page */}

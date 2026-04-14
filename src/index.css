@@ -127,7 +127,8 @@
     print-color-adjust: exact !important;
   }
 
-  /* Hide interactive UI */
+  /* Hide interactive UI and the full navbar (tabs, profile, etc.) */
+  header,
   .no-print {
     display: none !important;
   }
