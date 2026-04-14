@@ -1,14 +1,21 @@
 import { useState, useRef, useCallback } from 'react'
+import { ZoomIn, ZoomOut } from 'lucide-react'
 import PlanPhaseRow from './PlanPhaseRow'
 import { daysBetween } from '../hooks/usePlan'
 
 const LABEL_W_MIN     = 120
 const LABEL_W_DEFAULT = 200
-const ZOOM_LEVELS = [
+const DAY_PX_MIN = 3
+const DAY_PX_MAX = 80
+const ZOOM_PRESETS = [
   { label: 'Día',    dayPx: 40 },
-  { label: 'Semana', dayPx: 24 },
-  { label: 'Mes',    dayPx: 10 },
+  { label: 'Semana', dayPx: 18 },
+  { label: 'Mes',    dayPx: 8  },
 ]
+
+function clampDayPx(v) {
+  return Math.max(DAY_PX_MIN, Math.min(DAY_PX_MAX, v))
+}
 
 function buildMonthHeaders(planStart, totalDays, dayPx) {
   const headers = []
@@ -70,8 +77,11 @@ export default function GanttChart({
   onReorderPhases,
   compact = false,
 }) {
-  const [zoomIdx, setZoomIdx] = useState(1) // default: semana
-  const [labelW,  setLabelW]  = useState(LABEL_W_DEFAULT)
+  const [dayPxState, setDayPxState] = useState(18) // default: semana
+  const [labelW,     setLabelW]     = useState(LABEL_W_DEFAULT)
+
+  function zoomIn()  { setDayPxState(v => clampDayPx(Math.round(v * 1.4))) }
+  function zoomOut() { setDayPxState(v => clampDayPx(Math.round(v / 1.4))) }
   const [resizing, setResizing] = useState(false)
   const scrollRef = useRef(null)
 
@@ -110,7 +120,7 @@ export default function GanttChart({
     )
   }
 
-  const dayPx = ZOOM_LEVELS[zoomIdx].dayPx
+  const dayPx = dayPxState
 
   // Calculate timeline range
   const planStart  = plan.start_date
@@ -141,20 +151,57 @@ export default function GanttChart({
         <div className="flex items-center justify-between mb-3 no-print">
           <div className="flex items-center gap-2">
             <span className="text-xs" style={{ color: '#6e6e73' }}>Zoom:</span>
+            {/* Preset quick-jump buttons */}
             <div className="flex gap-0.5 p-1 rounded-xl" style={{ backgroundColor: '#111111' }}>
-              {ZOOM_LEVELS.map((z, i) => (
-                <button
-                  key={z.label}
-                  onClick={() => setZoomIdx(i)}
-                  className="px-3 py-1 rounded-lg text-xs font-medium transition-all"
-                  style={{
-                    backgroundColor: zoomIdx === i ? '#2a2a2a' : 'transparent',
-                    color: zoomIdx === i ? '#f5f5f7' : '#6e6e73',
-                  }}
-                >
-                  {z.label}
-                </button>
-              ))}
+              {ZOOM_PRESETS.map(z => {
+                const active = dayPx === z.dayPx
+                return (
+                  <button
+                    key={z.label}
+                    onClick={() => setDayPxState(z.dayPx)}
+                    className="px-3 py-1 rounded-lg text-xs font-medium transition-all"
+                    style={{
+                      backgroundColor: active ? '#2a2a2a' : 'transparent',
+                      color: active ? '#f5f5f7' : '#6e6e73',
+                    }}
+                  >
+                    {z.label}
+                  </button>
+                )
+              })}
+            </div>
+            {/* Fine zoom controls */}
+            <div className="flex gap-0.5 p-1 rounded-xl" style={{ backgroundColor: '#111111' }}>
+              <button
+                onClick={zoomOut}
+                disabled={dayPx <= DAY_PX_MIN}
+                className="flex items-center justify-center rounded-lg transition-all"
+                style={{
+                  width: 28, height: 28,
+                  color: dayPx <= DAY_PX_MIN ? '#3a3a3a' : '#6e6e73',
+                  cursor: dayPx <= DAY_PX_MIN ? 'not-allowed' : 'pointer',
+                }}
+                title="Alejar"
+                onMouseEnter={e => { if (dayPx > DAY_PX_MIN) e.currentTarget.style.color = '#f5f5f7' }}
+                onMouseLeave={e => { e.currentTarget.style.color = dayPx <= DAY_PX_MIN ? '#3a3a3a' : '#6e6e73' }}
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={zoomIn}
+                disabled={dayPx >= DAY_PX_MAX}
+                className="flex items-center justify-center rounded-lg transition-all"
+                style={{
+                  width: 28, height: 28,
+                  color: dayPx >= DAY_PX_MAX ? '#3a3a3a' : '#6e6e73',
+                  cursor: dayPx >= DAY_PX_MAX ? 'not-allowed' : 'pointer',
+                }}
+                title="Acercar"
+                onMouseEnter={e => { if (dayPx < DAY_PX_MAX) e.currentTarget.style.color = '#f5f5f7' }}
+                onMouseLeave={e => { e.currentTarget.style.color = dayPx >= DAY_PX_MAX ? '#3a3a3a' : '#6e6e73' }}
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
           {totalHours > 0 && (
