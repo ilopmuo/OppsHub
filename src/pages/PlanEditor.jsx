@@ -67,8 +67,8 @@ export default function PlanEditor() {
   //   height: (210 - 24) mm  = 186 mm = ~703  px
   const PRINT_LABEL_W  = 150
   const PRINT_PAGE_W   = 1009
-  const PRINT_PAGE_H   = 703
-  const PRINT_HEADER_H = 90  // estimated height of the plan-name / branding header
+  const PRINT_PAGE_H   = 620  // conservative: browser chrome + page footer eat ~80px of the theoretical 703px
+  const PRINT_HEADER_H = 110  // plan-name header + branding + some breathing room
 
   const printLastEnd    = phases.reduce((acc, p) => p.end_date > acc ? p.end_date : acc, plan.start_date)
   const printTotalDays  = Math.max(daysBetween(plan.start_date, printLastEnd) + 1, 14)
