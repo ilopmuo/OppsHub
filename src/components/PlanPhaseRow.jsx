@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useLayoutEffect } from 'react'
 import { ChevronDown, ChevronRight, GripVertical, Flag } from 'lucide-react'
 import PlanPhaseTaskList from './PlanPhaseTaskList'
 import { daysBetween, addDays } from '../hooks/usePlan'
@@ -17,9 +17,18 @@ export default function PlanPhaseRow({
   onUpdateTask,
   onDeleteTask,
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded,    setExpanded]    = useState(false)
+  const [tooltipPos,  setTooltipPos]  = useState(null)   // {x, y} or null
+  const [isTruncated, setIsTruncated] = useState(false)
   const dragRef    = useRef(null)
   const resizeRef  = useRef(null)
+  const nameRef    = useRef(null)
+
+  useLayoutEffect(() => {
+    if (nameRef.current) {
+      setIsTruncated(nameRef.current.scrollWidth > nameRef.current.clientWidth)
+    }
+  })
 
   const LABEL_W = 200 // px — must match GanttChart.jsx
 
@@ -122,10 +131,40 @@ export default function PlanPhaseRow({
               : <span className="w-3 h-3 shrink-0" />
             }
             <span
+              ref={nameRef}
               className="text-xs truncate"
               style={{ color: '#f5f5f7', fontWeight: 500 }}
-              title={phase.name}
+              onMouseEnter={e => {
+                if (isTruncated) {
+                  const r = e.currentTarget.getBoundingClientRect()
+                  setTooltipPos({ x: r.left, y: r.top })
+                }
+              }}
+              onMouseLeave={() => setTooltipPos(null)}
             >{phase.name}</span>
+
+            {/* Tooltip for truncated names */}
+            {tooltipPos && (
+              <div
+                style={{
+                  position: 'fixed',
+                  left: tooltipPos.x,
+                  top: tooltipPos.y - 34,
+                  backgroundColor: '#1c1c1e',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 8,
+                  padding: '5px 10px',
+                  fontSize: 12,
+                  color: '#f5f5f7',
+                  whiteSpace: 'nowrap',
+                  zIndex: 50,
+                  pointerEvents: 'none',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                }}
+              >
+                {phase.name}
+              </div>
+            )}
           </button>
           {phase.is_sprint && (
             <Flag className="w-3 h-3 shrink-0" style={{ color: '#ff9f0a' }} title="Sprint — no puede ser solapada" />
