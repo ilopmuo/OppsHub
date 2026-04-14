@@ -38,6 +38,17 @@ export default function PlanPhaseCalendar({ phase, onClose }) {
   const _t      = new Date()
   const todayStr = `${_t.getFullYear()}-${String(_t.getMonth()+1).padStart(2,'0')}-${String(_t.getDate()).padStart(2,'0')}`
   const hpd        = phase.hours_per_day ?? 8
+  const totalHours = phase.hours ?? 0
+
+  // Last working day may have fewer hours if hours isn't a multiple of hpd
+  const remainder  = totalHours > 0 ? totalHours % hpd : 0  // 0 means all days are full
+  const lastWorkingDay = phase.end_date  // end_date is always the last working day
+
+  function hoursForDay(dateStr) {
+    if (totalHours <= 0) return hpd
+    if (remainder !== 0 && dateStr === lastWorkingDay) return remainder
+    return hpd
+  }
 
   const months      = getMonthsInRange(phase.start_date, phase.end_date)
   const workingDays = workingDaysBetween(phase.start_date, phase.end_date)
@@ -142,10 +153,12 @@ export default function PlanPhaseCalendar({ phase, onClose }) {
                     let borderClr  = 'transparent'
                     let fontWeight = 400
 
+                    const isPartialDay = isWorking && remainder !== 0 && dateStr === lastWorkingDay
+
                     if (isWorking) {
-                      bg         = phase.color + '28'  // ~16 % opacity
+                      bg         = isPartialDay ? phase.color + '14' : phase.color + '28'  // partial: ~8% opacity
                       color      = '#f5f5f7'
-                      borderClr  = phase.color + '60'
+                      borderClr  = isPartialDay ? phase.color + '40' : phase.color + '60'
                       fontWeight = 600
                     } else if (inRange && isWeekend) {
                       // Weekend inside range: visible but clearly inactive
@@ -212,7 +225,7 @@ export default function PlanPhaseCalendar({ phase, onClose }) {
                               boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
                             }}
                           >
-                            {hpd}h
+                            {hoursForDay(dateStr)}h
                           </div>
                         )}
                       </div>
