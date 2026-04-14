@@ -73,6 +73,28 @@ export function isHoliday(dateStr) {
   return getMadridHolidays(year).has(dateStr)
 }
 
+// ── Computed phase status ─────────────────────────────────────
+// Auto-detects delay and risk from dates + progress.
+// Rules (in priority order):
+//   1. progress ≥ 100 → on_track (done)
+//   2. today > end_date && progress < 100 → delayed
+//   3. phase is active && expectedProgress – actualProgress > 25 → at_risk
+//   4. fall back to stored manual status
+export function computePhaseStatus(phase) {
+  if (phase.is_milestone) return null
+  const todayStr = today()
+  const progress = phase.progress ?? 0
+  if (progress >= 100) return 'on_track'
+  if (todayStr > phase.end_date) return 'delayed'
+  if (todayStr >= phase.start_date) {
+    const elapsed     = daysBetween(phase.start_date, todayStr)
+    const total       = Math.max(daysBetween(phase.start_date, phase.end_date), 1)
+    const expectedPct = (elapsed / total) * 100
+    if (expectedPct - progress > 25) return 'at_risk'
+  }
+  return phase.status ?? 'on_track'
+}
+
 export function addDays(dateStr, days) {
   const d = new Date(dateStr + 'T00:00:00')
   d.setDate(d.getDate() + days)
@@ -256,8 +278,11 @@ export default function usePlan(planId) {
       hours:         0,
       hours_per_day: 8,
       is_sprint:     false,
+      is_milestone:  false,
       progress:      0,
       status:        'on_track',
+      description:   null,
+      depends_on:    null,
       color,
       order_index:   newOrder,
     }
@@ -282,6 +307,43 @@ export default function usePlan(planId) {
     setPhases(prev => prev.map(p => p.id === tempId ? { ...data, plan_tasks: [] } : p))
   }
 
+  // ── Add milestone ───────────────────────────────────────
+  async function addMilestone() {
+    const lastPhase = phases[phases.length - 1]
+    const date      = lastPhase ? lastPhase.end_date : (plan?.start_date || today())
+    const newOrder  = phases.length
+
+    const payload = {
+      plan_id:      planId,
+      name:         `Hito ${phases.filter(p => p.is_milestone).length + 1}`,
+      start_date:   date,
+      end_date:     date,
+      hours:        0,
+      hours_per_day: 8,
+      is_sprint:    false,
+      is_milestone: true,
+      progress:     0,
+      status:       'on_track',
+      description:  null,
+      depends_on:   null,
+      color:        '#ff9f0a',
+      order_index:  newOrder,
+    }
+
+    const tempId = `temp-${Date.now()}`
+    setPhases(prev => [...prev, { ...payload, id: tempId, plan_tasks: [] }])
+
+    const { data, error } = await supabase
+      .from('plan_phases').insert(payload).select().single()
+
+    if (error) {
+      toast.error('Error al añadir hito')
+      setPhases(prev => prev.filter(p => p.id !== tempId))
+      return
+    }
+    setPhases(prev => prev.map(p => p.id === tempId ? { ...data, plan_tasks: [] } : p))
+  }
+
   // ── Update phase ─────────────────────────────────────────
   async function updatePhase(phaseId, fields, { cascade = false } = {}) {
     const idx = phases.findIndex(p => p.id === phaseId)
@@ -297,6 +359,12 @@ export default function usePlan(planId) {
       if (updatedFields.start_date <= prevEnd) {
         updatedFields.start_date = addDays(prevEnd, 1)
       }
+    }
+
+    // Milestone constraint: start and end must always be the same date.
+    if (current.is_milestone) {
+      if (updatedFields.start_date) updatedFields.end_date = updatedFields.start_date
+      if (updatedFields.end_date)   updatedFields.start_date = updatedFields.end_date
     }
 
     const hoursChanged = fields.hours         !== undefined
@@ -577,7 +645,7 @@ export default function usePlan(planId) {
   return {
     plan, phases, loading, saving,
     updatePlan,
-    addPhase, updatePhase, movePhase, resizePhase, deletePhase, reorderPhases,
+    addPhase, addMilestone, updatePhase, movePhase, resizePhase, deletePhase, reorderPhases,
     addTask, updateTask, deleteTask,
     deletePlan,
     snapshots, activeSnapshotId, setActiveSnapshotId,

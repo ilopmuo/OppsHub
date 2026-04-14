@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronRight, Link2, Copy, Check, AlertTriangle, Flag, CalendarDays, GitBranch, RotateCcw, CheckCircle2 } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronRight, Link2, Copy, Check, AlertTriangle, Flag, CalendarDays, GitBranch, RotateCcw, CheckCircle2, Diamond, AlignLeft, GitMerge } from 'lucide-react'
 import PlanPhaseTaskList from './PlanPhaseTaskList'
-import { calcEndDateFromHours, workingDaysBetween, addDays, daysBetween } from '../hooks/usePlan'
+import { calcEndDateFromHours, workingDaysBetween, addDays, daysBetween, computePhaseStatus } from '../hooks/usePlan'
 import toast from 'react-hot-toast'
 
 const PHASE_COLORS = ['#bf5af2', '#64d2ff', '#30d158', '#ff9f0a', '#ff453a', '#ff6b35', '#0ea5e9']
@@ -18,8 +18,16 @@ const inputStyle = {
   transition: 'border-color 0.15s',
 }
 
-function PhaseItem({ phase, minStartDate, baselinePhase, onUpdatePhase, onDeletePhase, onOpenCalendar, onAddTask, onUpdateTask, onDeleteTask }) {
+function PhaseItem({ phase, minStartDate, baselinePhase, allPhases, onUpdatePhase, onDeletePhase, onOpenCalendar, onAddTask, onUpdateTask, onDeleteTask }) {
   const [open, setOpen] = useState(false)
+
+  const effectiveStatus = computePhaseStatus(phase)
+  const isAutoStatus    = !phase.is_milestone && effectiveStatus !== (phase.status ?? 'on_track')
+  const STATUS_META = {
+    on_track: { label: 'En plazo',   color: '#30d158' },
+    at_risk:  { label: 'En riesgo',  color: '#ff9f0a' },
+    delayed:  { label: 'Retrasado',  color: '#ff453a' },
+  }
 
   return (
     <div
@@ -28,14 +36,23 @@ function PhaseItem({ phase, minStartDate, baselinePhase, onUpdatePhase, onDelete
     >
       {/* Phase header */}
       <div className="flex items-center gap-2 p-3">
-        {/* Color dot */}
-        <div className="relative shrink-0">
+        {/* Phase type indicator */}
+        {phase.is_milestone ? (
           <div
-            className="w-3 h-3 rounded-full cursor-pointer"
-            style={{ backgroundColor: phase.color || '#bf5af2' }}
-            title="Color"
+            className="shrink-0"
+            style={{
+              width: 12, height: 12,
+              transform: 'rotate(45deg)',
+              backgroundColor: phase.color || '#ff9f0a',
+              borderRadius: 2,
+            }}
           />
-        </div>
+        ) : (
+          <div
+            className="w-3 h-3 rounded-full shrink-0"
+            style={{ backgroundColor: phase.color || '#bf5af2' }}
+          />
+        )}
 
         {/* Name */}
         <input
@@ -97,96 +114,101 @@ function PhaseItem({ phase, minStartDate, baselinePhase, onUpdatePhase, onDelete
         className="px-3 pb-3 space-y-2"
         style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}
       >
-        {/* Row 1: dates */}
-        <div className="grid grid-cols-2 gap-2 pt-2">
-          <div>
-            <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Inicio</label>
+        {/* Dates */}
+        {phase.is_milestone ? (
+          <div className="pt-2">
+            <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Fecha del hito</label>
             <input
               type="date"
               value={phase.start_date}
-              min={phase.is_sprint ? minStartDate : undefined}
-              onChange={e => {
-                const val = e.target.value
-                if (!val) return
-                // Sprint: enforce start > prev phase end before calling updatePhase
-                const effective = (phase.is_sprint && minStartDate && val < minStartDate)
-                  ? minStartDate
-                  : val
-                onUpdatePhase(phase.id, { start_date: effective })
-              }}
+              onChange={e => { if (e.target.value) onUpdatePhase(phase.id, { start_date: e.target.value, end_date: e.target.value }) }}
               style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
               onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
               onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
             />
           </div>
-          <div>
-            <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Fin</label>
-            <input
-              type="date"
-              value={phase.end_date}
-              min={phase.is_sprint ? phase.start_date : undefined}
-              onChange={e => onUpdatePhase(phase.id, { end_date: e.target.value }, { cascade: true })}
-              style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
-              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
-              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
-            />
-          </div>
-        </div>
-
-        {/* Row 2: hours */}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Horas totales</label>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={phase.hours || ''}
-              placeholder="0"
-              onChange={e => onUpdatePhase(phase.id, { hours: parseFloat(e.target.value) || 0 })}
-              style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
-              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
-              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
-            />
-          </div>
-          <div>
-            <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Horas/día</label>
-            <input
-              type="number"
-              min="1"
-              max="24"
-              step="0.5"
-              value={phase.hours_per_day ?? 8}
-              onChange={e => onUpdatePhase(phase.id, { hours_per_day: parseFloat(e.target.value) || 8 })}
-              style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
-              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
-              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
-            />
-          </div>
-        </div>
-
-        {/* Working days info */}
-        {phase.hours > 0 && (phase.hours_per_day ?? 8) > 0 && (() => {
-          const autoEnd = calcEndDateFromHours(phase.start_date, phase.hours, phase.hours_per_day ?? 8)
-          const laborables = workingDaysBetween(phase.start_date, phase.end_date)
-          const autoMatch = autoEnd === phase.end_date
-          return (
-            <div
-              className="flex items-center justify-between px-2 py-1.5 rounded-lg text-xs"
-              style={{
-                backgroundColor: autoMatch ? 'rgba(48,209,88,0.06)' : 'rgba(255,159,10,0.06)',
-                border: `1px solid ${autoMatch ? 'rgba(48,209,88,0.15)' : 'rgba(255,159,10,0.15)'}`,
-              }}
-            >
-              <span style={{ color: '#6e6e73' }}>
-                {Math.ceil(phase.hours / (phase.hours_per_day ?? 8))} días necesarios
-              </span>
-              <span style={{ color: autoMatch ? '#30d158' : '#ff9f0a' }}>
-                {laborables} días laborables
-              </span>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Inicio</label>
+                <input
+                  type="date"
+                  value={phase.start_date}
+                  min={phase.is_sprint ? minStartDate : undefined}
+                  onChange={e => {
+                    const val = e.target.value
+                    if (!val) return
+                    const effective = (phase.is_sprint && minStartDate && val < minStartDate) ? minStartDate : val
+                    onUpdatePhase(phase.id, { start_date: effective })
+                  }}
+                  style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
+                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+                />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Fin</label>
+                <input
+                  type="date"
+                  value={phase.end_date}
+                  min={phase.is_sprint ? phase.start_date : undefined}
+                  onChange={e => onUpdatePhase(phase.id, { end_date: e.target.value }, { cascade: true })}
+                  style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
+                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+                />
+              </div>
             </div>
-          )
-        })()}
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Horas totales</label>
+                <input
+                  type="number" min="0" step="1"
+                  value={phase.hours || ''} placeholder="0"
+                  onChange={e => onUpdatePhase(phase.id, { hours: parseFloat(e.target.value) || 0 })}
+                  style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
+                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+                />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Horas/día</label>
+                <input
+                  type="number" min="1" max="24" step="0.5"
+                  value={phase.hours_per_day ?? 8}
+                  onChange={e => onUpdatePhase(phase.id, { hours_per_day: parseFloat(e.target.value) || 8 })}
+                  style={{ ...inputStyle, padding: '5px 8px', fontSize: 11 }}
+                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+                />
+              </div>
+            </div>
+
+            {phase.hours > 0 && (phase.hours_per_day ?? 8) > 0 && (() => {
+              const autoEnd    = calcEndDateFromHours(phase.start_date, phase.hours, phase.hours_per_day ?? 8)
+              const laborables = workingDaysBetween(phase.start_date, phase.end_date)
+              const autoMatch  = autoEnd === phase.end_date
+              return (
+                <div
+                  className="flex items-center justify-between px-2 py-1.5 rounded-lg text-xs"
+                  style={{
+                    backgroundColor: autoMatch ? 'rgba(48,209,88,0.06)' : 'rgba(255,159,10,0.06)',
+                    border: `1px solid ${autoMatch ? 'rgba(48,209,88,0.15)' : 'rgba(255,159,10,0.15)'}`,
+                  }}
+                >
+                  <span style={{ color: '#6e6e73' }}>
+                    {Math.ceil(phase.hours / (phase.hours_per_day ?? 8))} días necesarios
+                  </span>
+                  <span style={{ color: autoMatch ? '#30d158' : '#ff9f0a' }}>
+                    {laborables} días laborables
+                  </span>
+                </div>
+              )
+            })()}
+          </>
+        )}
 
         {/* Baseline deviation banner */}
         {baselinePhase && (() => {
@@ -226,49 +248,102 @@ function PhaseItem({ phase, minStartDate, baselinePhase, onUpdatePhase, onDelete
           )
         })()}
 
-        {/* Progress */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-xs" style={{ color: '#3a3a3a' }}>Progreso</label>
-            <span className="text-xs font-semibold" style={{ color: '#f5f5f7' }}>{phase.progress ?? 0}%</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            step="5"
-            value={phase.progress ?? 0}
-            onChange={e => onUpdatePhase(phase.id, { progress: parseInt(e.target.value) })}
-            style={{ width: '100%', accentColor: phase.color }}
-          />
-        </div>
+        {/* Progress + Status (hidden for milestones) */}
+        {!phase.is_milestone && (
+          <>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs" style={{ color: '#3a3a3a' }}>Progreso</label>
+                <span className="text-xs font-semibold" style={{ color: '#f5f5f7' }}>{phase.progress ?? 0}%</span>
+              </div>
+              <input
+                type="range" min="0" max="100" step="5"
+                value={phase.progress ?? 0}
+                onChange={e => onUpdatePhase(phase.id, { progress: parseInt(e.target.value) })}
+                style={{ width: '100%', accentColor: phase.color }}
+              />
+            </div>
 
-        {/* Status */}
-        <div className="flex gap-1.5">
-          {[
-            { key: 'on_track', label: 'En plazo',   color: '#30d158' },
-            { key: 'at_risk',  label: 'En riesgo',  color: '#ff9f0a' },
-            { key: 'delayed',  label: 'Retrasado',  color: '#ff453a' },
-          ].map(s => {
-            const active = (phase.status ?? 'on_track') === s.key
-            return (
-              <button
-                key={s.key}
-                onClick={() => onUpdatePhase(phase.id, { status: s.key })}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs flex-1 justify-center transition-all"
-                style={{
-                  backgroundColor: active ? s.color + '22' : 'transparent',
-                  color:           active ? s.color : '#3a3a3a',
-                  border:          `1px solid ${active ? s.color + '50' : 'rgba(255,255,255,0.06)'}`,
-                }}
-                onMouseEnter={e => { if (!active) { e.currentTarget.style.color = s.color; e.currentTarget.style.borderColor = s.color + '30' } }}
-                onMouseLeave={e => { if (!active) { e.currentTarget.style.color = '#3a3a3a'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)' } }}
-              >
-                <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                {s.label}
-              </button>
-            )
-          })}
+            {/* Status — shows computed (auto) or manual */}
+            <div>
+              {isAutoStatus && (
+                <p className="text-xs mb-1.5" style={{ color: '#3a3a3a' }}>
+                  Estado calculado automáticamente ·{' '}
+                  <span style={{ color: STATUS_META[effectiveStatus]?.color }}>
+                    {STATUS_META[effectiveStatus]?.label}
+                  </span>
+                </p>
+              )}
+              <div className="flex gap-1.5">
+                {Object.entries(STATUS_META).map(([key, { label, color }]) => {
+                  const isEffective = effectiveStatus === key
+                  const isManual    = (phase.status ?? 'on_track') === key
+                  const highlight   = isAutoStatus ? isEffective : isManual
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => onUpdatePhase(phase.id, { status: key })}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs flex-1 justify-center transition-all"
+                      style={{
+                        backgroundColor: highlight ? color + '22' : 'transparent',
+                        color:           highlight ? color : '#3a3a3a',
+                        border:          `1px solid ${highlight ? color + '50' : 'rgba(255,255,255,0.06)'}`,
+                        outline:         isAutoStatus && isEffective ? `1px solid ${color}60` : 'none',
+                        outlineOffset:   2,
+                      }}
+                      onMouseEnter={e => { if (!highlight) { e.currentTarget.style.color = color; e.currentTarget.style.borderColor = color + '30' } }}
+                      onMouseLeave={e => { if (!highlight) { e.currentTarget.style.color = '#3a3a3a'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)' } }}
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+        {/* Depends on */}
+        {allPhases && allPhases.length > 1 && (
+          <div>
+            <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Depende de</label>
+            <select
+              value={phase.depends_on || ''}
+              onChange={e => onUpdatePhase(phase.id, { depends_on: e.target.value || null })}
+              style={{
+                ...inputStyle, padding: '5px 8px', fontSize: 11,
+                appearance: 'none', backgroundImage: 'none',
+              }}
+              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+            >
+              <option value="">— Sin dependencia —</option>
+              {allPhases
+                .filter(p => p.id !== phase.id)
+                .map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.is_milestone ? '◆ ' : ''}{p.name}
+                  </option>
+                ))
+              }
+            </select>
+          </div>
+        )}
+
+        {/* Description */}
+        <div>
+          <label className="block text-xs mb-1" style={{ color: '#3a3a3a' }}>Notas</label>
+          <textarea
+            value={phase.description || ''}
+            onChange={e => onUpdatePhase(phase.id, { description: e.target.value || null })}
+            placeholder="Contexto, requisitos, exclusiones..."
+            rows={2}
+            style={{ ...inputStyle, padding: '5px 8px', fontSize: 11, resize: 'vertical' }}
+            onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
+            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+          />
         </div>
       </div>
 
@@ -321,6 +396,7 @@ export default function PlanSidebar({
   onDeleteTask,
   onDeletePlan,
   onPrint,
+  onAddMilestone,
   snapshots = [],
   activeSnapshotId = null,
   onSetActiveSnapshot,
@@ -452,6 +528,7 @@ export default function PlanSidebar({
             <PhaseItem
               key={phase.id}
               phase={phase}
+              allPhases={phases}
               minStartDate={idx > 0 ? addDays(phases[idx - 1].end_date, 1) : undefined}
               baselinePhase={baselineMap[phase.id] ?? null}
               onUpdatePhase={onUpdatePhase}
@@ -464,20 +541,37 @@ export default function PlanSidebar({
           ))}
         </div>
 
-        <button
-          onClick={onAddPhase}
-          className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all"
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.04)',
-            color: '#6e6e73',
-            border: '1px dashed rgba(255,255,255,0.1)',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
-          onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)' }}
-        >
-          <Plus className="w-4 h-4" />
-          Añadir fase
-        </button>
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={onAddPhase}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm transition-all"
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.04)',
+              color: '#6e6e73',
+              border: '1px dashed rgba(255,255,255,0.1)',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)' }}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Añadir fase
+          </button>
+          <button
+            onClick={onAddMilestone}
+            className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm transition-all"
+            style={{
+              backgroundColor: 'rgba(255,159,10,0.06)',
+              color: '#ff9f0a',
+              border: '1px dashed rgba(255,159,10,0.2)',
+            }}
+            title="Añadir hito (punto de control sin duración)"
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,159,10,0.12)' }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255,159,10,0.06)' }}
+          >
+            <div style={{ width: 10, height: 10, transform: 'rotate(45deg)', backgroundColor: '#ff9f0a', borderRadius: 1 }} />
+            Hito
+          </button>
+        </div>
       </div>
 
       {/* ── Plan base (baselines) ─────────────────────────── */}

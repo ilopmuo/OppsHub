@@ -267,7 +267,7 @@ export default function GanttChart({
           )}
 
           {/* ── Phase rows ───────────────────────────────────── */}
-          <div className="relative">
+          <div className="relative" id="gantt-rows-container">
             {/* Today marker */}
             {todayOffset >= 0 && todayOffset <= totalDays + 14 && (
               <div
@@ -300,6 +300,56 @@ export default function GanttChart({
                 }}
               />
             ))}
+
+            {/* ── Dependency arrows SVG overlay ──────────────── */}
+            {/* Y positions assume collapsed rows (44px each). Arrows will
+                be slightly off when rows are expanded — acceptable for MVP. */}
+            <svg
+              style={{
+                position: 'absolute', top: 0, left: 0,
+                width: '100%', height: phases.length * 44,
+                pointerEvents: 'none', overflow: 'visible', zIndex: 8,
+              }}
+            >
+              {phases.map((phase, phaseIdx) => {
+                if (!phase.depends_on) return null
+                const depIdx = phases.findIndex(p => p.id === phase.depends_on)
+                if (depIdx === -1) return null
+                const dep = phases[depIdx]
+
+                const ROW = 44
+                // Source: right edge of dep bar
+                const depOffset = daysBetween(planStart, dep.start_date)
+                const depW      = daysBetween(dep.start_date, dep.end_date) + 1
+                const x1 = labelW + (depOffset + depW) * dayPx
+                const y1 = depIdx * ROW + ROW / 2
+
+                // Target: left edge of current bar
+                const x2 = labelW + daysBetween(planStart, phase.start_date) * dayPx
+                const y2 = phaseIdx * ROW + ROW / 2
+
+                const c = (dep.color || '#bf5af2') + '70'
+                const dx      = Math.abs(x2 - x1)
+                const cpOff   = Math.max(dx * 0.45, 40)
+
+                // Arrowhead points right (bezier tangent at end is always horizontal→)
+                const ah = 7  // arrowhead half-height
+                return (
+                  <g key={`dep-${phase.id}`}>
+                    <path
+                      d={`M ${x1} ${y1} C ${x1 + cpOff} ${y1}, ${x2 - cpOff} ${y2}, ${x2} ${y2}`}
+                      fill="none"
+                      stroke={c}
+                      strokeWidth={1.5}
+                    />
+                    <polygon
+                      points={`${x2},${y2} ${x2 - ah * 1.5},${y2 - ah / 2} ${x2 - ah * 1.5},${y2 + ah / 2}`}
+                      fill={c}
+                    />
+                  </g>
+                )
+              })}
+            </svg>
 
             {phases.map((phase, idx) => (
               <div

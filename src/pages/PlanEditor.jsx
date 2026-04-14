@@ -15,7 +15,7 @@ export default function PlanEditor() {
   const {
     plan, phases, loading,
     updatePlan,
-    addPhase, updatePhase, movePhase, resizePhase, deletePhase,
+    addPhase, addMilestone, updatePhase, movePhase, resizePhase, deletePhase,
     addTask, updateTask, deleteTask,
     deletePlan,
     snapshots, activeSnapshotId, setActiveSnapshotId,
@@ -145,6 +145,7 @@ export default function PlanEditor() {
               onDeleteTask={deleteTask}
               onDeletePlan={handleDeletePlan}
               onPrint={handlePrint}
+              onAddMilestone={addMilestone}
               snapshots={snapshots}
               activeSnapshotId={activeSnapshotId}
               onSetActiveSnapshot={setActiveSnapshotId}
