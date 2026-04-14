@@ -5,7 +5,7 @@ import NavBar from '../components/NavBar'
 import GanttChart from '../components/GanttChart'
 import PlanSidebar from '../components/PlanSidebar'
 import PlanPhaseCalendar from '../components/PlanPhaseCalendar'
-import usePlan from '../hooks/usePlan'
+import usePlan, { daysBetween } from '../hooks/usePlan'
 import PlanInsights from '../components/PlanInsights'
 import toast from 'react-hot-toast'
 
@@ -60,6 +60,14 @@ export default function PlanEditor() {
       </div>
     )
   }
+
+  // ── Print-specific values ─────────────────────────────────
+  const PRINT_LABEL_W  = 150
+  const PRINT_PAGE_PX  = 1009 // A4 landscape CSS px: (297-30)mm * 96/25.4
+  const printLastEnd   = phases.reduce((acc, p) => p.end_date > acc ? p.end_date : acc, plan.start_date)
+  const printTotalDays = Math.max(daysBetween(plan.start_date, printLastEnd) + 1, 14)
+  const printDayPx     = Math.max(2, Math.floor((PRINT_PAGE_PX - PRINT_LABEL_W) / (printTotalDays + 7)))
+  const printTotalHours = phases.reduce((s, p) => s + Number(p.hours || 0), 0)
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#000000' }}>
@@ -166,16 +174,31 @@ export default function PlanEditor() {
         />
       )}
 
-      {/* Print-only area */}
+      {/* Print-only area — landscape A4 */}
       <div className="print-only" style={{ display: 'none' }}>
-        <div style={{ padding: 32 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>{plan.name}</h1>
-          {plan.client_name && <p style={{ color: '#555', marginBottom: 16 }}>{plan.client_name}</p>}
+        <div style={{ fontFamily: 'Inter, system-ui, sans-serif', padding: '0 8px' }}>
+          {/* Header */}
+          <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '2px solid #ddd', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16 }}>
+            <div>
+              <h1 style={{ fontSize: 19, fontWeight: 700, margin: 0, color: '#111' }}>{plan.name}</h1>
+              {plan.client_name && (
+                <p style={{ color: '#666', margin: '3px 0 0', fontSize: 12 }}>{plan.client_name}</p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 20, fontSize: 11, color: '#888', whiteSpace: 'nowrap' }}>
+              <span>{plan.start_date} — {printLastEnd}</span>
+              {printTotalHours > 0 && <span>{printTotalHours}h planificadas</span>}
+              <span>{phases.length} fase{phases.length !== 1 ? 's' : ''}</span>
+            </div>
+          </div>
+          {/* Gantt scaled to fit the page */}
           <GanttChart
             plan={plan}
             phases={phases}
             isEditable={false}
-            compact={false}
+            printMode={true}
+            forceDayPx={printDayPx}
+            forceLabelW={PRINT_LABEL_W}
           />
         </div>
       </div>

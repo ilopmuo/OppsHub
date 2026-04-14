@@ -115,9 +115,19 @@
 
 /* ── Print / PDF export ── */
 @media print {
-  /* Hide nav, sidebar, buttons */
-  header,
-  footer,
+  /* A4 landscape with narrow margins */
+  @page {
+    size: A4 landscape;
+    margin: 12mm 15mm;
+  }
+
+  /* Preserve all background-colors and colors exactly (phase bars, status dots) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide interactive UI */
   .no-print {
     display: none !important;
   }
@@ -127,39 +137,20 @@
     display: block !important;
   }
 
-  /* Force white background for print */
-  body,
-  html {
+  /* White page */
+  html, body {
     background: white !important;
     color: #111 !important;
   }
 
-  /* Gantt area overrides */
-  .gantt-print-area {
-    background: white !important;
-    color: #111 !important;
-    border: none !important;
-  }
-
-  .gantt-print-area * {
-    color: #111 !important;
-  }
-
-  /* Make gantt scroll container expand fully */
+  /* Let the Gantt scroll container expand to full content width */
   .gantt-scroll-container {
     overflow: visible !important;
-    border: 1px solid #eee !important;
-    background: white !important;
   }
 
-  /* Phase bars keep their colors */
-  .gantt-bar {
-    opacity: 0.85;
-  }
-
-  /* Page break hints */
+  /* No padding on the gantt wrapper — the print header adds its own */
   .gantt-print-area {
-    page-break-inside: avoid;
+    padding: 0 !important;
   }
 }
 

@@ -76,10 +76,17 @@ export default function GanttChart({
   onDeleteTask,
   onReorderPhases,
   compact = false,
+  printMode = false,
+  forceDayPx = null,
+  forceLabelW = null,
 }) {
   const [dayPxState, setDayPxState] = useState(18)
   const [labelW,     setLabelW]     = useState(LABEL_W_DEFAULT)
   const hasAutoFitted = useRef(false)
+
+  // Effective values: forceDayPx / forceLabelW override internal state (used in printMode)
+  const dayPx       = forceDayPx  ?? dayPxState
+  const effectiveLW = forceLabelW ?? labelW
 
   function zoomIn()  { setDayPxState(v => clampDayPx(Math.round(v * 1.4))) }
   function zoomOut() { setDayPxState(v => clampDayPx(Math.round(v / 1.4))) }
@@ -88,20 +95,39 @@ export default function GanttChart({
 
   // Auto-fit: on first render with data, scale so all phases fill the container width
   useEffect(() => {
-    if (hasAutoFitted.current || compact || !plan || !phases || phases.length === 0) return
+    if (forceDayPx !== null || hasAutoFitted.current || compact || !plan || !phases || phases.length === 0) return
     if (!scrollRef.current) return
     const containerW = scrollRef.current.clientWidth
     if (containerW <= 0) return
     const planStart = plan.start_date
     const lastEnd = phases.reduce((acc, p) => p.end_date > acc ? p.end_date : acc, planStart)
     const total = Math.max(daysBetween(planStart, lastEnd) + 1, 14)
-    const fitted = Math.floor((containerW - labelW - 14 * 18) / total) // subtract ~14 days padding
+    const fitted = Math.floor((containerW - effectiveLW - 14 * 18) / total)
     if (fitted > 0) {
       setDayPxState(clampDayPx(fitted))
       hasAutoFitted.current = true
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan, phases])
+
+  // Print-mode color theme
+  const t = printMode ? {
+    bg:         'white',
+    headerBg:   '#f5f5f5',
+    border:     '1px solid rgba(0,0,0,0.12)',
+    borderFaint:'1px solid rgba(0,0,0,0.07)',
+    textMuted:  '#555',
+    textFaint:  '#aaa',
+    gridLine:   'rgba(0,0,0,0.06)',
+  } : {
+    bg:         '#111111',
+    headerBg:   '#111111',
+    border:     '1px solid rgba(255,255,255,0.06)',
+    borderFaint:'1px solid rgba(255,255,255,0.04)',
+    textMuted:  '#6e6e73',
+    textFaint:  '#3a3a3a',
+    gridLine:   'rgba(255,255,255,0.03)',
+  }
 
   const handleLabelResizeStart = useCallback((e) => {
     e.preventDefault()
@@ -137,8 +163,6 @@ export default function GanttChart({
       </div>
     )
   }
-
-  const dayPx = dayPxState
 
   // Calculate timeline range
   const planStart  = plan.start_date
@@ -235,51 +259,42 @@ export default function GanttChart({
         ref={scrollRef}
         className="gantt-scroll-container overflow-x-auto rounded-2xl"
         style={{
-          backgroundColor: '#111111',
-          border: '1px solid rgba(255,255,255,0.06)',
+          backgroundColor: t.bg,
+          border: t.border,
         }}
       >
-        <div style={{ minWidth: labelW + canvasW, position: 'relative' }}>
+        <div style={{ minWidth: effectiveLW + canvasW, position: 'relative' }}>
 
           {/* ── Header: month labels ─────────────────────────── */}
           <div
-            className="flex sticky top-0 z-10"
+            className={printMode ? 'flex' : 'flex sticky top-0 z-10'}
             style={{
-              backgroundColor: '#111111',
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              backgroundColor: t.headerBg,
+              borderBottom: t.border,
               height: 32,
               cursor: resizing ? 'col-resize' : 'auto',
             }}
           >
             {/* Label column placeholder + resize handle */}
-            <div style={{ width: labelW, minWidth: labelW, position: 'relative', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-              {/* Resize grip — sits on the right border */}
-              <div
-                style={{
-                  position: 'absolute',
-                  right: -4,
-                  top: 0,
-                  bottom: 0,
-                  width: 8,
-                  cursor: 'col-resize',
-                  zIndex: 12,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                onMouseDown={handleLabelResizeStart}
-                title="Arrastra para ajustar el ancho de la columna"
-              >
-                <div style={{
-                  width: 2,
-                  height: 16,
-                  borderRadius: 2,
-                  backgroundColor: resizing ? 'rgba(255,255,255,0.3)' : 'transparent',
-                  transition: 'background-color 0.15s',
-                }}
-                  className="resize-grip-line"
-                />
-              </div>
+            <div style={{ width: effectiveLW, minWidth: effectiveLW, position: 'relative', borderRight: t.border }}>
+              {/* Resize grip — hidden in print mode */}
+              {!printMode && (
+                <div
+                  style={{
+                    position: 'absolute', right: -4, top: 0, bottom: 0, width: 8,
+                    cursor: 'col-resize', zIndex: 12,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                  onMouseDown={handleLabelResizeStart}
+                  title="Arrastra para ajustar el ancho de la columna"
+                >
+                  <div style={{
+                    width: 2, height: 16, borderRadius: 2,
+                    backgroundColor: resizing ? 'rgba(255,255,255,0.3)' : 'transparent',
+                    transition: 'background-color 0.15s',
+                  }} className="resize-grip-line" />
+                </div>
+              )}
             </div>
             {/* Month cells */}
             <div className="relative flex-1">
@@ -288,16 +303,14 @@ export default function GanttChart({
                   key={i}
                   className="absolute top-0 bottom-0 flex items-center"
                   style={{
-                    left: mh.left,
-                    width: mh.width,
-                    borderRight: '1px solid rgba(255,255,255,0.04)',
-                    paddingLeft: 8,
-                    overflow: 'hidden',
+                    left: mh.left, width: mh.width,
+                    borderRight: t.borderFaint,
+                    paddingLeft: 8, overflow: 'hidden',
                   }}
                 >
                   <span
                     className="text-xs font-medium capitalize"
-                    style={{ color: '#6e6e73', whiteSpace: 'nowrap' }}
+                    style={{ color: t.textMuted, whiteSpace: 'nowrap' }}
                   >
                     {mh.label}
                   </span>
@@ -309,23 +322,23 @@ export default function GanttChart({
           {/* ── Sub-header: week markers ─────────────────────── */}
           {dayPx >= 24 && (
             <div
-              className="flex sticky z-10"
+              className={printMode ? 'flex' : 'flex sticky z-10'}
               style={{
                 top: 32,
-                backgroundColor: '#111111',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                backgroundColor: t.headerBg,
+                borderBottom: t.border,
                 height: 20,
               }}
             >
-              <div style={{ width: labelW, minWidth: labelW, borderRight: '1px solid rgba(255,255,255,0.06)' }} />
+              <div style={{ width: effectiveLW, minWidth: effectiveLW, borderRight: t.border }} />
               <div className="relative flex-1">
                 {weekMarkers.map((wm, i) => (
                   <div
                     key={i}
                     className="absolute top-0 bottom-0 flex items-center"
-                    style={{ left: wm.left, borderLeft: '1px solid rgba(255,255,255,0.04)', paddingLeft: 4 }}
+                    style={{ left: wm.left, borderLeft: t.borderFaint, paddingLeft: 4 }}
                   >
-                    <span className="text-xs" style={{ color: '#3a3a3a' }}>{wm.label}</span>
+                    <span className="text-xs" style={{ color: t.textFaint }}>{wm.label}</span>
                   </div>
                 ))}
               </div>
@@ -334,16 +347,11 @@ export default function GanttChart({
 
           {/* ── Phase rows ───────────────────────────────────── */}
           <div className="relative" id="gantt-rows-container">
-            {/* Today marker */}
-            {todayOffset >= 0 && todayOffset <= totalDays + 14 && (
+            {/* Today marker — hidden in print */}
+            {!printMode && todayOffset >= 0 && todayOffset <= totalDays + 14 && (
               <div
                 className="absolute top-0 bottom-0 z-20 pointer-events-none"
-                style={{
-                  left: labelW + todayLeft,
-                  width: 1.5,
-                  backgroundColor: '#ff453a',
-                  opacity: 0.7,
-                }}
+                style={{ left: effectiveLW + todayLeft, width: 1.5, backgroundColor: '#ff453a', opacity: 0.7 }}
               >
                 <div
                   className="absolute -top-1 -translate-x-1/2 text-xs px-1 rounded"
@@ -354,22 +362,16 @@ export default function GanttChart({
               </div>
             )}
 
-            {/* Column grid lines (one per week) */}
+            {/* Column grid lines */}
             {weekMarkers.map((wm, i) => (
               <div
                 key={i}
                 className="absolute top-0 bottom-0 pointer-events-none"
-                style={{
-                  left: labelW + wm.left,
-                  width: 1,
-                  backgroundColor: 'rgba(255,255,255,0.03)',
-                }}
+                style={{ left: effectiveLW + wm.left, width: 1, backgroundColor: t.gridLine }}
               />
             ))}
 
             {/* ── Dependency arrows SVG overlay ──────────────── */}
-            {/* Y positions assume collapsed rows (44px each). Arrows will
-                be slightly off when rows are expanded — acceptable for MVP. */}
             <svg
               style={{
                 position: 'absolute', top: 0, left: 0,
@@ -382,31 +384,22 @@ export default function GanttChart({
                 const depIdx = phases.findIndex(p => p.id === phase.depends_on)
                 if (depIdx === -1) return null
                 const dep = phases[depIdx]
-
                 const ROW = 44
-                // Source: right edge of dep bar
                 const depOffset = daysBetween(planStart, dep.start_date)
                 const depW      = daysBetween(dep.start_date, dep.end_date) + 1
-                const x1 = labelW + (depOffset + depW) * dayPx
+                const x1 = effectiveLW + (depOffset + depW) * dayPx
                 const y1 = depIdx * ROW + ROW / 2
-
-                // Target: left edge of current bar
-                const x2 = labelW + daysBetween(planStart, phase.start_date) * dayPx
+                const x2 = effectiveLW + daysBetween(planStart, phase.start_date) * dayPx
                 const y2 = phaseIdx * ROW + ROW / 2
-
-                const c = (dep.color || '#bf5af2') + '70'
-                const dx      = Math.abs(x2 - x1)
-                const cpOff   = Math.max(dx * 0.45, 40)
-
-                // Arrowhead points right (bezier tangent at end is always horizontal→)
-                const ah = 7  // arrowhead half-height
+                const c  = (dep.color || '#bf5af2') + '70'
+                const dx = Math.abs(x2 - x1)
+                const cpOff = Math.max(dx * 0.45, 40)
+                const ah = 7
                 return (
                   <g key={`dep-${phase.id}`}>
                     <path
                       d={`M ${x1} ${y1} C ${x1 + cpOff} ${y1}, ${x2 - cpOff} ${y2}, ${x2} ${y2}`}
-                      fill="none"
-                      stroke={c}
-                      strokeWidth={1.5}
+                      fill="none" stroke={c} strokeWidth={1.5}
                     />
                     <polygon
                       points={`${x2},${y2} ${x2 - ah * 1.5},${y2 - ah / 2} ${x2 - ah * 1.5},${y2 + ah / 2}`}
@@ -420,18 +413,17 @@ export default function GanttChart({
             {phases.map((phase, idx) => (
               <div
                 key={phase.id}
-                style={{
-                  borderBottom: idx < phases.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                }}
+                style={{ borderBottom: idx < phases.length - 1 ? t.borderFaint : 'none' }}
               >
                 <PlanPhaseRow
                   phase={phase}
                   planStartDate={planStart}
                   totalDays={totalDays}
                   dayPx={dayPx}
-                  labelW={labelW}
+                  labelW={effectiveLW}
                   baselinePhase={baselineMap[phase.id] ?? null}
                   isEditable={isEditable}
+                  printMode={printMode}
                   isFirst={idx === 0}
                   isLast={idx === phases.length - 1}
                   onMove={onMove}

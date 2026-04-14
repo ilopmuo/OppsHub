@@ -13,6 +13,7 @@ export default function PlanPhaseRow({
   labelW,
   baselinePhase,
   isEditable,
+  printMode = false,
   isFirst,
   isLast,
   onMove,
@@ -172,7 +173,7 @@ export default function PlanPhaseRow({
             <span
               ref={nameRef}
               className="text-xs truncate"
-              style={{ color: '#f5f5f7', fontWeight: 500 }}
+              style={{ color: printMode ? '#111' : '#f5f5f7', fontWeight: 500 }}
               onMouseEnter={e => {
                 if (isTruncated) {
                   const r = e.currentTarget.getBoundingClientRect()
@@ -224,7 +225,7 @@ export default function PlanPhaseRow({
               {startDev > 0 ? `+${startDev}d` : `${startDev}d`}
             </span>
           ) : !phase.is_milestone && phase.hours > 0 ? (
-            <span className="text-xs shrink-0" style={{ color: '#6e6e73' }}>{phase.hours}h</span>
+            <span className="text-xs shrink-0" style={{ color: printMode ? '#666' : '#6e6e73' }}>{phase.hours}h</span>
           ) : null}
         </div>
 
