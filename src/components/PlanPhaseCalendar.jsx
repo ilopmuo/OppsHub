@@ -35,7 +35,8 @@ export default function PlanPhaseCalendar({ phase, onClose }) {
 
   const rangeStart = new Date(phase.start_date + 'T00:00:00')
   const rangeEnd   = new Date(phase.end_date   + 'T00:00:00')
-  const todayStr   = new Date().toISOString().slice(0, 10)
+  const _t      = new Date()
+  const todayStr = `${_t.getFullYear()}-${String(_t.getMonth()+1).padStart(2,'0')}-${String(_t.getDate()).padStart(2,'0')}`
   const hpd        = phase.hours_per_day ?? 8
 
   const months      = getMonthsInRange(phase.start_date, phase.end_date)
@@ -128,7 +129,7 @@ export default function PlanPhaseCalendar({ phase, onClose }) {
                   ))}
 
                   {days.map(date => {
-                    const dateStr  = date.toISOString().slice(0, 10)
+                    const dateStr  = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
                     const inRange  = date >= rangeStart && date <= rangeEnd
                     const dow      = date.getDay()
                     const isWeekend = dow === 0 || dow === 6

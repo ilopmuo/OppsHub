@@ -3,10 +3,20 @@ import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 // ── Date helpers ─────────────────────────────────────────────
+// Format a Date object as YYYY-MM-DD using LOCAL time components.
+// Never use toISOString() after date arithmetic — it outputs UTC and
+// shifts the date one day back in UTC+ timezones (e.g. Spain UTC+1/+2).
+function localDateStr(d) {
+  const y  = d.getFullYear()
+  const m  = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
+
 export function addDays(dateStr, days) {
   const d = new Date(dateStr + 'T00:00:00')
   d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  return localDateStr(d)
 }
 
 export function daysBetween(aStr, bStr) {
@@ -16,7 +26,7 @@ export function daysBetween(aStr, bStr) {
 }
 
 export function today() {
-  return new Date().toISOString().slice(0, 10)
+  return localDateStr(new Date())
 }
 
 // Adds n working days (Mon–Fri) to a date. n=0 returns the same date.
@@ -29,7 +39,7 @@ export function addWorkingDays(dateStr, n) {
     const dow = d.getDay() // 0=Sun, 6=Sat
     if (dow !== 0 && dow !== 6) added++
   }
-  return d.toISOString().slice(0, 10)
+  return localDateStr(d)
 }
 
 // Returns end_date given a start date, total hours and hours worked per day.
