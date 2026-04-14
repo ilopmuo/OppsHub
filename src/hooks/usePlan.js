@@ -211,7 +211,7 @@ export default function usePlan(planId) {
     const [planResult, snapshotsResult] = await Promise.all([
       supabase
         .from('project_plans')
-        .select(`*, plan_phases(*, plan_tasks(*))`)
+        .select(`*, plan_phases(*, plan_tasks(*)), project:project_id(id, name, icon_url)`)
         .eq('id', planId)
         .single(),
       supabase

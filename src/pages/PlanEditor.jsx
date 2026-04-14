@@ -101,6 +101,15 @@ export default function PlanEditor() {
             Planes
           </button>
           <span style={{ color: '#3a3a3a' }}>/</span>
+          {/* Project logo — white bg wrapper because most project icons have white background */}
+          {plan.project?.icon_url && (
+            <div
+              className="shrink-0 rounded-lg overflow-hidden"
+              style={{ width: 22, height: 22, backgroundColor: '#fff', padding: 2 }}
+            >
+              <img src={plan.project.icon_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+            </div>
+          )}
           <h1 className="text-sm font-semibold truncate" style={{ color: '#f5f5f7' }}>{plan.name}</h1>
           {plan.client_name && (
             <span
@@ -180,15 +189,24 @@ export default function PlanEditor() {
           {/* Header */}
           <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '2px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
             {/* Plan info */}
-            <div>
-              <h1 style={{ fontSize: 19, fontWeight: 700, margin: 0, color: '#111' }}>{plan.name}</h1>
-              {plan.client_name && (
-                <p style={{ color: '#666', margin: '3px 0 0', fontSize: 12 }}>{plan.client_name}</p>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              {plan.project?.icon_url && (
+                <img
+                  src={plan.project.icon_url}
+                  alt=""
+                  style={{ width: 36, height: 36, objectFit: 'contain', borderRadius: 6, flexShrink: 0, marginTop: 2 }}
+                />
               )}
-              <div style={{ display: 'flex', gap: 20, marginTop: 4, fontSize: 11, color: '#999' }}>
-                <span>{plan.start_date} — {printLastEnd}</span>
-                {printTotalHours > 0 && <span>{printTotalHours}h planificadas</span>}
-                <span>{phases.length} fase{phases.length !== 1 ? 's' : ''}</span>
+              <div>
+                <h1 style={{ fontSize: 19, fontWeight: 700, margin: 0, color: '#111' }}>{plan.name}</h1>
+                {plan.client_name && (
+                  <p style={{ color: '#666', margin: '3px 0 0', fontSize: 12 }}>{plan.client_name}</p>
+                )}
+                <div style={{ display: 'flex', gap: 20, marginTop: 4, fontSize: 11, color: '#999' }}>
+                  <span>{plan.start_date} — {printLastEnd}</span>
+                  {printTotalHours > 0 && <span>{printTotalHours}h planificadas</span>}
+                  <span>{phases.length} fase{phases.length !== 1 ? 's' : ''}</span>
+                </div>
               </div>
             </div>
             {/* OppsHub branding */}
