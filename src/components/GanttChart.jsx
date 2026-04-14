@@ -163,7 +163,7 @@ export default function GanttChart({
     : {}
 
   return (
-    <div className="flex flex-col" style={{ height: compact ? 'auto' : '100%' }}>
+    <div className="flex flex-col" style={{ height: 'auto' }}>
       {/* Top bar: zoom + stats */}
       {!compact && (
         <div className="flex items-center justify-between mb-3 no-print">
@@ -237,7 +237,6 @@ export default function GanttChart({
         style={{
           backgroundColor: '#111111',
           border: '1px solid rgba(255,255,255,0.06)',
-          flex: compact ? 'none' : 1,
         }}
       >
         <div style={{ minWidth: labelW + canvasW, position: 'relative' }}>

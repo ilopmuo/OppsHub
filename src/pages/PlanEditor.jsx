@@ -6,6 +6,7 @@ import GanttChart from '../components/GanttChart'
 import PlanSidebar from '../components/PlanSidebar'
 import PlanPhaseCalendar from '../components/PlanPhaseCalendar'
 import usePlan from '../hooks/usePlan'
+import PlanInsights from '../components/PlanInsights'
 import toast from 'react-hot-toast'
 
 export default function PlanEditor() {
@@ -103,11 +104,8 @@ export default function PlanEditor() {
           )}
         </div>
 
-        {/* Gantt: fills the visible area (viewport minus navbar + subheader) */}
-        <div
-          className="shrink-0 p-6 gantt-print-area"
-          style={{ height: 'calc(100vh - 100px)' }}
-        >
+        {/* Gantt: expands to fit all phases, no internal vertical scroll */}
+        <div className="shrink-0 p-6 gantt-print-area">
           <GanttChart
             plan={plan}
             phases={phases}
@@ -125,7 +123,12 @@ export default function PlanEditor() {
           />
         </div>
 
-        {/* Below-fold: wide plan panel */}
+        {/* Below-fold: charts + stats */}
+        <div className="shrink-0 no-print">
+          <PlanInsights plan={plan} phases={phases} />
+        </div>
+
+        {/* Below-fold: wide plan editing panel */}
         <div
           className="shrink-0 no-print"
           style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
