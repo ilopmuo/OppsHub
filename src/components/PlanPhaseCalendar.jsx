@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { X } from 'lucide-react'
 import { workingDaysBetween } from '../hooks/usePlan'
 
@@ -30,9 +31,12 @@ function getDaysInMonth(year, month) {
 }
 
 export default function PlanPhaseCalendar({ phase, onClose }) {
+  const [hoveredDay, setHoveredDay] = useState(null)
+
   const rangeStart = new Date(phase.start_date + 'T00:00:00')
   const rangeEnd   = new Date(phase.end_date   + 'T00:00:00')
   const todayStr   = new Date().toISOString().slice(0, 10)
+  const hpd        = phase.hours_per_day ?? 8
 
   const months      = getMonthsInRange(phase.start_date, phase.end_date)
   const workingDays = workingDaysBetween(phase.start_date, phase.end_date)
@@ -163,7 +167,10 @@ export default function PlanPhaseCalendar({ phase, onClose }) {
                           border: `1px solid ${borderClr}`,
                           fontWeight,
                           fontSize: 11,
+                          cursor: isWorking ? 'default' : 'default',
                         }}
+                        onMouseEnter={() => isWorking && setHoveredDay(dateStr)}
+                        onMouseLeave={() => setHoveredDay(null)}
                       >
                         {date.getDate()}
 
@@ -181,6 +188,31 @@ export default function PlanPhaseCalendar({ phase, onClose }) {
                               backgroundColor: isWorking ? phase.color : 'rgba(255,255,255,0.4)',
                             }}
                           />
+                        )}
+
+                        {/* Hours tooltip on hover */}
+                        {hoveredDay === dateStr && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              bottom: 'calc(100% + 5px)',
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              backgroundColor: '#1c1c1e',
+                              border: `1px solid ${phase.color}80`,
+                              borderRadius: 6,
+                              padding: '2px 7px',
+                              fontSize: 10,
+                              fontWeight: 600,
+                              color: '#f5f5f7',
+                              whiteSpace: 'nowrap',
+                              zIndex: 20,
+                              pointerEvents: 'none',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                            }}
+                          >
+                            {hpd}h
+                          </div>
                         )}
                       </div>
                     )
