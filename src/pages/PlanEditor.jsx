@@ -173,9 +173,7 @@ export default function PlanEditor() {
             </div>
 
             {/* Below-fold: charts + stats */}
-            <div className="no-print">
-              <PlanInsights plan={plan} phases={phases} />
-            </div>
+            <PlanInsights plan={plan} phases={phases} />
           </div>
 
           {/* Collapsible side panel */}
