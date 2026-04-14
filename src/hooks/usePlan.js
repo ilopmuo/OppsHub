@@ -68,14 +68,15 @@ function cascadeFromIndex(phases, changedIndex, delta) {
   })
 }
 
-// ── Sprint overlap resolution ─────────────────────────────────
-// After any cascade, check each sprint-marked phase against its predecessor.
-// If there's overlap (gap < 1 day), shift the sprint phase (and everything
-// after it) so it starts the day after the predecessor ends.
+// ── Overlap resolution ───────────────────────────────────────
+// After any cascade, ensure no two adjacent phases share a day.
+// A shared day would be counted twice in hour calculations, causing
+// the project timeline to appear shorter than it really is.
+// Sprint-marked phases keep their visual flag; the gap >= 1 rule
+// applies universally so hours always add up correctly.
 export function resolveSprintOverlaps(phases) {
   const result = phases.map(p => ({ ...p }))
   for (let i = 1; i < result.length; i++) {
-    if (!result[i].is_sprint) continue
     const gap = daysBetween(result[i - 1].end_date, result[i].start_date)
     if (gap < 1) {
       const delta = 1 - gap
