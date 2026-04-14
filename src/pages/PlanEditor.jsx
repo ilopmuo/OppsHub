@@ -62,12 +62,23 @@ export default function PlanEditor() {
   }
 
   // ── Print-specific values ─────────────────────────────────
+  // A4 landscape usable area at 96 CSS dpi with 12mm top/bottom + 15mm left/right margins:
+  //   width : (297 - 30) mm  = 267 mm = ~1009 px
+  //   height: (210 - 24) mm  = 186 mm = ~703  px
   const PRINT_LABEL_W  = 150
-  const PRINT_PAGE_PX  = 1009 // A4 landscape CSS px: (297-30)mm * 96/25.4
-  const printLastEnd   = phases.reduce((acc, p) => p.end_date > acc ? p.end_date : acc, plan.start_date)
-  const printTotalDays = Math.max(daysBetween(plan.start_date, printLastEnd) + 1, 14)
-  const printDayPx     = Math.max(2, Math.floor((PRINT_PAGE_PX - PRINT_LABEL_W) / (printTotalDays + 7)))
+  const PRINT_PAGE_W   = 1009
+  const PRINT_PAGE_H   = 703
+  const PRINT_HEADER_H = 90  // estimated height of the plan-name / branding header
+
+  const printLastEnd    = phases.reduce((acc, p) => p.end_date > acc ? p.end_date : acc, plan.start_date)
+  const printTotalDays  = Math.max(daysBetween(plan.start_date, printLastEnd) + 1, 14)
+  const printDayPx      = Math.max(2, Math.floor((PRINT_PAGE_W - PRINT_LABEL_W) / (printTotalDays + 7)))
   const printTotalHours = phases.reduce((s, p) => s + Number(p.hours || 0), 0)
+
+  // How tall the Gantt rows will be (headers + one 44px row per phase)
+  const printGanttH = 32 + (printDayPx >= 24 ? 20 : 0) + phases.length * 44
+  // Scale factor so total content fits in PRINT_PAGE_H (never scale up, only down)
+  const printZoom   = Math.min(1, PRINT_PAGE_H / (PRINT_HEADER_H + printGanttH))
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#000000' }}>
@@ -185,7 +196,7 @@ export default function PlanEditor() {
 
       {/* Print-only area — landscape A4 */}
       <div className="print-only" style={{ display: 'none' }}>
-        <div style={{ fontFamily: 'Inter, system-ui, sans-serif', padding: '0 8px' }}>
+        <div style={{ fontFamily: 'Inter, system-ui, sans-serif', padding: '0 8px', zoom: printZoom, transformOrigin: 'top left' }}>
           {/* Header */}
           <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '2px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
             {/* Plan info */}
