@@ -174,42 +174,56 @@ function diffPhases(original, updated) {
 
 // ── Main hook ────────────────────────────────────────────────
 export default function usePlan(planId) {
-  const [plan,    setPlan]    = useState(null)
-  const [phases,  setPhases]  = useState([])
-  const [loading, setLoading] = useState(true)
-  const [saving,  setSaving]  = useState(false)
+  const [plan,             setPlan]             = useState(null)
+  const [phases,           setPhases]           = useState([])
+  const [loading,          setLoading]          = useState(true)
+  const [saving,           setSaving]           = useState(false)
+  const [snapshots,        setSnapshots]        = useState([])
+  const [activeSnapshotId, setActiveSnapshotId] = useState(null)
 
   // ── Fetch ────────────────────────────────────────────────
   const fetchPlan = useCallback(async () => {
     if (!planId) return
     setLoading(true)
-    const { data, error } = await supabase
-      .from('project_plans')
-      .select(`
-        *,
-        plan_phases (
-          *,
-          plan_tasks ( * )
-        )
-      `)
-      .eq('id', planId)
-      .single()
 
-    if (error) {
+    const [planResult, snapshotsResult] = await Promise.all([
+      supabase
+        .from('project_plans')
+        .select(`*, plan_phases(*, plan_tasks(*))`)
+        .eq('id', planId)
+        .single(),
+      supabase
+        .from('plan_snapshots')
+        .select(`*, plan_snapshot_phases(*)`)
+        .eq('plan_id', planId)
+        .order('created_at', { ascending: true }),
+    ])
+
+    if (planResult.error) {
       toast.error('Error al cargar el plan')
       setLoading(false)
       return
     }
 
-    const sortedPhases = (data.plan_phases || [])
+    const sortedPhases = (planResult.data.plan_phases || [])
       .sort((a, b) => a.order_index - b.order_index)
       .map(ph => ({
         ...ph,
         plan_tasks: (ph.plan_tasks || []).sort((a, b) => a.order_index - b.order_index),
       }))
 
-    setPlan(data)
+    const loadedSnapshots = snapshotsResult.data || []
+
+    setPlan(planResult.data)
     setPhases(sortedPhases)
+    setSnapshots(loadedSnapshots)
+    // Auto-select the most recent snapshot as the active comparison
+    setActiveSnapshotId(prev => {
+      if (prev) return prev  // keep user's selection across refetches
+      return loadedSnapshots.length > 0
+        ? loadedSnapshots[loadedSnapshots.length - 1].id
+        : null
+    })
     setLoading(false)
   }, [planId])
 
@@ -499,6 +513,55 @@ export default function usePlan(planId) {
     if (error) { toast.error('Error al eliminar tarea'); fetchPlan() }
   }
 
+  // ── Snapshots (plan baselines) ───────────────────────────
+  async function createSnapshot(name) {
+    const trimmed = (name || '').trim()
+    if (!trimmed) return
+
+    const { data: snap, error } = await supabase
+      .from('plan_snapshots')
+      .insert({ plan_id: planId, name: trimmed })
+      .select()
+      .single()
+
+    if (error) { toast.error('Error al guardar el plan base'); return }
+
+    const snapPhases = phases.map(p => ({
+      snapshot_id: snap.id,
+      phase_id:    p.id,
+      phase_name:  p.name,
+      color:       p.color,
+      start_date:  p.start_date,
+      end_date:    p.end_date,
+      hours:       p.hours ?? 0,
+    }))
+
+    const { error: err2 } = await supabase
+      .from('plan_snapshot_phases')
+      .insert(snapPhases)
+
+    if (err2) { toast.error('Error al guardar fases del plan base'); return }
+
+    const newSnap = { ...snap, plan_snapshot_phases: snapPhases }
+    setSnapshots(prev => [...prev, newSnap])
+    setActiveSnapshotId(newSnap.id)
+    toast.success('Plan base guardado')
+    return newSnap
+  }
+
+  async function deleteSnapshot(snapshotId) {
+    setSnapshots(prev => prev.filter(s => s.id !== snapshotId))
+    if (activeSnapshotId === snapshotId) {
+      const remaining = snapshots.filter(s => s.id !== snapshotId)
+      setActiveSnapshotId(remaining.length > 0 ? remaining[remaining.length - 1].id : null)
+    }
+    const { error } = await supabase
+      .from('plan_snapshots')
+      .delete()
+      .eq('id', snapshotId)
+    if (error) { toast.error('Error al eliminar plan base'); fetchPlan() }
+  }
+
   // ── Delete plan ──────────────────────────────────────────
   async function deletePlan() {
     setSaving(true)
@@ -517,6 +580,8 @@ export default function usePlan(planId) {
     addPhase, updatePhase, movePhase, resizePhase, deletePhase, reorderPhases,
     addTask, updateTask, deleteTask,
     deletePlan,
+    snapshots, activeSnapshotId, setActiveSnapshotId,
+    createSnapshot, deleteSnapshot,
     refetch: fetchPlan,
   }
 }

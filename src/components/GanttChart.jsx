@@ -58,6 +58,8 @@ export default function GanttChart({
   plan,
   phases,
   isEditable = false,
+  snapshots = [],
+  activeSnapshotId = null,
   onMove,
   onResize,
   onUpdatePhase,
@@ -124,6 +126,12 @@ export default function GanttChart({
   const weekMarkers  = buildWeekMarkers(planStart, totalDays, dayPx)
 
   const totalHours = phases.reduce((s, p) => s + Number(p.hours || 0), 0)
+
+  // Build a map of phase_id → snapshot phase for the active baseline
+  const activeSnapshot  = snapshots.find(s => s.id === activeSnapshotId) ?? null
+  const baselineMap     = activeSnapshot
+    ? Object.fromEntries((activeSnapshot.plan_snapshot_phases || []).map(sp => [sp.phase_id, sp]))
+    : {}
 
   return (
     <div className="flex flex-col" style={{ height: compact ? 'auto' : '100%' }}>
@@ -306,6 +314,7 @@ export default function GanttChart({
                   totalDays={totalDays}
                   dayPx={dayPx}
                   labelW={labelW}
+                  baselinePhase={baselineMap[phase.id] ?? null}
                   isEditable={isEditable}
                   onMove={onMove}
                   onResize={onResize}

@@ -18,6 +18,8 @@ export default function PlanEditor() {
     addPhase, updatePhase, movePhase, resizePhase, deletePhase,
     addTask, updateTask, deleteTask,
     deletePlan,
+    snapshots, activeSnapshotId, setActiveSnapshotId,
+    createSnapshot, deleteSnapshot,
   } = usePlan(id)
 
   const [calendarPhase, setCalendarPhase] = useState(null)
@@ -109,6 +111,8 @@ export default function PlanEditor() {
               plan={plan}
               phases={phases}
               isEditable={true}
+              snapshots={snapshots}
+              activeSnapshotId={activeSnapshotId}
               onMove={movePhase}
               onResize={resizePhase}
               onUpdatePhase={updatePhase}
@@ -141,6 +145,11 @@ export default function PlanEditor() {
               onDeleteTask={deleteTask}
               onDeletePlan={handleDeletePlan}
               onPrint={handlePrint}
+              snapshots={snapshots}
+              activeSnapshotId={activeSnapshotId}
+              onSetActiveSnapshot={setActiveSnapshotId}
+              onCreateSnapshot={createSnapshot}
+              onDeleteSnapshot={deleteSnapshot}
             />
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronRight, Link2, Copy, Check, AlertTriangle, Flag, CalendarDays } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronRight, Link2, Copy, Check, AlertTriangle, Flag, CalendarDays, GitBranch, RotateCcw, CheckCircle2 } from 'lucide-react'
 import PlanPhaseTaskList from './PlanPhaseTaskList'
-import { calcEndDateFromHours, workingDaysBetween, addDays } from '../hooks/usePlan'
+import { calcEndDateFromHours, workingDaysBetween, addDays, daysBetween } from '../hooks/usePlan'
 import toast from 'react-hot-toast'
 
 const PHASE_COLORS = ['#bf5af2', '#64d2ff', '#30d158', '#ff9f0a', '#ff453a', '#ff6b35', '#0ea5e9']
@@ -18,7 +18,7 @@ const inputStyle = {
   transition: 'border-color 0.15s',
 }
 
-function PhaseItem({ phase, minStartDate, onUpdatePhase, onDeletePhase, onOpenCalendar, onAddTask, onUpdateTask, onDeleteTask }) {
+function PhaseItem({ phase, minStartDate, baselinePhase, onUpdatePhase, onDeletePhase, onOpenCalendar, onAddTask, onUpdateTask, onDeleteTask }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -188,6 +188,44 @@ function PhaseItem({ phase, minStartDate, onUpdatePhase, onDeletePhase, onOpenCa
           )
         })()}
 
+        {/* Baseline deviation banner */}
+        {baselinePhase && (() => {
+          const startDev = daysBetween(baselinePhase.start_date, phase.start_date)
+          const endDev   = daysBetween(baselinePhase.end_date,   phase.end_date)
+          if (startDev === 0 && endDev === 0) return (
+            <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs"
+              style={{ backgroundColor: 'rgba(48,209,88,0.06)', border: '1px solid rgba(48,209,88,0.15)' }}>
+              <CheckCircle2 className="w-3 h-3 shrink-0" style={{ color: '#30d158' }} />
+              <span style={{ color: '#30d158' }}>En plazo con el plan base</span>
+            </div>
+          )
+          const delayed = startDev > 0
+          return (
+            <div className="px-2 py-1.5 rounded-lg text-xs space-y-0.5"
+              style={{
+                backgroundColor: delayed ? 'rgba(255,69,58,0.06)' : 'rgba(48,209,88,0.06)',
+                border: `1px solid ${delayed ? 'rgba(255,69,58,0.2)' : 'rgba(48,209,88,0.2)'}`,
+              }}>
+              <div className="flex items-center justify-between">
+                <span style={{ color: '#6e6e73' }}>Inicio</span>
+                <span style={{ color: delayed ? '#ff453a' : '#30d158', fontWeight: 600 }}>
+                  {startDev > 0 ? `+${startDev}d` : startDev < 0 ? `${startDev}d` : '—'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span style={{ color: '#6e6e73' }}>Fin</span>
+                <span style={{ color: endDev > 0 ? '#ff453a' : endDev < 0 ? '#30d158' : '#6e6e73', fontWeight: 600 }}>
+                  {endDev > 0 ? `+${endDev}d` : endDev < 0 ? `${endDev}d` : '—'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-0.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ color: '#3a3a3a' }}>Plan base</span>
+                <span style={{ color: '#3a3a3a' }}>{baselinePhase.start_date} → {baselinePhase.end_date}</span>
+              </div>
+            </div>
+          )
+        })()}
+
         {/* Progress */}
         <div>
           <div className="flex items-center justify-between mb-1">
@@ -283,9 +321,38 @@ export default function PlanSidebar({
   onDeleteTask,
   onDeletePlan,
   onPrint,
+  snapshots = [],
+  activeSnapshotId = null,
+  onSetActiveSnapshot,
+  onCreateSnapshot,
+  onDeleteSnapshot,
 }) {
-  const [copied, setCopied] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [copied,           setCopied]           = useState(false)
+  const [confirmDelete,    setConfirmDelete]     = useState(false)
+  const [creatingSnapshot, setCreatingSnapshot] = useState(false)
+  const [newSnapshotName,  setNewSnapshotName]  = useState('')
+
+  // Baseline map: phase_id → snapshot phase
+  const activeSnapshot = snapshots.find(s => s.id === activeSnapshotId) ?? null
+  const baselineMap    = activeSnapshot
+    ? Object.fromEntries((activeSnapshot.plan_snapshot_phases || []).map(sp => [sp.phase_id, sp]))
+    : {}
+
+  function formatDate(isoStr) {
+    return new Date(isoStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
+  async function handleCreateSnapshot() {
+    const name = newSnapshotName.trim() || `Plan base · ${new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`
+    await onCreateSnapshot(name)
+    setCreatingSnapshot(false)
+    setNewSnapshotName('')
+  }
+
+  async function handleReplan() {
+    const name = `Re-plan · ${new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`
+    await onCreateSnapshot(name)
+  }
 
   const shareUrl = `${window.location.origin}/plans/${plan.share_token}/view`
 
@@ -386,6 +453,7 @@ export default function PlanSidebar({
               key={phase.id}
               phase={phase}
               minStartDate={idx > 0 ? addDays(phases[idx - 1].end_date, 1) : undefined}
+              baselinePhase={baselineMap[phase.id] ?? null}
               onUpdatePhase={onUpdatePhase}
               onDeletePhase={onDeletePhase}
               onOpenCalendar={onOpenCalendar}
@@ -410,6 +478,145 @@ export default function PlanSidebar({
           <Plus className="w-4 h-4" />
           Añadir fase
         </button>
+      </div>
+
+      {/* ── Plan base (baselines) ─────────────────────────── */}
+      <div
+        className="rounded-2xl p-4 space-y-3"
+        style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <GitBranch className="w-3.5 h-3.5" style={{ color: '#6e6e73' }} />
+            <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#6e6e73' }}>
+              Plan base
+            </h3>
+          </div>
+          <div className="flex gap-1.5">
+            {snapshots.length > 0 && (
+              <button
+                onClick={handleReplan}
+                title="Guardar estado actual como nuevo plan base (Re-plan)"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all"
+                style={{ backgroundColor: 'rgba(100,210,255,0.08)', color: '#64d2ff', border: '1px solid rgba(100,210,255,0.2)' }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(100,210,255,0.15)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(100,210,255,0.08)'}
+              >
+                <RotateCcw className="w-3 h-3" />
+                Re-plan
+              </button>
+            )}
+            <button
+              onClick={() => setCreatingSnapshot(true)}
+              title="Guardar una foto del plan actual"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all"
+              style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73', border: '1px solid rgba(255,255,255,0.08)' }}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#f5f5f7' }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#6e6e73' }}
+            >
+              <Plus className="w-3 h-3" />
+              Guardar
+            </button>
+          </div>
+        </div>
+
+        {/* Inline create form */}
+        {creatingSnapshot && (
+          <div className="flex gap-2">
+            <input
+              autoFocus
+              value={newSnapshotName}
+              onChange={e => setNewSnapshotName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreateSnapshot(); if (e.key === 'Escape') { setCreatingSnapshot(false); setNewSnapshotName('') } }}
+              placeholder={`Plan base · ${new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`}
+              style={{ ...inputStyle, padding: '5px 10px', fontSize: 12, flex: 1 }}
+              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+            />
+            <button
+              onClick={handleCreateSnapshot}
+              className="px-3 py-1 rounded-lg text-xs font-medium transition-all shrink-0"
+              style={{ backgroundColor: '#bf5af2', color: '#fff' }}
+            >
+              OK
+            </button>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {snapshots.length === 0 && !creatingSnapshot && (
+          <p className="text-xs" style={{ color: '#3a3a3a' }}>
+            Guarda el estado actual del plan para poder comparar después cuando haya cambios.
+          </p>
+        )}
+
+        {/* Snapshot list */}
+        {snapshots.length > 0 && (
+          <div className="space-y-1.5">
+            {snapshots.map((snap, idx) => {
+              const isActive = snap.id === activeSnapshotId
+              return (
+                <div
+                  key={snap.id}
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all"
+                  style={{
+                    backgroundColor: isActive ? 'rgba(191,90,242,0.08)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${isActive ? 'rgba(191,90,242,0.25)' : 'rgba(255,255,255,0.06)'}`,
+                  }}
+                  onClick={() => onSetActiveSnapshot(isActive ? null : snap.id)}
+                >
+                  {/* Index dot */}
+                  <div
+                    className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-bold"
+                    style={{
+                      backgroundColor: isActive ? '#bf5af2' : 'rgba(255,255,255,0.06)',
+                      color: isActive ? '#fff' : '#6e6e73',
+                    }}
+                  >
+                    {idx + 1}
+                  </div>
+
+                  {/* Name + date */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate" style={{ color: isActive ? '#f5f5f7' : '#6e6e73' }}>
+                      {snap.name}
+                    </p>
+                    <p className="text-xs" style={{ color: '#3a3a3a' }}>
+                      {formatDate(snap.created_at)}
+                    </p>
+                  </div>
+
+                  {/* Active badge */}
+                  {isActive && (
+                    <span className="text-xs shrink-0 px-1.5 py-0.5 rounded-md"
+                      style={{ backgroundColor: 'rgba(191,90,242,0.15)', color: '#bf5af2', fontSize: 10 }}>
+                      activo
+                    </span>
+                  )}
+
+                  {/* Delete */}
+                  <button
+                    onClick={e => { e.stopPropagation(); onDeleteSnapshot(snap.id) }}
+                    className="p-1 rounded shrink-0 transition-colors"
+                    style={{ color: '#2a2a2a' }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#ff453a'}
+                    onMouseLeave={e => e.currentTarget.style.color = '#2a2a2a'}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Comparison hint */}
+        {activeSnapshot && (
+          <p className="text-xs" style={{ color: '#3a3a3a' }}>
+            Las barras fantasma en el Gantt muestran dónde estaban las fases en "<span style={{ color: '#6e6e73' }}>{activeSnapshot.name}</span>".
+          </p>
+        )}
       </div>
 
       {/* ── Share ──────────────────────────────────────────── */}

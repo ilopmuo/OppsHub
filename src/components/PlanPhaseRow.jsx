@@ -3,12 +3,19 @@ import { ChevronDown, ChevronRight, GripVertical, Flag } from 'lucide-react'
 import PlanPhaseTaskList from './PlanPhaseTaskList'
 import { daysBetween, addDays } from '../hooks/usePlan'
 
+// Deviation helpers
+function deviationDays(baselineDate, actualDate) {
+  // positive = delayed, negative = ahead of schedule
+  return daysBetween(baselineDate, actualDate)
+}
+
 export default function PlanPhaseRow({
   phase,
   planStartDate,
   totalDays,
   dayPx,
   labelW,
+  baselinePhase,    // snapshot phase object or null
   isEditable,
   onMove,           // (phaseId, deltaDays) => void
   onResize,         // (phaseId, newEndDate) => void
@@ -90,6 +97,16 @@ export default function PlanPhaseRow({
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('mouseup', onMouseUp)
   }
+
+  // Baseline (ghost bar) calculations
+  const startDev = baselinePhase ? deviationDays(baselinePhase.start_date, phase.start_date) : 0
+  const endDev   = baselinePhase ? deviationDays(baselinePhase.end_date,   phase.end_date)   : 0
+  const hasDeviation = baselinePhase && (startDev !== 0 || endDev !== 0)
+
+  const baselineOffset = baselinePhase ? daysBetween(planStartDate, baselinePhase.start_date) : 0
+  const baselineWidth  = baselinePhase ? daysBetween(baselinePhase.start_date, baselinePhase.end_date) + 1 : 0
+  const baselineLeft   = baselineOffset * dayPx
+  const baselineBarW   = Math.max(baselineWidth * dayPx, dayPx)
 
   const hasTasks   = phase.plan_tasks && phase.plan_tasks.length > 0
   const doneTasks  = (phase.plan_tasks || []).filter(t => t.done).length
@@ -177,15 +194,43 @@ export default function PlanPhaseRow({
               title={status === 'at_risk' ? 'En riesgo' : 'Retrasado'}
             />
           )}
-          {phase.hours > 0 && (
-            <span className="text-xs shrink-0 ml-auto" style={{ color: '#6e6e73' }}>
+          {phase.hours > 0 && !hasDeviation && (
+            <span className="text-xs shrink-0" style={{ color: '#6e6e73' }}>
               {phase.hours}h
+            </span>
+          )}
+          {hasDeviation && (
+            <span
+              className="text-xs shrink-0 font-bold"
+              style={{ color: startDev > 0 ? '#ff453a' : '#30d158' }}
+              title={startDev > 0
+                ? `Retrasado ${startDev}d respecto al plan base`
+                : `Adelantado ${Math.abs(startDev)}d respecto al plan base`}
+            >
+              {startDev > 0 ? `+${startDev}d` : `${startDev}d`}
             </span>
           )}
         </div>
 
         {/* Bar area */}
         <div className="relative flex-1" style={{ height: '100%' }}>
+
+          {/* Ghost bar — baseline position */}
+          {hasDeviation && (
+            <div
+              className="absolute top-1/2 -translate-y-1/2 rounded-lg pointer-events-none"
+              style={{
+                left:            baselineLeft,
+                width:           baselineBarW,
+                height:          28,
+                backgroundColor: (phase.color || '#bf5af2') + '18',
+                border:          `1.5px dashed ${phase.color || '#bf5af2'}55`,
+                zIndex:          0,
+              }}
+              title={`Plan base: ${baselinePhase.start_date} → ${baselinePhase.end_date}`}
+            />
+          )}
+
           {/* The bar */}
           <div
             className="absolute top-1/2 -translate-y-1/2 rounded-lg flex items-center overflow-hidden"
@@ -193,6 +238,7 @@ export default function PlanPhaseRow({
               left:   left,
               width:  barW,
               height: 28,
+              zIndex: 1,
               background: progress > 0
                 ? `linear-gradient(to right, ${phase.color || '#bf5af2'} ${progress}%, ${phase.color || '#bf5af2'}55 ${progress}%)`
                 : (phase.color || '#bf5af2'),
