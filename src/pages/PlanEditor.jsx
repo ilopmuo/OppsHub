@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import NavBar from '../components/NavBar'
 import GanttChart from '../components/GanttChart'
 import PlanSidebar from '../components/PlanSidebar'
+import PlanPhaseCalendar from '../components/PlanPhaseCalendar'
 import usePlan from '../hooks/usePlan'
 import toast from 'react-hot-toast'
 
@@ -17,6 +19,8 @@ export default function PlanEditor() {
     addTask, updateTask, deleteTask,
     deletePlan,
   } = usePlan(id)
+
+  const [calendarPhase, setCalendarPhase] = useState(null)
 
   async function handleDeletePlan() {
     const ok = await deletePlan()
@@ -108,6 +112,7 @@ export default function PlanEditor() {
               onMove={movePhase}
               onResize={resizePhase}
               onUpdatePhase={updatePhase}
+              onOpenCalendar={setCalendarPhase}
               onAddTask={addTask}
               onUpdateTask={updateTask}
               onDeleteTask={deleteTask}
@@ -130,6 +135,7 @@ export default function PlanEditor() {
               onUpdatePhase={updatePhase}
               onAddPhase={addPhase}
               onDeletePhase={deletePhase}
+              onOpenCalendar={setCalendarPhase}
               onAddTask={addTask}
               onUpdateTask={updateTask}
               onDeleteTask={deleteTask}
@@ -139,6 +145,14 @@ export default function PlanEditor() {
           </div>
         </div>
       </main>
+
+      {/* Phase calendar modal */}
+      {calendarPhase && (
+        <PlanPhaseCalendar
+          phase={calendarPhase}
+          onClose={() => setCalendarPhase(null)}
+        />
+      )}
 
       {/* Print-only area */}
       <div className="print-only" style={{ display: 'none' }}>

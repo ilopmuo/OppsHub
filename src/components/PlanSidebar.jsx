@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronRight, Link2, Copy, Check, AlertTriangle, Flag } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronRight, Link2, Copy, Check, AlertTriangle, Flag, CalendarDays } from 'lucide-react'
 import PlanPhaseTaskList from './PlanPhaseTaskList'
 import { calcEndDateFromHours, workingDaysBetween } from '../hooks/usePlan'
 import toast from 'react-hot-toast'
@@ -18,7 +18,7 @@ const inputStyle = {
   transition: 'border-color 0.15s',
 }
 
-function PhaseItem({ phase, onUpdatePhase, onDeletePhase, onAddTask, onUpdateTask, onDeleteTask }) {
+function PhaseItem({ phase, onUpdatePhase, onDeletePhase, onOpenCalendar, onAddTask, onUpdateTask, onDeleteTask }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -44,6 +44,18 @@ function PhaseItem({ phase, onUpdatePhase, onDeletePhase, onAddTask, onUpdateTas
           className="flex-1 min-w-0 text-sm font-medium bg-transparent outline-none"
           style={{ color: '#f5f5f7', border: 'none' }}
         />
+
+        {/* Calendar */}
+        <button
+          onClick={() => onOpenCalendar(phase)}
+          title="Ver días de trabajo"
+          className="p-1 rounded transition-colors shrink-0"
+          style={{ color: '#3a3a3a' }}
+          onMouseEnter={e => e.currentTarget.style.color = '#6e6e73'}
+          onMouseLeave={e => e.currentTarget.style.color = '#3a3a3a'}
+        >
+          <CalendarDays className="w-3.5 h-3.5" />
+        </button>
 
         {/* Sprint toggle */}
         <button
@@ -210,6 +222,7 @@ export default function PlanSidebar({
   onUpdatePhase,
   onAddPhase,
   onDeletePhase,
+  onOpenCalendar,
   onAddTask,
   onUpdateTask,
   onDeleteTask,
@@ -319,6 +332,7 @@ export default function PlanSidebar({
               phase={phase}
               onUpdatePhase={onUpdatePhase}
               onDeletePhase={onDeletePhase}
+              onOpenCalendar={onOpenCalendar}
               onAddTask={onAddTask}
               onUpdateTask={onUpdateTask}
               onDeleteTask={onDeleteTask}

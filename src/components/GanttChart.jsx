@@ -60,6 +60,7 @@ export default function GanttChart({
   onMove,
   onResize,
   onUpdatePhase,
+  onOpenCalendar,
   onAddTask,
   onUpdateTask,
   onDeleteTask,
@@ -257,6 +258,7 @@ export default function GanttChart({
                   onMove={onMove}
                   onResize={onResize}
                   onUpdate={onUpdatePhase}
+                  onOpenCalendar={onOpenCalendar}
                   onAddTask={onAddTask}
                   onUpdateTask={onUpdateTask}
                   onDeleteTask={onDeleteTask}

@@ -9,9 +9,10 @@ export default function PlanPhaseRow({
   totalDays,
   dayPx,
   isEditable,
-  onMove,      // (phaseId, deltaDays) => void
-  onResize,    // (phaseId, newEndDate) => void
-  onUpdate,    // (phaseId, fields) => void
+  onMove,           // (phaseId, deltaDays) => void
+  onResize,         // (phaseId, newEndDate) => void
+  onUpdate,         // (phaseId, fields) => void
+  onOpenCalendar,   // (phase) => void — called on bar click (no drag)
   onAddTask,
   onUpdateTask,
   onDeleteTask,
@@ -28,16 +29,24 @@ export default function PlanPhaseRow({
   const barW   = Math.max(width * dayPx, dayPx) // min 1 day wide
 
   // ── Drag (move) ───────────────────────────────────────────
+  // If the mouse moves < 5 px we treat it as a click → open calendar.
   function handleDragStart(e) {
     if (!isEditable) return
     e.preventDefault()
     const startX = e.clientX
+    let moved = false
 
-    function onMouseMove() {} // visual feedback via cursor only
+    function onMouseMove(me) {
+      if (Math.abs(me.clientX - startX) > 5) moved = true
+    }
 
     function onMouseUp(me) {
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
+      if (!moved) {
+        onOpenCalendar?.(phase)
+        return
+      }
       const delta = Math.round((me.clientX - startX) / dayPx)
       if (delta !== 0) onMove(phase.id, delta)
     }
