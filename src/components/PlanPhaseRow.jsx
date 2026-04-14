@@ -1,5 +1,5 @@
 import { useState, useRef, useLayoutEffect } from 'react'
-import { ChevronDown, ChevronRight, GripVertical, Flag } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronUp, Flag } from 'lucide-react'
 import PlanPhaseTaskList from './PlanPhaseTaskList'
 import { daysBetween, addDays, computePhaseStatus } from '../hooks/usePlan'
 
@@ -13,6 +13,8 @@ export default function PlanPhaseRow({
   labelW,
   baselinePhase,
   isEditable,
+  isFirst,
+  isLast,
   onMove,
   onResize,
   onUpdate,
@@ -20,6 +22,8 @@ export default function PlanPhaseRow({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
+  onMoveUp,
+  onMoveDown,
 }) {
   const [expanded,    setExpanded]    = useState(false)
   const [tooltipPos,  setTooltipPos]  = useState(null)
@@ -116,14 +120,27 @@ export default function PlanPhaseRow({
           style={{ width: LABEL_W, minWidth: LABEL_W }}
         >
           {isEditable && (
-            <div
-              ref={dragRef}
-              className="cursor-grab active:cursor-grabbing p-1 rounded"
-              style={{ color: '#3a3a3a' }}
-              onMouseEnter={e => e.currentTarget.style.color = '#6e6e73'}
-              onMouseLeave={e => e.currentTarget.style.color = '#3a3a3a'}
-            >
-              <GripVertical className="w-3 h-3" />
+            <div className="flex flex-col shrink-0" style={{ gap: 1 }}>
+              <button
+                onClick={onMoveUp}
+                disabled={isFirst}
+                style={{ color: isFirst ? '#2a2a2a' : '#3a3a3a', lineHeight: 0, background: 'none', border: 'none', cursor: isFirst ? 'default' : 'pointer', padding: 1 }}
+                onMouseEnter={e => { if (!isFirst) e.currentTarget.style.color = '#f5f5f7' }}
+                onMouseLeave={e => { if (!isFirst) e.currentTarget.style.color = '#3a3a3a' }}
+                title="Mover arriba"
+              >
+                <ChevronUp className="w-3 h-3" />
+              </button>
+              <button
+                onClick={onMoveDown}
+                disabled={isLast}
+                style={{ color: isLast ? '#2a2a2a' : '#3a3a3a', lineHeight: 0, background: 'none', border: 'none', cursor: isLast ? 'default' : 'pointer', padding: 1 }}
+                onMouseEnter={e => { if (!isLast) e.currentTarget.style.color = '#f5f5f7' }}
+                onMouseLeave={e => { if (!isLast) e.currentTarget.style.color = '#3a3a3a' }}
+                title="Mover abajo"
+              >
+                <ChevronDown className="w-3 h-3" />
+              </button>
             </div>
           )}
 

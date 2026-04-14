@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronRight, Link2, Copy, Check, AlertTriangle, Flag, CalendarDays, GitBranch, RotateCcw, CheckCircle2, Diamond, AlignLeft, GitMerge } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronRight, ChevronUp, Link2, Copy, Check, AlertTriangle, Flag, CalendarDays, GitBranch, RotateCcw, CheckCircle2, Diamond, AlignLeft, GitMerge } from 'lucide-react'
 import PlanPhaseTaskList from './PlanPhaseTaskList'
 import { calcEndDateFromHours, workingDaysBetween, addDays, daysBetween, computePhaseStatus } from '../hooks/usePlan'
 import toast from 'react-hot-toast'
@@ -18,7 +18,7 @@ const inputStyle = {
   transition: 'border-color 0.15s',
 }
 
-function PhaseItem({ phase, minStartDate, baselinePhase, allPhases, onUpdatePhase, onDeletePhase, onOpenCalendar, onAddTask, onUpdateTask, onDeleteTask }) {
+function PhaseItem({ phase, isFirst, isLast, minStartDate, baselinePhase, allPhases, onUpdatePhase, onDeletePhase, onOpenCalendar, onAddTask, onUpdateTask, onDeleteTask, onMoveUp, onMoveDown }) {
   const [open, setOpen] = useState(false)
 
   const effectiveStatus = computePhaseStatus(phase)
@@ -96,6 +96,32 @@ function PhaseItem({ phase, minStartDate, baselinePhase, allPhases, onUpdatePhas
         >
           {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
+
+        {/* Move up / down */}
+        <div className="flex flex-col shrink-0" style={{ gap: 1 }}>
+          <button
+            onClick={onMoveUp}
+            disabled={isFirst}
+            className="p-0.5 rounded transition-colors"
+            style={{ color: isFirst ? '#2a2a2a' : '#3a3a3a', lineHeight: 0 }}
+            onMouseEnter={e => { if (!isFirst) e.currentTarget.style.color = '#f5f5f7' }}
+            onMouseLeave={e => { if (!isFirst) e.currentTarget.style.color = '#3a3a3a' }}
+            title="Mover arriba"
+          >
+            <ChevronUp className="w-3 h-3" />
+          </button>
+          <button
+            onClick={onMoveDown}
+            disabled={isLast}
+            className="p-0.5 rounded transition-colors"
+            style={{ color: isLast ? '#2a2a2a' : '#3a3a3a', lineHeight: 0 }}
+            onMouseEnter={e => { if (!isLast) e.currentTarget.style.color = '#f5f5f7' }}
+            onMouseLeave={e => { if (!isLast) e.currentTarget.style.color = '#3a3a3a' }}
+            title="Mover abajo"
+          >
+            <ChevronDown className="w-3 h-3" />
+          </button>
+        </div>
 
         {/* Delete */}
         <button
@@ -396,6 +422,7 @@ export default function PlanSidebar({
   onDeletePlan,
   onPrint,
   onAddMilestone,
+  onReorderPhases,
   snapshots = [],
   activeSnapshotId = null,
   onSetActiveSnapshot,
@@ -527,6 +554,8 @@ export default function PlanSidebar({
             <PhaseItem
               key={phase.id}
               phase={phase}
+              isFirst={idx === 0}
+              isLast={idx === phases.length - 1}
               allPhases={phases}
               minStartDate={idx > 0 ? addDays(phases[idx - 1].end_date, 1) : undefined}
               baselinePhase={baselineMap[phase.id] ?? null}
@@ -536,6 +565,18 @@ export default function PlanSidebar({
               onAddTask={onAddTask}
               onUpdateTask={onUpdateTask}
               onDeleteTask={onDeleteTask}
+              onMoveUp={() => {
+                if (idx === 0 || !onReorderPhases) return
+                const next = [...phases]
+                ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+                onReorderPhases(next)
+              }}
+              onMoveDown={() => {
+                if (idx === phases.length - 1 || !onReorderPhases) return
+                const next = [...phases]
+                ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
+                onReorderPhases(next)
+              }}
             />
           ))}
         </div>

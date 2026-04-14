@@ -67,6 +67,7 @@ export default function GanttChart({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
+  onReorderPhases,
   compact = false,
 }) {
   const [zoomIdx, setZoomIdx] = useState(1) // default: semana
@@ -367,6 +368,8 @@ export default function GanttChart({
                   labelW={labelW}
                   baselinePhase={baselineMap[phase.id] ?? null}
                   isEditable={isEditable}
+                  isFirst={idx === 0}
+                  isLast={idx === phases.length - 1}
                   onMove={onMove}
                   onResize={onResize}
                   onUpdate={onUpdatePhase}
@@ -374,6 +377,18 @@ export default function GanttChart({
                   onAddTask={onAddTask}
                   onUpdateTask={onUpdateTask}
                   onDeleteTask={onDeleteTask}
+                  onMoveUp={() => {
+                    if (idx === 0 || !onReorderPhases) return
+                    const next = [...phases]
+                    ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+                    onReorderPhases(next)
+                  }}
+                  onMoveDown={() => {
+                    if (idx === phases.length - 1 || !onReorderPhases) return
+                    const next = [...phases]
+                    ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
+                    onReorderPhases(next)
+                  }}
                 />
               </div>
             ))}
