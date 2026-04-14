@@ -303,7 +303,6 @@ function PhaseItem({ phase, minStartDate, baselinePhase, allPhases, onUpdatePhas
             </div>
           </>
         )}
-      </div>
 
         {/* Depends on */}
         {allPhases && allPhases.length > 1 && (
