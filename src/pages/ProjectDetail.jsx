@@ -19,6 +19,7 @@ import ProjectDetailReports from '../components/ProjectDetailReports'
 import ProjectIconUpload from '../components/ProjectIconUpload'
 import ProjectFinances from '../components/ProjectFinances'
 import ProjectPlanTab from '../components/ProjectPlanTab'
+import StatusReport from '../components/StatusReport'
 import { notify } from '../lib/notify'
 
 async function logActivity(projectId, userId, action, metadata = {}) {
@@ -396,9 +397,10 @@ export default function ProjectDetail() {
         {/* Tab switcher */}
         <div className="flex items-center gap-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
           {[
-            { id: 'tasks',    label: 'Tareas' },
-            { id: 'finances', label: 'Recursos & Finanzas' },
-            { id: 'plan',     label: 'Plan' },
+            { id: 'tasks',         label: 'Tareas' },
+            { id: 'finances',      label: 'Recursos & Finanzas' },
+            { id: 'plan',          label: 'Plan' },
+            { id: 'status_report', label: 'Status report' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -422,7 +424,15 @@ export default function ProjectDetail() {
 
         {activeTab === 'plan' && <ProjectPlanTab projectId={id} />}
 
-        {activeTab !== 'plan' && (
+        {activeTab === 'status_report' && (
+          <StatusReport
+            project={project}
+            members={members}
+            tasks={tasks}
+          />
+        )}
+
+        {activeTab !== 'plan' && activeTab !== 'status_report' && (
         <div className="max-w-6xl mx-auto px-6 pb-8">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_272px] gap-8 items-start">
 
