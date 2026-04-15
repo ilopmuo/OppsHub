@@ -97,7 +97,7 @@ export default function PlanPublicView() {
           borderBottom: '1px solid rgba(255,255,255,0.07)',
         }}
       >
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <svg width="20" height="20" viewBox="0 0 44 44" fill="none">
               <rect width="44" height="44" rx="10" fill="#1a1a1a"/>
@@ -123,7 +123,7 @@ export default function PlanPublicView() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-10">
+      <main className="px-6 py-10">
         {/* Plan header */}
         <div className="mb-8 gantt-print-header">
           <h1 className="text-2xl font-bold mb-2" style={{ color: '#f5f5f7' }}>{plan.name}</h1>
@@ -253,7 +253,7 @@ export default function PlanPublicView() {
         className="mt-16 py-6 no-print"
         style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
       >
-        <div className="max-w-5xl mx-auto px-6 flex items-center justify-center gap-2">
+        <div className="px-6 flex items-center justify-center gap-2">
           <svg width="14" height="14" viewBox="0 0 44 44" fill="none">
             <rect width="44" height="44" rx="10" fill="#1a1a1a"/>
             <rect x="10" y="10" width="10" height="10" rx="2" fill="white"/>

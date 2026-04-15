@@ -424,17 +424,33 @@ function WorkloadChart({ months, hasHours, t }) {
 
 // ── Export handler ───────────────────────────────────────────────────────
 function triggerChartsExport() {
+  const charts = document.querySelector('.charts-print-only')
+  if (!charts) return
+
+  // Move charts to body root so we can hide everything else with a simple selector
+  const placeholder = document.createElement('span')
+  charts.parentNode.insertBefore(placeholder, charts)
+  document.body.appendChild(charts)
+
   const style = document.createElement('style')
-  style.id    = '__charts_print__'
+  style.id = '__charts_print__'
   style.textContent = `
     @media print {
-      .gantt-print-area, .print-only { display: none !important; }
-      .charts-print-only { display: block !important; }
+      @page { size: A4 portrait; margin: 12mm 15mm; }
+      html, body { background: white !important; }
+      body > *:not(.charts-print-only) { display: none !important; }
+      .charts-print-only { display: block !important; padding: 16px !important; }
+      .charts-p2 { page-break-before: always; padding-top: 8px; }
     }
   `
   document.head.appendChild(style)
   window.print()
-  setTimeout(() => document.getElementById('__charts_print__')?.remove(), 1500)
+
+  setTimeout(() => {
+    placeholder.parentNode.insertBefore(charts, placeholder)
+    placeholder.remove()
+    document.getElementById('__charts_print__')?.remove()
+  }, 1500)
 }
 
 // ── Charts panel (shared between screen + print) ─────────────────────────
@@ -545,7 +561,7 @@ function ChartsPanel({ plan, phases, nonMilestone, milestones, t, planStart, las
       </div>
 
       {/* ── Row: workload + duration ─────────────────────────── */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      <div className="grid gap-3 charts-p2" style={{ gridTemplateColumns: '1fr 1fr' }}>
 
         {/* Monthly workload */}
         <div className="rounded-2xl p-4 flex flex-col gap-2"

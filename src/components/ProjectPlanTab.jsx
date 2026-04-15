@@ -1,55 +1,66 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Loader2, Plus, PanelRightOpen, PanelRightClose, LayoutList } from 'lucide-react'
+import GanttChart from './GanttChart'
+import PlanSidebar from './PlanSidebar'
+import PlanPhaseCalendar from './PlanPhaseCalendar'
+import PlanInsights from './PlanInsights'
+import NewPlanModal from './NewPlanModal'
+import usePlan from '../hooks/usePlan'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { Loader2, Plus, ExternalLink, LayoutList } from 'lucide-react'
-import GanttChart from './GanttChart'
-import NewPlanModal from './NewPlanModal'
+import toast from 'react-hot-toast'
 
 export default function ProjectPlanTab({ projectId }) {
-  const navigate  = useNavigate()
-  const { user }  = useAuth()
-  const [plan,        setPlan]        = useState(null)
-  const [phases,      setPhases]      = useState([])
-  const [loading,     setLoading]     = useState(true)
-  const [showModal,   setShowModal]   = useState(false)
+  const { user } = useAuth()
+  const [planId, setPlanId] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+  const [loadingPlanId, setLoadingPlanId] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [calendarPhase, setCalendarPhase] = useState(null)
 
-  useEffect(() => { fetchPlan() }, [projectId])
+  // Load plan ID from project
+  useEffect(() => {
+    if (!user?.id) return
 
-  async function fetchPlan() {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('project_plans')
-      .select(`
-        *,
-        plan_phases (
-          *,
-          plan_tasks ( * )
-        )
-      `)
-      .eq('project_id', projectId)
-      .eq('owner_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    async function loadPlanId() {
+      setLoadingPlanId(true)
+      const { data, error } = await supabase
+        .from('project_plans')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('owner_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
-    if (!error && data) {
-      const sortedPhases = (data.plan_phases || [])
-        .sort((a, b) => a.order_index - b.order_index)
-        .map(ph => ({
-          ...ph,
-          plan_tasks: (ph.plan_tasks || []).sort((a, b) => a.order_index - b.order_index),
-        }))
-      setPlan(data)
-      setPhases(sortedPhases)
-    } else {
-      setPlan(null)
-      setPhases([])
+      if (!error && data) {
+        setPlanId(data.id)
+      }
+      setLoadingPlanId(false)
     }
-    setLoading(false)
+    loadPlanId()
+  }, [projectId, user?.id])
+
+  // Use the plan hook to manage all plan operations
+  const {
+    plan, phases, loading,
+    updatePlan,
+    addPhase, addMilestone, updatePhase, movePhase, resizePhase, deletePhase, reorderPhases,
+    addTask, updateTask, deleteTask,
+    deletePlan,
+    snapshots, activeSnapshotId, setActiveSnapshotId,
+    createSnapshot, deleteSnapshot,
+  } = usePlan(planId)
+
+  async function handleDeletePlan() {
+    const ok = await deletePlan()
+    if (ok) {
+      toast.success('Plan eliminado')
+      setPlanId(null)
+    }
   }
 
-  if (loading) {
+  if (loadingPlanId || loading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#bf5af2' }} />
@@ -90,7 +101,10 @@ export default function ProjectPlanTab({ projectId }) {
           <NewPlanModal
             projectId={projectId}
             onClose={() => setShowModal(false)}
-            onCreated={() => { setShowModal(false); fetchPlan() }}
+            onCreated={(newPlanId) => {
+              setShowModal(false)
+              setPlanId(newPlanId)
+            }}
           />
         )}
       </>
@@ -98,34 +112,128 @@ export default function ProjectPlanTab({ projectId }) {
   }
 
   return (
-    <div>
+    <div className="flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-base font-semibold" style={{ color: '#f5f5f7' }}>{plan.name}</h2>
-          {plan.client_name && (
-            <p className="text-xs mt-0.5" style={{ color: '#6e6e73' }}>{plan.client_name}</p>
-          )}
-        </div>
+      <div
+        className="flex items-center gap-3 px-6 py-3 shrink-0 sticky top-0 z-20"
+        style={{
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          backgroundColor: '#000',
+        }}
+      >
+        <h2 className="text-sm font-semibold truncate" style={{ color: '#f5f5f7' }}>
+          {plan.name}
+        </h2>
+        {plan.client_name && (
+          <span
+            className="text-xs px-2 py-0.5 rounded-full shrink-0"
+            style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}
+          >
+            {plan.client_name}
+          </span>
+        )}
+
+        <div className="flex-1" />
+
         <button
-          onClick={() => navigate(`/plans/${plan.id}`)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm transition-all"
-          style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#f5f5f7' }}
-          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'}
+          onClick={() => setSidebarOpen(v => !v)}
+          className="flex items-center gap-1.5 text-xs transition-colors shrink-0"
+          style={{ color: sidebarOpen ? '#bf5af2' : '#6e6e73', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}
+          onMouseEnter={e => { if (!sidebarOpen) e.currentTarget.style.color = '#f5f5f7' }}
+          onMouseLeave={e => { if (!sidebarOpen) e.currentTarget.style.color = '#6e6e73' }}
+          title={sidebarOpen ? 'Cerrar panel' : 'Abrir panel de edición'}
         >
-          <ExternalLink className="w-3.5 h-3.5" />
-          Editar plan completo
+          {sidebarOpen
+            ? <PanelRightClose className="w-4 h-4" />
+            : <PanelRightOpen  className="w-4 h-4" />
+          }
         </button>
       </div>
 
-      {/* Gantt (read-only, compact) */}
-      <GanttChart
-        plan={plan}
-        phases={phases}
-        isEditable={false}
-        compact={true}
-      />
+      {/* Main content: Gantt + optional side panel */}
+      <div className="flex" style={{ alignItems: 'flex-start' }}>
+
+        {/* Gantt column */}
+        <div className="flex-1 min-w-0">
+          <div className="p-6">
+            <GanttChart
+              plan={plan}
+              phases={phases}
+              isEditable={true}
+              snapshots={snapshots}
+              activeSnapshotId={activeSnapshotId}
+              onMove={movePhase}
+              onResize={resizePhase}
+              onUpdatePhase={updatePhase}
+              onOpenCalendar={setCalendarPhase}
+              onAddTask={addTask}
+              onUpdateTask={updateTask}
+              onDeleteTask={deleteTask}
+              onReorderPhases={reorderPhases}
+            />
+          </div>
+
+          {/* Below-fold: charts + stats */}
+          <PlanInsights plan={plan} phases={phases} />
+        </div>
+
+        {/* Collapsible side panel */}
+        <div
+          className="shrink-0"
+          style={{
+            width: sidebarOpen ? 360 : 0,
+            overflow: 'hidden',
+            transition: 'width 0.25s ease',
+            position: 'sticky',
+            top: 44,
+            height: 'calc(100vh - 100px)',
+            borderLeft: sidebarOpen ? '1px solid rgba(255,255,255,0.06)' : 'none',
+            backgroundColor: '#000',
+          }}
+        >
+          <div style={{ width: 360, height: '100%', overflowY: 'auto' }}>
+            <PlanSidebar
+              plan={plan}
+              phases={phases}
+              onUpdatePlan={updatePlan}
+              onUpdatePhase={updatePhase}
+              onAddPhase={addPhase}
+              onDeletePhase={deletePhase}
+              onOpenCalendar={setCalendarPhase}
+              onAddTask={addTask}
+              onUpdateTask={updateTask}
+              onDeleteTask={deleteTask}
+              onDeletePlan={handleDeletePlan}
+              onAddMilestone={addMilestone}
+              onReorderPhases={reorderPhases}
+              snapshots={snapshots}
+              activeSnapshotId={activeSnapshotId}
+              onSetActiveSnapshot={setActiveSnapshotId}
+              onCreateSnapshot={createSnapshot}
+              onDeleteSnapshot={deleteSnapshot}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Phase calendar modal */}
+      {calendarPhase && (
+        <PlanPhaseCalendar
+          phase={calendarPhase}
+          onClose={() => setCalendarPhase(null)}
+        />
+      )}
+
+      {showModal && (
+        <NewPlanModal
+          projectId={projectId}
+          onClose={() => setShowModal(false)}
+          onCreated={(newPlanId) => {
+            setShowModal(false)
+            setPlanId(newPlanId)
+          }}
+        />
+      )}
     </div>
   )
 }

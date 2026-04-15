@@ -328,7 +328,8 @@ export default function ProjectDetail() {
         }} />
       )}
 
-      <main className="max-w-6xl mx-auto px-6 py-8 page-enter">
+      <main className="page-enter">
+        <div className="max-w-6xl mx-auto px-6 py-8">
 
         {/* ── Header ── */}
         <div className="flex items-start justify-between gap-4 mb-6">
@@ -392,41 +393,42 @@ export default function ProjectDetail() {
           </div>
         )}
 
-        {/* ── Two-column layout ── */}
+        {/* Tab switcher */}
+        <div className="flex items-center gap-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          {[
+            { id: 'tasks',    label: 'Tareas' },
+            { id: 'finances', label: 'Recursos & Finanzas' },
+            { id: 'plan',     label: 'Plan' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className="px-4 py-2.5 text-sm font-medium transition-all"
+              style={{
+                color: activeTab === tab.id ? '#f5f5f7' : '#6e6e73',
+                marginBottom: -1,
+                background: 'none', border: 'none',
+                borderBottomStyle: 'solid',
+                borderBottomWidth: 1.5,
+                borderBottomColor: activeTab === tab.id ? '#f5f5f7' : 'transparent',
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+              onMouseEnter={e => { if (activeTab !== tab.id) e.currentTarget.style.color = '#f5f5f7' }}
+              onMouseLeave={e => { if (activeTab !== tab.id) e.currentTarget.style.color = '#6e6e73' }}
+            >{tab.label}</button>
+          ))}
+        </div>
+        </div>
+
+        {activeTab === 'plan' && <ProjectPlanTab projectId={id} />}
+
+        {activeTab !== 'plan' && (
+        <div className="max-w-6xl mx-auto px-6 pb-8">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_272px] gap-8 items-start">
 
           {/* ── LEFT: Tab content ── */}
           <div>
-            {/* Tab switcher */}
-            <div className="flex items-center gap-1 mb-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 0 }}>
-              {[
-                { id: 'tasks',    label: 'Tareas' },
-                { id: 'finances', label: 'Recursos & Finanzas' },
-                { id: 'plan',     label: 'Plan' },
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className="px-4 py-2.5 text-sm font-medium transition-all"
-                  style={{
-                    color: activeTab === tab.id ? '#f5f5f7' : '#6e6e73',
-                    borderBottom: activeTab === tab.id ? '1.5px solid #f5f5f7' : '1.5px solid transparent',
-                    marginBottom: -1,
-                    background: 'none', border: 'none',
-                    borderBottomStyle: 'solid',
-                    borderBottomWidth: 1.5,
-                    borderBottomColor: activeTab === tab.id ? '#f5f5f7' : 'transparent',
-                    cursor: 'pointer', fontFamily: 'inherit',
-                  }}
-                  onMouseEnter={e => { if (activeTab !== tab.id) e.currentTarget.style.color = '#f5f5f7' }}
-                  onMouseLeave={e => { if (activeTab !== tab.id) e.currentTarget.style.color = '#6e6e73' }}
-                >{tab.label}</button>
-              ))}
-            </div>
-
-            {activeTab === 'plan' && (
-              <ProjectPlanTab projectId={id} />
-            )}
+            <div className="mb-5" />
 
             {activeTab === 'finances' && (
               <ProjectFinances
@@ -685,6 +687,8 @@ export default function ProjectDetail() {
             <ActivityLog projectId={id} />
           </div>
         </div>
+        </div>
+        )}
       </main>
 
       {showTaskModal && (
