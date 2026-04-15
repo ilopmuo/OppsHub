@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Loader2, Calendar, Clock, Building2, Printer } from 'lucide-react'
 import GanttChart from '../components/GanttChart'
+import PlanInsights from '../components/PlanInsights'
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
@@ -164,6 +165,9 @@ export default function PlanPublicView() {
             isEditable={false}
           />
         </div>
+
+        {/* Reports */}
+        <PlanInsights plan={plan} phases={phases} />
 
         {/* Phase list (print-friendly summary) */}
         {phases.length > 0 && (
