@@ -597,7 +597,7 @@ function ChartsPanel({ plan, phases, nonMilestone, milestones, t, planStart, las
 }
 
 // ── Main component ───────────────────────────────────────────────────────
-export default function PlanInsights({ plan, phases }) {
+export default function PlanInsights({ plan, phases, hideExport = false }) {
   if (!plan || phases.length === 0) return null
 
   const nonMilestone = phases.filter(p => !p.is_milestone)
@@ -662,21 +662,23 @@ export default function PlanInsights({ plan, phases }) {
           <span className="text-xs" style={{ color: '#3a3a3a' }}>
             {fmtDate(planStart)} → {fmtDate(lastEnd)}
           </span>
-          <button
-            onClick={triggerChartsExport}
-            className="flex items-center gap-1.5 text-xs transition-colors"
-            style={{
-              backgroundColor: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              color: '#6e6e73', borderRadius: 8, padding: '5px 10px',
-              cursor: 'pointer',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)' }}
-          >
-            <Download className="w-3.5 h-3.5" />
-            Exportar resumen
-          </button>
+          {!hideExport && (
+            <button
+              onClick={triggerChartsExport}
+              className="flex items-center gap-1.5 text-xs transition-colors"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#6e6e73', borderRadius: 8, padding: '5px 10px',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)' }}
+            >
+              <Download className="w-3.5 h-3.5" />
+              Exportar resumen
+            </button>
+          )}
         </div>
 
         <ChartsPanel {...shared} t={DARK} />

@@ -111,16 +111,6 @@ export default function PlanPublicView() {
             <span style={{ color: '#3a3a3a' }}>/</span>
             <span className="text-sm truncate max-w-xs" style={{ color: '#6e6e73' }}>{plan.name}</span>
           </div>
-          <button
-            onClick={handlePrint}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm transition-all"
-            style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#f5f5f7' }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'}
-          >
-            <Printer className="w-3.5 h-3.5" />
-            Exportar PDF
-          </button>
         </div>
       </header>
 
@@ -167,7 +157,7 @@ export default function PlanPublicView() {
         </div>
 
         {/* Reports */}
-        <PlanInsights plan={plan} phases={phases} />
+        <PlanInsights plan={plan} phases={phases} hideExport />
 
         {/* Phase list (print-friendly summary) */}
         {phases.length > 0 && (
