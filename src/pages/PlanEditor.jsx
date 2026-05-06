@@ -167,6 +167,7 @@ export default function PlanEditor() {
                 onMove={movePhase}
                 onResize={resizePhase}
                 onUpdatePhase={updatePhase}
+                onUpdatePlan={updatePlan}
                 onOpenCalendar={setCalendarPhase}
                 onAddTask={addTask}
                 onUpdateTask={updateTask}

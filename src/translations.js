@@ -20,6 +20,7 @@ export const translations = {
       generatedWith: 'Generado con OppsHub',
       notFoundPublic: 'Plan no encontrado o enlace no válido.',
       planned: 'planificadas',
+      legend: 'Leyenda',
     },
     insights: {
       duration: 'Duración',
@@ -107,6 +108,7 @@ export const translations = {
       generatedWith: 'Generated with OppsHub',
       notFoundPublic: 'Plan not found or invalid link.',
       planned: 'planned',
+      legend: 'Legend',
     },
     insights: {
       duration: 'Duration',

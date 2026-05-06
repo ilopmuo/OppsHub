@@ -1,8 +1,134 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ZoomIn, ZoomOut } from 'lucide-react'
+import { ZoomIn, ZoomOut, Plus, Trash2 } from 'lucide-react'
 import PlanPhaseRow from './PlanPhaseRow'
 import { daysBetween } from '../hooks/usePlan'
 import { useLang } from '../contexts/LanguageContext'
+
+// ── Legend panel ──────────────────────────────────────────────
+function LegendPanel({ items = [], isEditable, onUpdate, printMode }) {
+  const { t: tl } = useLang()
+  const [editIdx, setEditIdx] = useState(null)
+
+  function addItem() {
+    const colors = ['#bf5af2', '#64d2ff', '#30d158', '#ff9f0a', '#ff453a']
+    const next = [...items, { color: colors[items.length % colors.length], label: '' }]
+    onUpdate(next)
+    setEditIdx(next.length - 1)
+  }
+
+  function updateItem(idx, patch) {
+    onUpdate(items.map((it, i) => i === idx ? { ...it, ...patch } : it))
+  }
+
+  function deleteItem(idx) {
+    onUpdate(items.filter((_, i) => i !== idx))
+    setEditIdx(null)
+  }
+
+  if (!isEditable && items.length === 0) return null
+
+  const bg      = printMode ? 'rgba(245,245,247,0.95)' : 'rgba(17,17,17,0.92)'
+  const border  = printMode ? '1px solid #ddd'         : '1px solid rgba(255,255,255,0.08)'
+  const textCol = printMode ? '#111'                   : '#f5f5f7'
+  const mutedCol= printMode ? '#666'                   : '#6e6e73'
+
+  return (
+    <div
+      style={{
+        position: 'absolute', bottom: 10, right: 10,
+        backgroundColor: bg,
+        border,
+        borderRadius: 10,
+        padding: '8px 10px',
+        minWidth: 120,
+        maxWidth: 220,
+        backdropFilter: 'blur(12px)',
+        zIndex: 15,
+        boxShadow: printMode ? '0 1px 6px rgba(0,0,0,0.1)' : '0 4px 20px rgba(0,0,0,0.5)',
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-1.5" style={{ gap: 6 }}>
+        <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: mutedCol }}>
+          {tl('plans.legend') || 'Leyenda'}
+        </span>
+        {isEditable && (
+          <button
+            onClick={addItem}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: mutedCol, lineHeight: 0 }}
+            onMouseEnter={e => e.currentTarget.style.color = textCol}
+            onMouseLeave={e => e.currentTarget.style.color = mutedCol}
+            title="Añadir entrada"
+          >
+            <Plus style={{ width: 12, height: 12 }} />
+          </button>
+        )}
+      </div>
+
+      {/* Items */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {items.map((item, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Color swatch — editable */}
+            <input
+              type="color"
+              value={item.color}
+              disabled={!isEditable}
+              onChange={e => updateItem(i, { color: e.target.value })}
+              style={{
+                width: 14, height: 14, border: 'none', borderRadius: 3,
+                padding: 0, cursor: isEditable ? 'pointer' : 'default',
+                flexShrink: 0, backgroundColor: 'transparent',
+              }}
+              title={item.color}
+            />
+            {/* Label */}
+            {isEditable && editIdx === i ? (
+              <input
+                autoFocus
+                value={item.label}
+                onChange={e => updateItem(i, { label: e.target.value })}
+                onBlur={() => setEditIdx(null)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditIdx(null) }}
+                placeholder="Etiqueta..."
+                style={{
+                  flex: 1, fontSize: 11, background: 'none',
+                  border: 'none', borderBottom: `1px solid ${mutedCol}`,
+                  outline: 'none', color: textCol, padding: '0 0 1px',
+                }}
+              />
+            ) : (
+              <span
+                onClick={() => isEditable && setEditIdx(i)}
+                style={{
+                  flex: 1, fontSize: 11, color: item.label ? textCol : mutedCol,
+                  cursor: isEditable ? 'pointer' : 'default',
+                  fontStyle: item.label ? 'normal' : 'italic',
+                }}
+              >
+                {item.label || (isEditable ? 'Sin etiqueta' : '')}
+              </span>
+            )}
+            {/* Delete */}
+            {isEditable && (
+              <button
+                onClick={() => deleteItem(i)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: mutedCol, lineHeight: 0, flexShrink: 0 }}
+                onMouseEnter={e => e.currentTarget.style.color = '#ff453a'}
+                onMouseLeave={e => e.currentTarget.style.color = mutedCol}
+              >
+                <Trash2 style={{ width: 10, height: 10 }} />
+              </button>
+            )}
+          </div>
+        ))}
+        {items.length === 0 && isEditable && (
+          <span style={{ fontSize: 10, color: mutedCol, fontStyle: 'italic' }}>Pulsa + para añadir</span>
+        )}
+      </div>
+    </div>
+  )
+}
 
 const LABEL_W_MIN     = 120
 const LABEL_W_DEFAULT = 200
@@ -76,6 +202,7 @@ export default function GanttChart({
   onUpdateTask,
   onDeleteTask,
   onReorderPhases,
+  onUpdatePlan,
   compact = false,
   printMode = false,
   forceDayPx = null,
@@ -427,6 +554,14 @@ export default function GanttChart({
               </div>
             ))}
           </div>
+
+          {/* Legend */}
+          <LegendPanel
+            items={plan.legend || []}
+            isEditable={isEditable && !!onUpdatePlan}
+            onUpdate={items => onUpdatePlan?.({ legend: items })}
+            printMode={printMode}
+          />
 
         </div>
       </div>
