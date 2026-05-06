@@ -2,19 +2,20 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useLang } from '../contexts/LanguageContext'
 import toast from 'react-hot-toast'
 import { Plus, LayoutList, Calendar, Clock, Building2, ExternalLink } from 'lucide-react'
 import NavBar from '../components/NavBar'
 import NewPlanModal from '../components/NewPlanModal'
 
-function formatDate(dateStr) {
+function formatDate(dateStr, locale) {
   if (!dateStr) return '—'
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('es-ES', {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString(locale, {
     day: 'numeric', month: 'short', year: 'numeric',
   })
 }
 
-function PlanCard({ plan, onClick }) {
+function PlanCard({ plan, onClick, locale, p }) {
   const phaseCount = plan.phase_count || 0
   const totalHours = plan.total_hours || 0
 
@@ -69,12 +70,12 @@ function PlanCard({ plan, onClick }) {
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1.5">
           <Calendar className="w-3 h-3" style={{ color: '#6e6e73' }} />
-          <span className="text-xs" style={{ color: '#6e6e73' }}>{formatDate(plan.start_date)}</span>
+          <span className="text-xs" style={{ color: '#6e6e73' }}>{formatDate(plan.start_date, locale)}</span>
         </div>
         {phaseCount > 0 && (
           <div className="flex items-center gap-1.5">
             <span className="text-xs" style={{ color: '#6e6e73' }}>
-              {phaseCount} fase{phaseCount !== 1 ? 's' : ''}
+              {phaseCount} {phaseCount !== 1 ? p.phases : p.phase}
             </span>
           </div>
         )}
@@ -110,6 +111,9 @@ function SkeletonPlanCard() {
 export default function Plans() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { lang, t } = useLang()
+  const locale = lang === 'en' ? 'en-US' : 'es-ES'
+  const p = t('plans')
   const [plans,     setPlans]     = useState([])
   const [loading,   setLoading]   = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -129,7 +133,7 @@ export default function Plans() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      toast.error('Error al cargar los planes')
+      toast.error(p.errorLoading)
     } else {
       const enriched = (data || []).map(p => ({
         ...p,
@@ -149,10 +153,8 @@ export default function Plans() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold mb-1" style={{ color: '#f5f5f7' }}>Planes</h1>
-            <p className="text-sm" style={{ color: '#6e6e73' }}>
-              Crea y gestiona planes de proyecto para tus clientes
-            </p>
+            <h1 className="text-2xl font-bold mb-1" style={{ color: '#f5f5f7' }}>{p.title}</h1>
+            <p className="text-sm" style={{ color: '#6e6e73' }}>{p.subtitle}</p>
           </div>
           <button
             onClick={() => setShowModal(true)}
@@ -162,7 +164,7 @@ export default function Plans() {
             onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f5f5f7'}
           >
             <Plus className="w-4 h-4" />
-            Nuevo plan
+            {p.newPlan}
           </button>
         </div>
 
@@ -182,10 +184,8 @@ export default function Plans() {
             >
               <LayoutList className="w-8 h-8" style={{ color: '#3a3a3a' }} />
             </div>
-            <p className="font-semibold mb-2" style={{ color: '#f5f5f7' }}>Sin planes todavía</p>
-            <p className="text-sm mb-6 text-center max-w-xs" style={{ color: '#6e6e73' }}>
-              Crea tu primer plan de proyecto con Gantt y compártelo con tus clientes.
-            </p>
+            <p className="font-semibold mb-2" style={{ color: '#f5f5f7' }}>{p.empty}</p>
+            <p className="text-sm mb-6 text-center max-w-xs" style={{ color: '#6e6e73' }}>{p.emptyDesc}</p>
             <button
               onClick={() => setShowModal(true)}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
@@ -194,7 +194,7 @@ export default function Plans() {
               onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f5f5f7'}
             >
               <Plus className="w-4 h-4" />
-              Crear primer plan
+              {p.createFirst}
             </button>
           </div>
         ) : (
@@ -204,6 +204,8 @@ export default function Plans() {
                 key={plan.id}
                 plan={plan}
                 onClick={() => navigate(`/plans/${plan.id}`)}
+                locale={locale}
+                p={p}
               />
             ))}
           </div>

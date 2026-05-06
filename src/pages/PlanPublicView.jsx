@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Loader2, Calendar, Clock, Building2, Printer } from 'lucide-react'
+import { Loader2, Calendar, Clock, Building2 } from 'lucide-react'
 import GanttChart from '../components/GanttChart'
 import PlanInsights from '../components/PlanInsights'
+import { useLang } from '../contexts/LanguageContext'
 
-function formatDate(dateStr) {
+function formatDate(dateStr, locale) {
   if (!dateStr) return '—'
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('es-ES', {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString(locale, {
     day: 'numeric', month: 'long', year: 'numeric',
   })
 }
 
 export default function PlanPublicView() {
   const { token } = useParams()
+  const { lang, toggleLang, t } = useLang()
+  const locale = lang === 'en' ? 'en-US' : 'es-ES'
+  const p = t('plans')
   const [plan,    setPlan]    = useState(null)
   const [phases,  setPhases]  = useState([])
   const [loading, setLoading] = useState(true)
@@ -34,7 +38,7 @@ export default function PlanPublicView() {
         .single()
 
       if (error || !data) {
-        setError('Plan no encontrado o enlace no válido.')
+        setError(p.notFoundPublic)
         setLoading(false)
         return
       }
@@ -111,6 +115,15 @@ export default function PlanPublicView() {
             <span style={{ color: '#3a3a3a' }}>/</span>
             <span className="text-sm truncate max-w-xs" style={{ color: '#6e6e73' }}>{plan.name}</span>
           </div>
+          <button
+            onClick={toggleLang}
+            className="text-xs px-2.5 py-1.5 rounded-lg transition-all font-medium"
+            style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+          >
+            {lang === 'es' ? 'EN' : 'ES'}
+          </button>
         </div>
       </header>
 
@@ -132,16 +145,16 @@ export default function PlanPublicView() {
             <div className="flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5" style={{ color: '#6e6e73' }} />
               <span className="text-sm" style={{ color: '#6e6e73' }}>
-                {formatDate(plan.start_date)}
+                {formatDate(plan.start_date, locale)}
                 {lastEnd && lastEnd !== plan.start_date && (
-                  <> → {formatDate(lastEnd)}</>
+                  <> → {formatDate(lastEnd, locale)}</>
                 )}
               </span>
             </div>
             {totalHours > 0 && (
               <div className="flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5" style={{ color: '#6e6e73' }} />
-                <span className="text-sm" style={{ color: '#6e6e73' }}>{totalHours}h estimadas</span>
+                <span className="text-sm" style={{ color: '#6e6e73' }}>{totalHours}h {p.estimated}</span>
               </div>
             )}
           </div>
@@ -170,7 +183,7 @@ export default function PlanPublicView() {
               style={{ backgroundColor: '#111111', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
             >
               <h2 className="text-sm font-semibold" style={{ color: '#f5f5f7' }}>
-                Fases del proyecto
+                {p.projectPhases}
               </h2>
             </div>
             {phases.map((phase, idx) => {
@@ -200,7 +213,7 @@ export default function PlanPublicView() {
                         </div>
                       </div>
                       <p className="text-xs" style={{ color: '#6e6e73' }}>
-                        {formatDate(phase.start_date)} → {formatDate(phase.end_date)}
+                        {formatDate(phase.start_date, locale)} → {formatDate(phase.end_date, locale)}
                       </p>
                       {phaseTasks.length > 0 && (
                         <div className="mt-2 space-y-1">
@@ -255,7 +268,7 @@ export default function PlanPublicView() {
             <rect x="10" y="24" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
             <rect x="24" y="24" width="10" height="10" rx="2" fill="white"/>
           </svg>
-          <span className="text-xs" style={{ color: '#3a3a3a' }}>Generado con OppsHub</span>
+          <span className="text-xs" style={{ color: '#3a3a3a' }}>{p.generatedWith}</span>
         </div>
       </footer>
     </div>

@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { Loader2 } from 'lucide-react'
+import { useLang } from '../contexts/LanguageContext'
 
 export default function AuthPage() {
   const navigate = useNavigate()
+  const { t, lang, toggleLang } = useLang()
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,11 +20,11 @@ export default function AuthPage() {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        toast.success('Bienvenido de vuelta')
+        toast.success(t('auth.welcomeBack'))
       } else {
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
-        toast.success('Cuenta creada')
+        toast.success(t('auth.accountCreated'))
       }
       // Redirect to pending invite if exists
       const pendingInvite = localStorage.getItem('pending_invite')
@@ -31,7 +33,7 @@ export default function AuthPage() {
         navigate(`/join?token=${pendingInvite}`, { replace: true })
       }
     } catch (err) {
-      toast.error(err.message || 'Ha ocurrido un error')
+      toast.error(err.message || t('auth.error'))
     } finally {
       setLoading(false)
     }
@@ -63,10 +65,10 @@ export default function AuthPage() {
 
         {/* Heading */}
         <h1 className="text-3xl font-semibold text-center mb-2 tracking-tight" style={{ color: '#f5f5f7' }}>
-          {mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+          {mode === 'login' ? t('auth.login') : t('auth.register')}
         </h1>
         <p className="text-center text-sm mb-10" style={{ color: '#6e6e73' }}>
-          {mode === 'login' ? 'Accede a OppsHub' : 'Empieza a gestionar tus proyectos'}
+          {mode === 'login' ? t('auth.loginSubtitle') : t('auth.registerSubtitle')}
         </p>
 
         {/* Form */}
@@ -76,7 +78,7 @@ export default function AuthPage() {
             required
             value={email}
             onChange={e => setEmail(e.target.value)}
-            placeholder="Email"
+            placeholder={t('auth.email')}
             className="w-full px-4 py-3.5 rounded-xl text-sm outline-none transition-all"
             style={{
               backgroundColor: '#1a1a1a',
@@ -91,7 +93,7 @@ export default function AuthPage() {
             required
             value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder="Contraseña"
+            placeholder={t('auth.password')}
             minLength={6}
             className="w-full px-4 py-3.5 rounded-xl text-sm outline-none transition-all"
             style={{
@@ -115,13 +117,13 @@ export default function AuthPage() {
             onMouseLeave={e => { if (!loading) e.currentTarget.style.backgroundColor = '#f5f5f7' }}
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#666' }} />}
-            {mode === 'login' ? 'Continuar' : 'Crear cuenta'}
+            {mode === 'login' ? t('auth.continue') : t('auth.register')}
           </button>
         </form>
 
         {/* Toggle */}
         <p className="text-center text-sm mt-8" style={{ color: '#6e6e73' }}>
-          {mode === 'login' ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
+          {mode === 'login' ? t('auth.noAccount') : t('auth.hasAccount')}
           <button
             onClick={() => setMode(m => m === 'login' ? 'register' : 'login')}
             className="transition-colors"
@@ -129,9 +131,22 @@ export default function AuthPage() {
             onMouseEnter={e => e.target.style.color = '#6e6e73'}
             onMouseLeave={e => e.target.style.color = '#f5f5f7'}
           >
-            {mode === 'login' ? 'Regístrate' : 'Inicia sesión'}
+            {mode === 'login' ? t('auth.signUp') : t('auth.signIn')}
           </button>
         </p>
+
+        {/* Language toggle */}
+        <div className="flex justify-center mt-10">
+          <button
+            onClick={toggleLang}
+            className="text-xs transition-colors"
+            style={{ color: '#3a3a3a' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#6e6e73'}
+            onMouseLeave={e => e.currentTarget.style.color = '#3a3a3a'}
+          >
+            {lang === 'es' ? 'Switch to English' : 'Cambiar a Español'}
+          </button>
+        </div>
       </div>
     </div>
   )

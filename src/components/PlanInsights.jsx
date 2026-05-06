@@ -1,5 +1,6 @@
 import { Download, TrendingUp, Clock, Layers, Flag, CheckSquare, Calendar } from 'lucide-react'
 import { daysBetween, computePhaseStatus } from '../hooks/usePlan'
+import { useLang } from '../contexts/LanguageContext'
 
 // ── Themes ─────────────────────────────────────────────────────────────
 const DARK = {
@@ -28,21 +29,21 @@ const LIGHT = {
 }
 
 // ── Date helpers ────────────────────────────────────────────────────────
-function fmtDate(iso) {
-  return new Date(iso + 'T00:00:00').toLocaleDateString('es-ES', {
+function fmtDate(iso, locale) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString(locale, {
     day: 'numeric', month: 'short', year: 'numeric',
   })
 }
-function fmtDateShort(iso) {
-  return new Date(iso + 'T00:00:00').toLocaleDateString('es-ES', {
+function fmtDateShort(iso, locale) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString(locale, {
     day: 'numeric', month: 'short',
   })
 }
-function fmtDuration(days) {
-  if (days < 30) return `${days} días`
+function fmtDuration(days, i) {
+  if (days < 30) return `${days} ${i.days}`
   const months = Math.floor(days / 30.4)
   const rem = days - Math.round(months * 30.4)
-  if (rem < 5) return months === 1 ? '1 mes' : `${months} meses`
+  if (rem < 5) return months === 1 ? `1 ${i.month}` : `${months} ${i.months}`
   return `${months}m ${rem}d`
 }
 function todayISO() {
@@ -53,15 +54,8 @@ function todayISO() {
   return `${y}-${m}-${dd}`
 }
 
-// ── Status meta ─────────────────────────────────────────────────────────
-const STATUS_META = {
-  on_track: { label: 'En plazo',  color: '#30d158' },
-  at_risk:  { label: 'En riesgo', color: '#ff9f0a' },
-  delayed:  { label: 'Retrasado', color: '#ff453a' },
-}
-
 // ── Monthly workload builder ─────────────────────────────────────────────
-function buildMonthly(nonMilestone, planStart, planEnd) {
+function buildMonthly(nonMilestone, planStart, planEnd, locale) {
   const result = []
   const cur = new Date(planStart + 'T00:00:00')
   cur.setDate(1)
@@ -92,7 +86,7 @@ function buildMonthly(nonMilestone, planStart, planEnd) {
     }
 
     result.push({
-      label: cur.toLocaleDateString('es-ES', { month: 'short' }),
+      label: cur.toLocaleDateString(locale, { month: 'short' }),
       year:  y,
       value,
       activeCount: active.length,
@@ -104,23 +98,23 @@ function buildMonthly(nonMilestone, planStart, planEnd) {
 
 // ── Sub-components ──────────────────────────────────────────────────────
 
-function StatCard({ icon: Icon, label, value, sub, accent, t }) {
+function StatCard({ icon: Icon, label, value, sub, accent, theme }) {
   return (
     <div className="rounded-2xl p-4 flex flex-col gap-1.5"
-      style={{ backgroundColor: t.bg, border: t.border }}>
+      style={{ backgroundColor: theme.bg, border: theme.border }}>
       <div className="flex items-center gap-1.5">
-        {Icon && <Icon className="w-3.5 h-3.5" style={{ color: t.muted }} />}
-        <p className="text-xs uppercase tracking-wider" style={{ color: t.muted }}>{label}</p>
+        {Icon && <Icon className="w-3.5 h-3.5" style={{ color: theme.muted }} />}
+        <p className="text-xs uppercase tracking-wider" style={{ color: theme.muted }}>{label}</p>
       </div>
-      <p className="text-2xl font-bold leading-none" style={{ color: accent || t.text }}>
+      <p className="text-2xl font-bold leading-none" style={{ color: accent || theme.text }}>
         {value}
       </p>
-      {sub && <p className="text-xs" style={{ color: t.faint }}>{sub}</p>}
+      {sub && <p className="text-xs" style={{ color: theme.faint }}>{sub}</p>}
     </div>
   )
 }
 
-function DonutChart({ segments, size = 130, stroke = 26, label, sublabel, t }) {
+function DonutChart({ segments, size = 130, stroke = 26, label, sublabel, theme }) {
   const r     = (size - stroke) / 2
   const circ  = 2 * Math.PI * r
   let cumOffset = 0
@@ -129,7 +123,7 @@ function DonutChart({ segments, size = 130, stroke = 26, label, sublabel, t }) {
       <div style={{ position: 'relative', width: size, height: size }}>
         <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
           <circle cx={size/2} cy={size/2} r={r} fill="none"
-            stroke={t.track} strokeWidth={stroke} />
+            stroke={theme.track} strokeWidth={stroke} />
           {segments.filter(s => s.pct > 0).map((seg, i) => {
             const dash = (seg.pct / 100) * circ
             const el = (
@@ -146,26 +140,26 @@ function DonutChart({ segments, size = 130, stroke = 26, label, sublabel, t }) {
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center"
           style={{ pointerEvents: 'none' }}>
-          <span className="text-xl font-bold leading-none" style={{ color: t.text }}>{label}</span>
-          {sublabel && <span className="text-xs mt-0.5" style={{ color: t.muted }}>{sublabel}</span>}
+          <span className="text-xl font-bold leading-none" style={{ color: theme.text }}>{label}</span>
+          {sublabel && <span className="text-xs mt-0.5" style={{ color: theme.muted }}>{sublabel}</span>}
         </div>
       </div>
     </div>
   )
 }
 
-function HorizBar({ pct, color, label, valueLabel, t }) {
+function HorizBar({ pct, color, label, valueLabel, theme }) {
   const safe = Math.min(Math.max(pct, 0), 100)
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5 min-w-0">
           <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-          <span className="text-xs truncate" style={{ color: t.muted }}>{label}</span>
+          <span className="text-xs truncate" style={{ color: theme.muted }}>{label}</span>
         </div>
-        <span className="text-xs font-semibold shrink-0 ml-2 tabular" style={{ color: t.text }}>{valueLabel}</span>
+        <span className="text-xs font-semibold shrink-0 ml-2 tabular" style={{ color: theme.text }}>{valueLabel}</span>
       </div>
-      <div className="rounded-full overflow-hidden" style={{ height: 5, backgroundColor: t.track }}>
+      <div className="rounded-full overflow-hidden" style={{ height: 5, backgroundColor: theme.track }}>
         <div className="h-full rounded-full"
           style={{ width: `${safe}%`, backgroundColor: color, transition: 'width 0.5s ease' }} />
       </div>
@@ -173,13 +167,12 @@ function HorizBar({ pct, color, label, valueLabel, t }) {
   )
 }
 
-function MiniTimeline({ phases, planStart, planEnd, t }) {
+function MiniTimeline({ phases, planStart, planEnd, theme, locale, i }) {
   const totalDays = Math.max(daysBetween(planStart, planEnd) + 1, 1)
   const todayStr  = todayISO()
   const todayOff  = daysBetween(planStart, todayStr)
   const showToday = todayOff >= 0 && todayOff <= totalDays
 
-  // Month markers
   const months = []
   const cur = new Date(planStart + 'T00:00:00')
   cur.setDate(1)
@@ -192,7 +185,7 @@ function MiniTimeline({ phases, planStart, planEnd, t }) {
     if (off >= 0) {
       months.push({
         pct:   (off / totalDays) * 100,
-        label: cur.toLocaleDateString('es-ES', { month: 'short' }),
+        label: cur.toLocaleDateString(locale, { month: 'short' }),
       })
     }
     cur.setMonth(cur.getMonth() + 1)
@@ -201,23 +194,28 @@ function MiniTimeline({ phases, planStart, planEnd, t }) {
   const nonMilestone = phases.filter(p => !p.is_milestone)
   const milestones   = phases.filter(p =>  p.is_milestone)
 
+  const statusMeta = {
+    on_track: { label: i.onTrack,  color: '#30d158' },
+    at_risk:  { label: i.atRisk,   color: '#ff9f0a' },
+    delayed:  { label: i.delayed,  color: '#ff453a' },
+  }
+
   return (
     <div style={{ position: 'relative' }}>
       {/* Month header */}
       <div style={{ position: 'relative', height: 22 }}>
-        {months.map((m, i) => (
-          <span key={i} style={{
+        {months.map((m, idx) => (
+          <span key={idx} style={{
             position: 'absolute',
             left: `${m.pct}%`,
             fontSize: 10,
-            color: t.muted,
+            color: theme.muted,
             lineHeight: '22px',
             paddingLeft: 3,
             fontFamily: 'Inter, sans-serif',
             whiteSpace: 'nowrap',
           }}>{m.label}</span>
         ))}
-        {/* Today label */}
         {showToday && (
           <span style={{
             position: 'absolute',
@@ -228,25 +226,24 @@ function MiniTimeline({ phases, planStart, planEnd, t }) {
             fontFamily: 'Inter, sans-serif',
             whiteSpace: 'nowrap',
             transform: 'translateX(-50%)',
-          }}>Hoy</span>
+          }}>{i.today}</span>
         )}
       </div>
 
-      {/* Grid lines at months */}
-      <div style={{ position: 'relative', borderTop: t.borderFaint }}>
-        {months.map((m, i) => (
-          <div key={i} style={{
+      {/* Grid lines */}
+      <div style={{ position: 'relative', borderTop: theme.borderFaint }}>
+        {months.map((m, idx) => (
+          <div key={idx} style={{
             position: 'absolute',
             left:   `${m.pct}%`,
             top:    0,
             bottom: 0,
             width:  1,
-            backgroundColor: t.trackLine,
+            backgroundColor: theme.trackLine,
             pointerEvents: 'none',
           }} />
         ))}
 
-        {/* Today line */}
         {showToday && (
           <div style={{
             position: 'absolute',
@@ -258,23 +255,20 @@ function MiniTimeline({ phases, planStart, planEnd, t }) {
           }} />
         )}
 
-        {/* Phase rows */}
         {nonMilestone.map(phase => {
           const leftPct  = (Math.max(daysBetween(planStart, phase.start_date), 0) / totalDays) * 100
           const widthPct = Math.max(((daysBetween(phase.start_date, phase.end_date) + 1) / totalDays) * 100, 0.4)
           const color    = phase.color || '#bf5af2'
           const progress = phase.progress || 0
           const status   = computePhaseStatus(phase)
-          const statusColor = STATUS_META[status]?.color
+          const statusColor = statusMeta[status]?.color
 
           return (
             <div key={phase.id} style={{ position: 'relative', height: 20, marginBottom: 3 }}>
-              {/* Background track */}
               <div style={{
                 position: 'absolute', left: `${leftPct}%`, width: `${widthPct}%`,
                 height: '100%', backgroundColor: color + '22', borderRadius: 4,
               }} />
-              {/* Progress fill */}
               {progress > 0 && (
                 <div style={{
                   position: 'absolute', left: `${leftPct}%`,
@@ -282,14 +276,12 @@ function MiniTimeline({ phases, planStart, planEnd, t }) {
                   height: '100%', backgroundColor: color + 'bb', borderRadius: 4,
                 }} />
               )}
-              {/* Solid base (no progress) */}
               {progress === 0 && (
                 <div style={{
                   position: 'absolute', left: `${leftPct}%`, width: `${widthPct}%`,
                   height: '100%', backgroundColor: color + '66', borderRadius: 4,
                 }} />
               )}
-              {/* Status ring */}
               {statusColor && (
                 <div style={{
                   position: 'absolute', left: `${leftPct}%`, width: `${widthPct}%`,
@@ -297,13 +289,12 @@ function MiniTimeline({ phases, planStart, planEnd, t }) {
                   boxShadow: `inset 0 0 0 1.5px ${statusColor}`,
                 }} />
               )}
-              {/* Label */}
               <span style={{
                 position: 'absolute',
                 left: `calc(${leftPct}% + 6px)`,
                 lineHeight: '20px',
                 fontSize: 10,
-                color: t.text,
+                color: theme.text,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 maxWidth: `calc(${widthPct}% - 10px)`,
@@ -316,7 +307,6 @@ function MiniTimeline({ phases, planStart, planEnd, t }) {
           )
         })}
 
-        {/* Milestone row */}
         {milestones.length > 0 && (
           <div style={{ position: 'relative', height: 20, marginBottom: 3 }}>
             {milestones.map(m => {
@@ -342,19 +332,19 @@ function MiniTimeline({ phases, planStart, planEnd, t }) {
         {milestones.length > 0 && (
           <div className="flex items-center gap-1.5">
             <div style={{ width: 8, height: 8, backgroundColor: '#bf5af2', borderRadius: 1, transform: 'rotate(45deg)' }} />
-            <span style={{ fontSize: 10, color: t.muted }}>Hito</span>
+            <span style={{ fontSize: 10, color: theme.muted }}>{i.milestone}</span>
           </div>
         )}
-        {Object.entries(STATUS_META).map(([k, v]) => (
+        {Object.entries(statusMeta).map(([k, v]) => (
           <div key={k} className="flex items-center gap-1.5">
             <div style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: v.color + '66', boxShadow: `inset 0 0 0 1.5px ${v.color}` }} />
-            <span style={{ fontSize: 10, color: t.muted }}>{v.label}</span>
+            <span style={{ fontSize: 10, color: theme.muted }}>{v.label}</span>
           </div>
         ))}
         {showToday && (
           <div className="flex items-center gap-1.5">
             <div style={{ width: 12, height: 2, backgroundImage: 'repeating-linear-gradient(to right, #ff453a 0px, #ff453a 4px, transparent 4px, transparent 8px)' }} />
-            <span style={{ fontSize: 10, color: t.muted }}>Hoy</span>
+            <span style={{ fontSize: 10, color: theme.muted }}>{i.today}</span>
           </div>
         )}
       </div>
@@ -362,7 +352,7 @@ function MiniTimeline({ phases, planStart, planEnd, t }) {
   )
 }
 
-function WorkloadChart({ months, hasHours, t }) {
+function WorkloadChart({ months, hasHours, theme, i, locale }) {
   const maxVal = Math.max(...months.map(m => m.value), 1)
   const H = 110
   const PAD = { l: 32, r: 8, t: 8, b: 28 }
@@ -371,7 +361,7 @@ function WorkloadChart({ months, hasHours, t }) {
   const barArea = W - PAD.l - PAD.r
   const barW    = Math.max(barArea / months.length - 6, 6)
   const spacing = barArea / months.length
-  const todayLabel = new Date().toLocaleDateString('es-ES', { month: 'short' })
+  const todayLabel = new Date().toLocaleDateString(locale, { month: 'short' })
 
   const yTicks = [0, 0.5, 1].map(pct => ({
     pct,
@@ -381,42 +371,39 @@ function WorkloadChart({ months, hasHours, t }) {
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ display: 'block', overflow: 'visible' }}>
-      {/* Y ticks */}
-      {yTicks.map(({ pct, val, y }, i) => (
-        <g key={i}>
+      {yTicks.map(({ pct, val, y }, idx) => (
+        <g key={idx}>
           <line x1={PAD.l} y1={y} x2={W - PAD.r} y2={y}
-            stroke={pct === 0 ? t.muted : t.trackLine} strokeWidth={pct === 0 ? 1 : 0.5} />
+            stroke={pct === 0 ? theme.muted : theme.trackLine} strokeWidth={pct === 0 ? 1 : 0.5} />
           <text x={PAD.l - 4} y={y + 4} textAnchor="end" fontSize={8}
-            fill={t.faint} fontFamily="Inter, sans-serif">
+            fill={theme.faint} fontFamily="Inter, sans-serif">
             {val > 0 ? val : ''}
           </text>
         </g>
       ))}
 
-      {/* Bars */}
-      {months.map((m, i) => {
+      {months.map((m, idx) => {
         const barH   = Math.max((m.value / maxVal) * chartH, m.value > 0 ? 2 : 0)
-        const x      = PAD.l + i * spacing + (spacing - barW) / 2
+        const x      = PAD.l + idx * spacing + (spacing - barW) / 2
         const y      = PAD.t + chartH - barH
         const isCur  = m.label === todayLabel
         const color  = isCur ? '#bf5af2' : '#bf5af255'
 
         return (
-          <g key={i}>
+          <g key={idx}>
             <rect x={x} y={y} width={barW} height={barH} rx={3} fill={color} />
             <text x={x + barW / 2} y={H - PAD.b + 14}
               textAnchor="middle" fontSize={9}
-              fill={isCur ? t.text : t.muted} fontFamily="Inter, sans-serif">
+              fill={isCur ? theme.text : theme.muted} fontFamily="Inter, sans-serif">
               {m.label}
             </text>
           </g>
         )
       })}
 
-      {/* Unit label */}
       <text x={W - PAD.r} y={PAD.t - 2} textAnchor="end" fontSize={8}
-        fill={t.faint} fontFamily="Inter, sans-serif">
-        {hasHours ? 'horas' : 'fases activas'}
+        fill={theme.faint} fontFamily="Inter, sans-serif">
+        {hasHours ? i.hours : i.activePhases}
       </text>
     </svg>
   )
@@ -427,7 +414,6 @@ function triggerChartsExport() {
   const charts = document.querySelector('.charts-print-only')
   if (!charts) return
 
-  // Move charts to body root so we can hide everything else with a simple selector
   const placeholder = document.createElement('span')
   charts.parentNode.insertBefore(placeholder, charts)
   document.body.appendChild(charts)
@@ -453,35 +439,41 @@ function triggerChartsExport() {
   }, 1500)
 }
 
-// ── Charts panel (shared between screen + print) ─────────────────────────
-function ChartsPanel({ plan, phases, nonMilestone, milestones, t, planStart, lastEnd,
+// ── Charts panel ─────────────────────────────────────────────────────────
+function ChartsPanel({ plan, phases, nonMilestone, milestones, theme, planStart, lastEnd,
   totalDays, overallProgress, progressColor, totalHours, statusCounts, donutSegments,
   phasesWithHours, maxHours, phasesWithDuration, maxDuration, monthlyData, hasHours,
-  allTasks, doneTasks }) {
+  allTasks, doneTasks, i, locale }) {
+
+  const statusMeta = {
+    on_track: { label: i.onTrack,  color: '#30d158' },
+    at_risk:  { label: i.atRisk,   color: '#ff9f0a' },
+    delayed:  { label: i.delayed,  color: '#ff453a' },
+  }
 
   return (
     <>
       {/* ── KPI cards ──────────────────────────────────────────── */}
       <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
-        <StatCard icon={Calendar}    label="Duración"          value={fmtDuration(totalDays)}     sub={`${totalDays} días naturales`}               t={t} />
-        <StatCard icon={TrendingUp}  label="Avance global"     value={`${overallProgress}%`}       sub="Ponderado por duración"  accent={progressColor} t={t} />
-        <StatCard icon={Clock}       label="Horas planificadas" value={totalHours > 0 ? `${totalHours}h` : '—'} sub={totalHours > 0 ? `≈ ${Math.round(totalHours / 8)} jornadas` : 'Sin asignar'} t={t} />
-        <StatCard icon={Layers}      label="Fases"             value={nonMilestone.length}         sub={milestones.length > 0 ? `+ ${milestones.length} hito${milestones.length > 1 ? 's' : ''}` : 'Sin hitos'} t={t} />
+        <StatCard icon={Calendar}    label={i.duration}         value={fmtDuration(totalDays, i)}   sub={`${totalDays} ${i.calendarDays}`}                    theme={theme} />
+        <StatCard icon={TrendingUp}  label={i.overallProgress}  value={`${overallProgress}%`}        sub={i.weightedByDuration}  accent={progressColor}         theme={theme} />
+        <StatCard icon={Clock}       label={i.plannedHours}     value={totalHours > 0 ? `${totalHours}h` : '—'} sub={totalHours > 0 ? `≈ ${Math.round(totalHours / 8)} ${i.workDays}` : i.unassigned} theme={theme} />
+        <StatCard icon={Layers}      label={i.phases}           value={nonMilestone.length}          sub={milestones.length > 0 ? `+ ${milestones.length} ${milestones.length > 1 ? i.phases2 : i.phase}` : i.noMilestones} theme={theme} />
         {allTasks > 0 && (
-          <StatCard icon={CheckSquare} label="Tareas"           value={`${doneTasks}/${allTasks}`}  sub={`${Math.round((doneTasks/allTasks)*100)}% completadas`} accent={doneTasks === allTasks ? '#30d158' : undefined} t={t} />
+          <StatCard icon={CheckSquare} label={i.tasks}          value={`${doneTasks}/${allTasks}`}   sub={`${Math.round((doneTasks/allTasks)*100)}% ${i.completed}`} accent={doneTasks === allTasks ? '#30d158' : undefined} theme={theme} />
         )}
         {milestones.length > 0 && (
-          <StatCard icon={Flag}      label="Próximo hito"       value={fmtDateShort(milestones.sort((a,b)=>a.start_date.localeCompare(b.start_date)).find(m => m.start_date >= todayISO())?.start_date || milestones[0].start_date)} sub={milestones.sort((a,b)=>a.start_date.localeCompare(b.start_date)).find(m => m.start_date >= todayISO())?.name || milestones[0].name} t={t} />
+          <StatCard icon={Flag}      label={i.nextMilestone}    value={fmtDateShort(milestones.sort((a,b)=>a.start_date.localeCompare(b.start_date)).find(m => m.start_date >= todayISO())?.start_date || milestones[0].start_date, locale)} sub={milestones.sort((a,b)=>a.start_date.localeCompare(b.start_date)).find(m => m.start_date >= todayISO())?.name || milestones[0].name} theme={theme} />
         )}
       </div>
 
       {/* ── Mini timeline ──────────────────────────────────────── */}
       <div className="rounded-2xl p-4 mb-3"
-        style={{ backgroundColor: t.bg, border: t.border }}>
-        <p className="text-xs uppercase tracking-wider mb-3" style={{ color: t.muted }}>
-          Línea de tiempo
+        style={{ backgroundColor: theme.bg, border: theme.border }}>
+        <p className="text-xs uppercase tracking-wider mb-3" style={{ color: theme.muted }}>
+          {i.timeline}
         </p>
-        <MiniTimeline phases={phases} planStart={planStart} planEnd={lastEnd} t={t} />
+        <MiniTimeline phases={phases} planStart={planStart} planEnd={lastEnd} theme={theme} locale={locale} i={i} />
       </div>
 
       {/* ── Row: donut + hours + progress ──────────────────────── */}
@@ -489,24 +481,24 @@ function ChartsPanel({ plan, phases, nonMilestone, milestones, t, planStart, las
 
         {/* Status donut */}
         <div className="rounded-2xl p-4 flex flex-col gap-3"
-          style={{ backgroundColor: t.bg, border: t.border }}>
-          <p className="text-xs uppercase tracking-wider" style={{ color: t.muted }}>Estado</p>
+          style={{ backgroundColor: theme.bg, border: theme.border }}>
+          <p className="text-xs uppercase tracking-wider" style={{ color: theme.muted }}>{i.status}</p>
           <DonutChart
             segments={donutSegments}
             size={130} stroke={28}
             label={nonMilestone.length}
-            sublabel="fases"
-            t={t}
+            sublabel={i.phases2}
+            theme={theme}
           />
           <div className="flex flex-col gap-1.5">
-            {Object.entries(STATUS_META).map(([key, { label, color }]) => (
+            {Object.entries(statusMeta).map(([key, { label, color }]) => (
               <div key={key} className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="text-xs" style={{ color: t.muted }}>{label}</span>
+                  <span className="text-xs" style={{ color: theme.muted }}>{label}</span>
                 </div>
                 <span className="text-xs font-semibold tabular"
-                  style={{ color: statusCounts[key] > 0 ? color : t.faint }}>
+                  style={{ color: statusCounts[key] > 0 ? color : theme.faint }}>
                   {statusCounts[key]}
                 </span>
               </div>
@@ -516,10 +508,10 @@ function ChartsPanel({ plan, phases, nonMilestone, milestones, t, planStart, las
 
         {/* Hours by phase */}
         <div className="rounded-2xl p-4 flex flex-col gap-3"
-          style={{ backgroundColor: t.bg, border: t.border }}>
-          <p className="text-xs uppercase tracking-wider" style={{ color: t.muted }}>Horas por fase</p>
+          style={{ backgroundColor: theme.bg, border: theme.border }}>
+          <p className="text-xs uppercase tracking-wider" style={{ color: theme.muted }}>{i.hoursByPhase}</p>
           {phasesWithHours.length === 0
-            ? <p className="text-xs" style={{ color: t.faint }}>Sin horas asignadas</p>
+            ? <p className="text-xs" style={{ color: theme.faint }}>{i.noHours}</p>
             : <div className="flex flex-col gap-2.5">
                 {phasesWithHours.slice(0, 9).map(p => (
                   <HorizBar key={p.id}
@@ -527,7 +519,7 @@ function ChartsPanel({ plan, phases, nonMilestone, milestones, t, planStart, las
                     color={p.color || '#bf5af2'}
                     label={p.name}
                     valueLabel={`${p.hours}h`}
-                    t={t}
+                    theme={theme}
                   />
                 ))}
               </div>
@@ -536,14 +528,14 @@ function ChartsPanel({ plan, phases, nonMilestone, milestones, t, planStart, las
 
         {/* Progress by phase */}
         <div className="rounded-2xl p-4 flex flex-col gap-3"
-          style={{ backgroundColor: t.bg, border: t.border }}>
-          <p className="text-xs uppercase tracking-wider" style={{ color: t.muted }}>Avance por fase</p>
+          style={{ backgroundColor: theme.bg, border: theme.border }}>
+          <p className="text-xs uppercase tracking-wider" style={{ color: theme.muted }}>{i.progressByPhase}</p>
           {nonMilestone.length === 0
-            ? <p className="text-xs" style={{ color: t.faint }}>Sin fases</p>
+            ? <p className="text-xs" style={{ color: theme.faint }}>{i.noPhases}</p>
             : <div className="flex flex-col gap-2.5">
                 {nonMilestone.slice(0, 9).map(p => {
                   const status = computePhaseStatus(p)
-                  const statusColor = STATUS_META[status]?.color
+                  const statusColor = statusMeta[status]?.color
                   const barColor = status !== 'on_track' ? statusColor : (p.color || '#bf5af2')
                   return (
                     <HorizBar key={p.id}
@@ -551,7 +543,7 @@ function ChartsPanel({ plan, phases, nonMilestone, milestones, t, planStart, las
                       color={barColor}
                       label={p.name}
                       valueLabel={`${p.progress || 0}%`}
-                      t={t}
+                      theme={theme}
                     />
                   )
                 })}
@@ -565,19 +557,19 @@ function ChartsPanel({ plan, phases, nonMilestone, milestones, t, planStart, las
 
         {/* Monthly workload */}
         <div className="rounded-2xl p-4 flex flex-col gap-2"
-          style={{ backgroundColor: t.bg, border: t.border }}>
-          <p className="text-xs uppercase tracking-wider" style={{ color: t.muted }}>
-            Carga mensual {hasHours ? '(h)' : '(fases activas)'}
+          style={{ backgroundColor: theme.bg, border: theme.border }}>
+          <p className="text-xs uppercase tracking-wider" style={{ color: theme.muted }}>
+            {i.monthlyWorkload} {hasHours ? `(h)` : `(${i.activePhases})`}
           </p>
-          <WorkloadChart months={monthlyData} hasHours={hasHours} t={t} />
+          <WorkloadChart months={monthlyData} hasHours={hasHours} theme={theme} i={i} locale={locale} />
         </div>
 
         {/* Duration by phase */}
         <div className="rounded-2xl p-4 flex flex-col gap-3"
-          style={{ backgroundColor: t.bg, border: t.border }}>
-          <p className="text-xs uppercase tracking-wider" style={{ color: t.muted }}>Duración por fase</p>
+          style={{ backgroundColor: theme.bg, border: theme.border }}>
+          <p className="text-xs uppercase tracking-wider" style={{ color: theme.muted }}>{i.durationByPhase}</p>
           {phasesWithDuration.length === 0
-            ? <p className="text-xs" style={{ color: t.faint }}>Sin fases</p>
+            ? <p className="text-xs" style={{ color: theme.faint }}>{i.noPhases}</p>
             : <div className="flex flex-col gap-2.5">
                 {phasesWithDuration.slice(0, 9).map(p => (
                   <HorizBar key={p.id}
@@ -585,7 +577,7 @@ function ChartsPanel({ plan, phases, nonMilestone, milestones, t, planStart, las
                     color={p.color || '#bf5af2'}
                     label={p.name}
                     valueLabel={`${p._dur}d`}
-                    t={t}
+                    theme={theme}
                   />
                 ))}
               </div>
@@ -598,6 +590,10 @@ function ChartsPanel({ plan, phases, nonMilestone, milestones, t, planStart, las
 
 // ── Main component ───────────────────────────────────────────────────────
 export default function PlanInsights({ plan, phases, hideExport = false }) {
+  const { lang, t } = useLang()
+  const locale = lang === 'en' ? 'en-US' : 'es-ES'
+  const i = t('insights') // insights translations object shorthand
+
   if (!plan || phases.length === 0) return null
 
   const nonMilestone = phases.filter(p => !p.is_milestone)
@@ -621,10 +617,11 @@ export default function PlanInsights({ plan, phases, hideExport = false }) {
   const statusCounts = { on_track: 0, at_risk: 0, delayed: 0 }
   nonMilestone.forEach(p => { const s = computePhaseStatus(p); statusCounts[s] = (statusCounts[s] || 0) + 1 })
   const statusTotal   = nonMilestone.length || 1
-  const donutSegments = Object.entries(STATUS_META).map(([key, { color }]) => ({
-    color,
-    pct: (statusCounts[key] / statusTotal) * 100,
-  }))
+  const donutSegments = [
+    { color: '#30d158', pct: (statusCounts.on_track / statusTotal) * 100 },
+    { color: '#ff9f0a', pct: (statusCounts.at_risk  / statusTotal) * 100 },
+    { color: '#ff453a', pct: (statusCounts.delayed  / statusTotal) * 100 },
+  ]
   if (donutSegments.every(s => s.pct === 0)) donutSegments[0].pct = 100
 
   const phasesWithHours    = [...nonMilestone].filter(p => p.hours > 0).sort((a, b) => b.hours - a.hours)
@@ -636,31 +633,30 @@ export default function PlanInsights({ plan, phases, hideExport = false }) {
   const maxDuration = phasesWithDuration[0]?._dur || 1
 
   const allTasks  = nonMilestone.reduce((s, p) => s + (p.plan_tasks?.length || 0), 0)
-  const doneTasks = nonMilestone.reduce((s, p) => s + (p.plan_tasks?.filter(t => t.done).length || 0), 0)
+  const doneTasks = nonMilestone.reduce((s, p) => s + (p.plan_tasks?.filter(tk => tk.done).length || 0), 0)
 
-  const monthlyData = buildMonthly(nonMilestone, planStart, lastEnd)
+  const monthlyData = buildMonthly(nonMilestone, planStart, lastEnd, locale)
 
   const shared = {
     plan, phases, nonMilestone, milestones, planStart, lastEnd,
     totalDays, overallProgress, progressColor, totalHours,
     statusCounts, donutSegments, phasesWithHours, maxHours,
     phasesWithDuration, maxDuration, monthlyData, hasHours,
-    allTasks, doneTasks,
+    allTasks, doneTasks, i, locale,
   }
 
   return (
     <>
       {/* ── Screen version (dark) ─────────────────────────────── */}
       <div className="no-print" style={{ padding: '0 24px 48px' }}>
-        {/* Section header */}
         <div className="flex items-center gap-3 mb-5"
           style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 28 }}>
           <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#6e6e73' }}>
-            Resumen del plan
+            {i.planSummary}
           </h2>
           <div style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.04)' }} />
           <span className="text-xs" style={{ color: '#3a3a3a' }}>
-            {fmtDate(planStart)} → {fmtDate(lastEnd)}
+            {fmtDate(planStart, locale)} → {fmtDate(lastEnd, locale)}
           </span>
           {!hideExport && (
             <button
@@ -676,22 +672,21 @@ export default function PlanInsights({ plan, phases, hideExport = false }) {
               onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)' }}
             >
               <Download className="w-3.5 h-3.5" />
-              Exportar resumen
+              {i.exportSummary}
             </button>
           )}
         </div>
 
-        <ChartsPanel {...shared} t={DARK} />
+        <ChartsPanel {...shared} theme={DARK} />
       </div>
 
-      {/* ── Print version (light, charts export only) ─────────── */}
+      {/* ── Print version (light) ─────────── */}
       <div className="charts-print-only" style={{ display: 'none', padding: '16px 20px 24px', fontFamily: 'Inter, system-ui, sans-serif', backgroundColor: '#fff' }}>
-        {/* Print header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 12, borderBottom: '2px solid #e0e0e0' }}>
           <div>
-            <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: '#111' }}>{plan.name} — Resumen</h1>
+            <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: '#111' }}>{plan.name} — {i.summary}</h1>
             <p style={{ margin: '3px 0 0', fontSize: 11, color: '#888' }}>
-              {fmtDate(planStart)} → {fmtDate(lastEnd)} · {totalDays} días · {nonMilestone.length} fase{nonMilestone.length !== 1 ? 's' : ''}
+              {fmtDate(planStart, locale)} → {fmtDate(lastEnd, locale)} · {totalDays} {i.days} · {nonMilestone.length} {nonMilestone.length !== 1 ? i.phases2 : i.phase}
               {totalHours > 0 ? ` · ${totalHours}h` : ''}
             </p>
           </div>
@@ -706,7 +701,7 @@ export default function PlanInsights({ plan, phases, hideExport = false }) {
             <span style={{ fontSize: 12, fontWeight: 600, color: '#333' }}>OppsHub</span>
           </div>
         </div>
-        <ChartsPanel {...shared} t={LIGHT} />
+        <ChartsPanel {...shared} theme={LIGHT} />
       </div>
     </>
   )

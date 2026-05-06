@@ -15,6 +15,7 @@ import PlanPublicView from './pages/PlanPublicView'
 import { useTheme } from './hooks/useTheme'
 import { useDeadlineNotifications } from './hooks/useDeadlineNotifications'
 import { Loader2 } from 'lucide-react'
+import { LanguageProvider } from './contexts/LanguageContext'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -118,10 +119,12 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </AuthProvider>
+    </LanguageProvider>
   )
 }

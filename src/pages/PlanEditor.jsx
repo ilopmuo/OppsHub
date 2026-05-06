@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Loader2, PanelRightOpen, PanelRightClose } from 'lucide-react'
+import { useLang } from '../contexts/LanguageContext'
 import NavBar from '../components/NavBar'
 import GanttChart from '../components/GanttChart'
 import PlanSidebar from '../components/PlanSidebar'
@@ -23,13 +24,15 @@ export default function PlanEditor() {
     createSnapshot, deleteSnapshot,
   } = usePlan(id)
 
+  const { t } = useLang()
+  const p = t('plans')
   const [calendarPhase, setCalendarPhase] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   async function handleDeletePlan() {
     const ok = await deletePlan()
     if (ok) {
-      toast.success('Plan eliminado')
+      toast.success(p.deleted)
       navigate('/plans')
     }
   }
@@ -56,7 +59,7 @@ export default function PlanEditor() {
       <div style={{ minHeight: '100vh', backgroundColor: '#000000' }}>
         <NavBar />
         <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 56px)' }}>
-          <p style={{ color: '#6e6e73' }}>Plan no encontrado.</p>
+          <p style={{ color: '#6e6e73' }}>{p.notFound}</p>
         </div>
       </div>
     )
@@ -110,7 +113,7 @@ export default function PlanEditor() {
             onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}
           >
             <ArrowLeft className="w-4 h-4" />
-            Planes
+            {p.backToPlans}
           </button>
           <span style={{ color: '#3a3a3a' }}>/</span>
           {/* Project logo — white bg wrapper because most project icons have white background */}
@@ -140,7 +143,7 @@ export default function PlanEditor() {
             style={{ color: sidebarOpen ? '#bf5af2' : '#6e6e73', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}
             onMouseEnter={e => { if (!sidebarOpen) e.currentTarget.style.color = '#f5f5f7' }}
             onMouseLeave={e => { if (!sidebarOpen) e.currentTarget.style.color = '#6e6e73' }}
-            title={sidebarOpen ? 'Cerrar panel' : 'Abrir panel de edición'}
+            title={sidebarOpen ? p.closePanel : p.openPanel}
           >
             {sidebarOpen
               ? <PanelRightClose className="w-4 h-4" />

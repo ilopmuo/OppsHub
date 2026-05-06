@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useLang } from '../contexts/LanguageContext'
 import { LogOut, Search } from 'lucide-react'
 import SearchOverlay from './SearchOverlay'
 import NotificationsPanel from './NotificationsPanel'
@@ -19,9 +20,9 @@ function initials(email, name) {
   return email.split('@')[0].slice(0, 2).toUpperCase()
 }
 
-const NAV = [
+const NAV_ITEMS = [
   {
-    label: 'Proyectos',
+    key: 'projects',
     path: '/',
     icon: (
       <svg width="14" height="14" viewBox="0 0 44 44" fill="none">
@@ -33,7 +34,7 @@ const NAV = [
     ),
   },
   {
-    label: 'Agenda',
+    key: 'agenda',
     path: '/agenda',
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -43,7 +44,7 @@ const NAV = [
     ),
   },
   {
-    label: 'Hábitos',
+    key: 'habits',
     path: '/habits',
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -52,7 +53,7 @@ const NAV = [
     ),
   },
   {
-    label: 'Reports',
+    key: 'reports',
     path: '/reports',
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -62,7 +63,7 @@ const NAV = [
     ),
   },
   {
-    label: 'Planes',
+    key: 'plans',
     path: '/plans',
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -78,6 +79,7 @@ export default function NavBar({ breadcrumb }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, profile } = useAuth()
+  const { lang, toggleLang, t } = useLang()
   const [showSearch, setShowSearch] = useState(false)
 
   useEffect(() => {
@@ -124,7 +126,7 @@ export default function NavBar({ breadcrumb }) {
 
         {/* Nav links */}
         <nav className="flex items-center gap-1">
-          {NAV.map(({ label, path, icon }) => {
+          {NAV_ITEMS.map(({ key, path, icon }) => {
             const active = location.pathname === path ||
               (path === '/' && location.pathname.startsWith('/project')) ||
               (path === '/habits' && location.pathname.startsWith('/habits')) ||
@@ -143,7 +145,7 @@ export default function NavBar({ breadcrumb }) {
                 onMouseLeave={e => { if (!active) e.currentTarget.style.color = '#6e6e73' }}
               >
                 {icon}
-                {label}
+                {t(`nav.${key}`)}
               </button>
             )
           })}
@@ -163,12 +165,22 @@ export default function NavBar({ breadcrumb }) {
         {/* User */}
         <div className="flex items-center gap-3 shrink-0">
           <button
+            onClick={toggleLang}
+            className="flex items-center px-2.5 py-1.5 rounded-lg transition-all text-xs font-medium"
+            style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+            title={lang === 'es' ? 'Switch to English' : 'Cambiar a Español'}
+          >
+            {lang === 'es' ? 'EN' : 'ES'}
+          </button>
+          <button
             onClick={() => setShowSearch(true)}
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-all"
             style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)' }}
             onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
-            title="Buscar (⌘K)"
+            title={`${t('nav.search')} (⌘K)`}
           >
             <Search className="w-3.5 h-3.5" />
             <kbd className="text-xs hidden sm:block" style={{ color: '#3a3a3a' }}>⌘K</kbd>
@@ -177,7 +189,7 @@ export default function NavBar({ breadcrumb }) {
           <button
             onClick={() => navigate('/profile')}
             className="flex items-center gap-2 rounded-full transition-all"
-            title="Mi perfil"
+            title={t('nav.profile')}
           >
             <div
               className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold shrink-0"
@@ -198,7 +210,7 @@ export default function NavBar({ breadcrumb }) {
             style={{ color: '#6e6e73' }}
             onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
             onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}
-            title="Cerrar sesión"
+            title={t('nav.logout')}
           >
             <LogOut className="w-4 h-4" />
           </button>

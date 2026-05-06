@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import PlanPhaseRow from './PlanPhaseRow'
 import { daysBetween } from '../hooks/usePlan'
+import { useLang } from '../contexts/LanguageContext'
 
 const LABEL_W_MIN     = 120
 const LABEL_W_DEFAULT = 200
@@ -17,7 +18,7 @@ function clampDayPx(v) {
   return Math.max(DAY_PX_MIN, Math.min(DAY_PX_MAX, v))
 }
 
-function buildMonthHeaders(planStart, totalDays, dayPx) {
+function buildMonthHeaders(planStart, totalDays, dayPx, locale) {
   const headers = []
   let cursor = new Date(planStart + 'T00:00:00')
   let dayOffset = 0
@@ -31,7 +32,7 @@ function buildMonthHeaders(planStart, totalDays, dayPx) {
     const clampedDays = Math.min(daysInSlice, totalDays + 7 - dayOffset)
 
     headers.push({
-      label: cursor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
+      label: cursor.toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
       left: dayOffset * dayPx,
       width: clampedDays * dayPx,
     })
@@ -80,6 +81,8 @@ export default function GanttChart({
   forceDayPx = null,
   forceLabelW = null,
 }) {
+  const { lang } = useLang()
+  const locale = lang === 'en' ? 'en-US' : 'es-ES'
   const [dayPxState, setDayPxState] = useState(18)
   const [labelW,     setLabelW]     = useState(LABEL_W_DEFAULT)
   const hasAutoFitted = useRef(false)
@@ -175,7 +178,7 @@ export default function GanttChart({
   const todayOffset = daysBetween(planStart, todayStr)
   const todayLeft  = todayOffset * dayPx
 
-  const monthHeaders = buildMonthHeaders(planStart, totalDays, dayPx)
+  const monthHeaders = buildMonthHeaders(planStart, totalDays, dayPx, locale)
   const weekMarkers  = buildWeekMarkers(planStart, totalDays, dayPx)
 
   const totalHours = phases.reduce((s, p) => s + Number(p.hours || 0), 0)
