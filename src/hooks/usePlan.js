@@ -111,6 +111,31 @@ export function today() {
   return localDateStr(new Date())
 }
 
+// ── Per-month coordinate helpers ──────────────────────────────
+// monthHeaders is the array produced by buildMonthHeaders in GanttChart.
+// Each entry has: { left, width, dayPx, days, startDate, monthKey }
+
+export function mhDateToPixel(dateStr, monthHeaders) {
+  for (let i = 0; i < monthHeaders.length - 1; i++) {
+    if (dateStr < monthHeaders[i + 1].startDate) {
+      return monthHeaders[i].left + daysBetween(monthHeaders[i].startDate, dateStr) * monthHeaders[i].dayPx
+    }
+  }
+  const last = monthHeaders[monthHeaders.length - 1]
+  return last.left + daysBetween(last.startDate, dateStr) * last.dayPx
+}
+
+export function mhPixelToDate(px, monthHeaders) {
+  for (let i = 0; i < monthHeaders.length; i++) {
+    const mh = monthHeaders[i]
+    if (px < mh.left + mh.width || i === monthHeaders.length - 1) {
+      const days = Math.round(Math.max(0, px - mh.left) / mh.dayPx)
+      return addDays(mh.startDate, days)
+    }
+  }
+  return monthHeaders[0]?.startDate ?? ''
+}
+
 // Adds n working days (Mon–Fri, skipping Madrid holidays) to a date.
 export function addWorkingDays(dateStr, n) {
   if (n <= 0) return dateStr

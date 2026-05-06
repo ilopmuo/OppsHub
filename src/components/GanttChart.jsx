@@ -1,7 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { ZoomIn, ZoomOut, Plus, Trash2 } from 'lucide-react'
 import PlanPhaseRow from './PlanPhaseRow'
-import { daysBetween } from '../hooks/usePlan'
+import { daysBetween, mhDateToPixel, mhPixelToDate } from '../hooks/usePlan'
+
+function localDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
 import { useLang } from '../contexts/LanguageContext'
 
 // ── Legend panel ──────────────────────────────────────────────
@@ -144,26 +148,32 @@ function clampDayPx(v) {
   return Math.max(DAY_PX_MIN, Math.min(DAY_PX_MAX, v))
 }
 
-function buildMonthHeaders(planStart, totalDays, dayPx, locale) {
+function buildMonthHeaders(planStart, totalDays, baseDayPx, monthScales, locale) {
   const headers = []
   let cursor = new Date(planStart + 'T00:00:00')
+  let pixelLeft = 0
   let dayOffset = 0
 
-  while (dayOffset < totalDays + 7) {
+  while (dayOffset < totalDays + 14) {
     const year  = cursor.getFullYear()
     const month = cursor.getMonth()
-    // Count days until next month
     const nextMonth = new Date(year, month + 1, 1)
     const daysInSlice = Math.round((nextMonth - cursor) / 86400000)
-    const clampedDays = Math.min(daysInSlice, totalDays + 7 - dayOffset)
+    const clampedDays = Math.min(daysInSlice, totalDays + 14 - dayOffset)
+    const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
+    const mDayPx = clampDayPx(baseDayPx * (monthScales[monthKey] ?? 1))
 
     headers.push({
-      label: cursor.toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
-      left: dayOffset * dayPx,
-      width: clampedDays * dayPx,
-      days: clampedDays,
+      label:     cursor.toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
+      left:      pixelLeft,
+      width:     clampedDays * mDayPx,
+      days:      clampedDays,
+      dayPx:     mDayPx,
+      monthKey,
+      startDate: localDateStr(cursor),
     })
 
+    pixelLeft += daysInSlice * mDayPx
     dayOffset += daysInSlice
     cursor = nextMonth
   }
@@ -205,6 +215,8 @@ export default function GanttChart({
   onReorderPhases,
   onUpdatePlan,
   onDayPxChange,
+  onMonthScalesChange,
+  forcedMonthScales = null,
   compact = false,
   printMode = false,
   forceDayPx = null,
@@ -213,6 +225,7 @@ export default function GanttChart({
   const { lang } = useLang()
   const locale = lang === 'en' ? 'en-US' : 'es-ES'
   const [dayPxState, setDayPxState] = useState(18)
+  const [monthScalesState, setMonthScalesState] = useState({})
   const [labelW,     setLabelW]     = useState(LABEL_W_DEFAULT)
   const hasAutoFitted = useRef(false)
 
@@ -220,7 +233,13 @@ export default function GanttChart({
   const dayPx       = forceDayPx  ?? dayPxState
   const effectiveLW = forceLabelW ?? labelW
 
-  function setZoom(v) { const next = clampDayPx(Math.round(v)); setDayPxState(next); onDayPxChange?.(next) }
+  const monthScales = forcedMonthScales ?? monthScalesState
+
+  function setZoom(v) {
+    const next = clampDayPx(Math.round(v))
+    setDayPxState(next)
+    onDayPxChange?.(next)
+  }
   function zoomIn()  { setZoom(dayPxState * 1.4) }
   function zoomOut() { setZoom(dayPxState / 1.4) }
 
@@ -228,8 +247,13 @@ export default function GanttChart({
     e.preventDefault()
     const startX = e.clientX
     function onMouseMove(me) {
-      const newWidth = mh.width + (me.clientX - startX)
-      setZoom(newWidth / mh.days)
+      const newWidth = Math.max(mh.days * 1, mh.width + (me.clientX - startX))
+      const newScale = Math.max(0.1, (newWidth / mh.days) / dayPx)
+      setMonthScalesState(s => {
+        const next = { ...s, [mh.monthKey]: newScale }
+        onMonthScalesChange?.(next)
+        return next
+      })
     }
     function onMouseUp() {
       window.removeEventListener('mousemove', onMouseMove)
@@ -318,18 +342,19 @@ export default function GanttChart({
   }
 
   // Calculate timeline range
-  const planStart  = plan.start_date
-  const lastEnd    = phases.reduce((acc, p) => p.end_date > acc ? p.end_date : acc, planStart)
-  const totalDays  = Math.max(daysBetween(planStart, lastEnd) + 1, 14)
-  const canvasW    = (totalDays + 14) * dayPx // extra 14 days padding right
+  const planStart   = plan.start_date
+  const lastEnd     = phases.reduce((acc, p) => p.end_date > acc ? p.end_date : acc, planStart)
+  const totalDays   = Math.max(daysBetween(planStart, lastEnd) + 1, 14)
+
+  const monthHeaders = buildMonthHeaders(planStart, totalDays, dayPx, monthScales, locale)
+  const lastMH       = monthHeaders[monthHeaders.length - 1]
+  const canvasW      = lastMH ? lastMH.left + lastMH.width : totalDays * dayPx
 
   // Today marker
-  const todayStr   = new Date().toISOString().slice(0, 10)
-  const todayOffset = daysBetween(planStart, todayStr)
-  const todayLeft  = todayOffset * dayPx
+  const todayStr  = localDateStr(new Date())
+  const todayLeft = mhDateToPixel(todayStr, monthHeaders)
 
-  const monthHeaders = buildMonthHeaders(planStart, totalDays, dayPx, locale)
-  const weekMarkers  = buildWeekMarkers(planStart, totalDays, dayPx)
+  const weekMarkers = buildWeekMarkers(planStart, totalDays, dayPx)
 
   const totalHours = phases.reduce((s, p) => s + Number(p.hours || 0), 0)
 
@@ -545,9 +570,7 @@ export default function GanttChart({
               >
                 <PlanPhaseRow
                   phase={phase}
-                  planStartDate={planStart}
-                  totalDays={totalDays}
-                  dayPx={dayPx}
+                  monthHeaders={monthHeaders}
                   labelW={effectiveLW}
                   baselinePhase={baselineMap[phase.id] ?? null}
                   isEditable={isEditable}

@@ -1,15 +1,13 @@
 import { useState, useRef, useLayoutEffect } from 'react'
 import { ChevronDown, ChevronRight, ChevronUp, Flag } from 'lucide-react'
 import PlanPhaseTaskList from './PlanPhaseTaskList'
-import { daysBetween, addDays, computePhaseStatus } from '../hooks/usePlan'
+import { daysBetween, addDays, computePhaseStatus, mhDateToPixel, mhPixelToDate } from '../hooks/usePlan'
 
 const STATUS_COLORS = { at_risk: '#ff9f0a', delayed: '#ff453a', on_track: null }
 
 export default function PlanPhaseRow({
   phase,
-  planStartDate,
-  totalDays,
-  dayPx,
+  monthHeaders,
   labelW,
   baselinePhase,
   isEditable,
@@ -40,17 +38,19 @@ export default function PlanPhaseRow({
   })
 
   const LABEL_W = labelW ?? 200
+  const mh = monthHeaders ?? []
 
-  const offset = daysBetween(planStartDate, phase.start_date)
   const width  = daysBetween(phase.start_date, phase.end_date) + 1
-  const left   = offset * dayPx
-  const barW   = Math.max(width * dayPx, dayPx)
+  const left   = mhDateToPixel(phase.start_date, mh)
+  const endPx  = mhDateToPixel(addDays(phase.end_date, 1), mh)
+  const barW   = Math.max(endPx - left, mh[0]?.dayPx ?? 4)
 
   // ── Drag (move) ───────────────────────────────────────────
   function handleDragStart(e) {
     if (!isEditable) return
     e.preventDefault()
-    const startX = e.clientX
+    const startX    = e.clientX
+    const startLeft = left
     let moved = false
 
     function onMouseMove(me) {
@@ -60,7 +60,8 @@ export default function PlanPhaseRow({
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
       if (!moved) { onOpenCalendar?.(phase); return }
-      const delta = Math.round((me.clientX - startX) / dayPx)
+      const newDate = mhPixelToDate(Math.max(0, startLeft + (me.clientX - startX)), mh)
+      const delta = daysBetween(phase.start_date, newDate)
       if (delta !== 0) onMove(phase.id, delta)
     }
     window.addEventListener('mousemove', onMouseMove)
@@ -72,17 +73,18 @@ export default function PlanPhaseRow({
     if (!isEditable) return
     e.preventDefault()
     e.stopPropagation()
-    const startX = e.clientX
+    const startX   = e.clientX
+    const startEnd = endPx
 
     function onMouseMove() {}
     function onMouseUp(me) {
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
-      const deltaDays = Math.round((me.clientX - startX) / dayPx)
-      if (deltaDays !== 0) {
-        const newEnd = addDays(phase.end_date, deltaDays)
-        if (newEnd >= phase.start_date) onResize(phase.id, newEnd)
-      }
+      const newEndPx  = startEnd + (me.clientX - startX)
+      const newEndDate = mhPixelToDate(newEndPx, mh)
+      // endPx is start of next day; subtract 1 day to get actual end date
+      const newEnd = addDays(newEndDate, -1)
+      if (newEnd >= phase.start_date) onResize(phase.id, newEnd)
     }
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('mouseup', onMouseUp)
@@ -103,10 +105,10 @@ export default function PlanPhaseRow({
   const endDev       = baselinePhase ? daysBetween(baselinePhase.end_date,   phase.end_date)   : 0
   const hasDeviation = !phase.is_milestone && baselinePhase && (startDev !== 0 || endDev !== 0)
 
-  const baselineOffset = baselinePhase ? daysBetween(planStartDate, baselinePhase.start_date) : 0
-  const baselineWidth  = baselinePhase ? daysBetween(baselinePhase.start_date, baselinePhase.end_date) + 1 : 0
-  const baselineLeft   = baselineOffset * dayPx
-  const baselineBarW   = Math.max(baselineWidth * dayPx, dayPx)
+  const baselineLeft = baselinePhase ? mhDateToPixel(baselinePhase.start_date, mh) : 0
+  const baselineBarW = baselinePhase
+    ? Math.max(mhDateToPixel(addDays(baselinePhase.end_date, 1), mh) - baselineLeft, mh[0]?.dayPx ?? 4)
+    : 0
 
   const color = phase.color || '#bf5af2'
 
@@ -254,7 +256,7 @@ export default function PlanPhaseRow({
             <div
               className="absolute"
               style={{
-                left:      left + dayPx / 2 - 10,
+                left:      left + (mh[0]?.dayPx ?? 4) / 2 - 10,
                 top:       '50%',
                 width:     20,
                 height:    20,

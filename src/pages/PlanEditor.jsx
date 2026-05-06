@@ -28,7 +28,8 @@ export default function PlanEditor() {
   const p = t('plans')
   const [calendarPhase, setCalendarPhase] = useState(null)
   const [sidebarOpen,   setSidebarOpen]   = useState(false)
-  const [ganttDayPx,    setGanttDayPx]    = useState(null)
+  const [ganttDayPx,      setGanttDayPx]      = useState(null)
+  const [ganttMonthScales, setGanttMonthScales] = useState({})
 
   async function handleDeletePlan() {
     const ok = await deletePlan()
@@ -172,6 +173,7 @@ export default function PlanEditor() {
                 onUpdatePhase={updatePhase}
                 onUpdatePlan={updatePlan}
                 onDayPxChange={setGanttDayPx}
+                onMonthScalesChange={setGanttMonthScales}
                 onOpenCalendar={setCalendarPhase}
                 onAddTask={addTask}
                 onUpdateTask={updateTask}
@@ -279,6 +281,7 @@ export default function PlanEditor() {
             printMode={true}
             forceDayPx={printDayPx}
             forceLabelW={PRINT_LABEL_W}
+            forcedMonthScales={ganttMonthScales}
           />
         </div>
       </div>
