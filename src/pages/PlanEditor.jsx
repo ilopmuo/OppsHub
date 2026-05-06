@@ -76,13 +76,14 @@ export default function PlanEditor() {
 
   const printLastEnd    = phases.reduce((acc, p) => p.end_date > acc ? p.end_date : acc, plan.start_date)
   const printTotalDays  = Math.max(daysBetween(plan.start_date, printLastEnd) + 1, 14)
-  const printDayPx      = Math.max(2, Math.floor((PRINT_PAGE_W - PRINT_LABEL_W) / printTotalDays))
   const printTotalHours = phases.reduce((s, p) => s + Number(p.hours || 0), 0)
 
-  // How tall the Gantt rows will be (headers + one 44px row per phase)
-  const printGanttH = 32 + (printDayPx >= 24 ? 20 : 0) + phases.length * 44
-  // Scale factor so total content fits in PRINT_PAGE_H (never scale up, only down)
+  // Calculate zoom first (assumes week sub-header hidden, i.e. dayPx < 24)
+  const printGanttH = 32 + phases.length * 44
   const printZoom   = Math.min(1, PRINT_PAGE_H / (PRINT_HEADER_H + printGanttH))
+  // Compensate zoom so bars fill the full page width after scaling:
+  // (PRINT_LABEL_W + totalDays * dayPx) * zoom ≈ PRINT_PAGE_W
+  const printDayPx  = Math.max(2, Math.floor((PRINT_PAGE_W / printZoom - PRINT_LABEL_W) / printTotalDays))
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#000000' }}>
