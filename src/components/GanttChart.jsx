@@ -501,16 +501,7 @@ export default function GanttChart({
               </div>
             )}
 
-            {/* Column grid lines — weeks */}
-            {weekMarkers.map((wm, i) => (
-              <div
-                key={i}
-                className="absolute top-0 bottom-0 pointer-events-none"
-                style={{ left: effectiveLW + wm.left, width: 1, backgroundColor: t.gridLine }}
-              />
-            ))}
-
-            {/* Column grid lines — months (more prominent) */}
+            {/* Column grid lines — months only */}
             {monthHeaders.map((mh, i) => (
               <div
                 key={i}

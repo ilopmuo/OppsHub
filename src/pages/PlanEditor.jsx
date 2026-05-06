@@ -76,8 +76,7 @@ export default function PlanEditor() {
 
   const printLastEnd    = phases.reduce((acc, p) => p.end_date > acc ? p.end_date : acc, plan.start_date)
   const printTotalDays  = Math.max(daysBetween(plan.start_date, printLastEnd) + 1, 14)
-  // Divide by totalDays+14 to match canvasW=(totalDays+14)*dayPx, filling the full page width
-  const printDayPx      = Math.max(2, Math.floor((PRINT_PAGE_W - PRINT_LABEL_W) / (printTotalDays + 14)))
+  const printDayPx      = Math.max(2, Math.floor((PRINT_PAGE_W - PRINT_LABEL_W) / printTotalDays))
   const printTotalHours = phases.reduce((s, p) => s + Number(p.hours || 0), 0)
 
   // How tall the Gantt rows will be (headers + one 44px row per phase)
