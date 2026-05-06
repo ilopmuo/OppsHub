@@ -432,15 +432,12 @@ export default function GanttChart({
             </div>
             {/* Month cells */}
             <div className="relative flex-1">
+              {/* Labels */}
               {monthHeaders.map((mh, i) => (
                 <div
                   key={i}
                   className="absolute top-0 bottom-0 flex items-center"
-                  style={{
-                    left: mh.left, width: mh.width,
-                    borderRight: t.monthBorder,
-                    paddingLeft: 8, overflow: 'hidden',
-                  }}
+                  style={{ left: mh.left, width: mh.width, paddingLeft: 8, overflow: 'hidden' }}
                 >
                   <span
                     className="text-xs font-medium capitalize"
@@ -449,6 +446,14 @@ export default function GanttChart({
                     {mh.label}
                   </span>
                 </div>
+              ))}
+              {/* Separators — exactly same left as row grid lines */}
+              {monthHeaders.map((mh, i) => (
+                <div
+                  key={`sep-${i}`}
+                  className="absolute top-0 bottom-0 pointer-events-none"
+                  style={{ left: mh.left + mh.width, width: 2, backgroundColor: t.monthLine }}
+                />
               ))}
             </div>
           </div>
