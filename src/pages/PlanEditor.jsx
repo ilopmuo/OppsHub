@@ -210,6 +210,7 @@ export default function PlanEditor() {
                 plan={plan}
                 phases={phases}
                 isEditable={true}
+                onUpdatePlan={updatePlan}
                 onUpdatePhase={updatePhase}
               />
             )}
