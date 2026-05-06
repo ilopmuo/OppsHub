@@ -27,7 +27,8 @@ export default function PlanEditor() {
   const { t } = useLang()
   const p = t('plans')
   const [calendarPhase, setCalendarPhase] = useState(null)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarOpen,   setSidebarOpen]   = useState(false)
+  const [ganttDayPx,    setGanttDayPx]    = useState(null)
 
   async function handleDeletePlan() {
     const ok = await deletePlan()
@@ -78,11 +79,13 @@ export default function PlanEditor() {
   const printTotalDays  = Math.max(daysBetween(plan.start_date, printLastEnd) + 1, 14)
   const printTotalHours = phases.reduce((s, p) => s + Number(p.hours || 0), 0)
 
-  // Calculate zoom first (assumes week sub-header hidden, i.e. dayPx < 24)
-  const printGanttH = 32 + phases.length * 44
-  const printZoom   = Math.min(1, PRINT_PAGE_H / (PRINT_HEADER_H + printGanttH))
-  // Compensate zoom so bars fill the page width, leaving ~140px for the legend
-  const printDayPx  = Math.max(2, Math.floor((PRINT_PAGE_W / printZoom - PRINT_LABEL_W - 140) / printTotalDays))
+  const printGanttH  = 32 + phases.length * 44
+  const printZoom    = Math.min(1, PRINT_PAGE_H / (PRINT_HEADER_H + printGanttH))
+  const autoFitDayPx = Math.max(2, Math.floor((PRINT_PAGE_W / printZoom - PRINT_LABEL_W - 140) / printTotalDays))
+  // Use user-adjusted zoom (scaled by printZoom) capped to what fits the page
+  const printDayPx   = ganttDayPx
+    ? Math.min(autoFitDayPx, Math.max(2, Math.round(ganttDayPx / printZoom)))
+    : autoFitDayPx
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#000000' }}>
@@ -168,6 +171,7 @@ export default function PlanEditor() {
                 onResize={resizePhase}
                 onUpdatePhase={updatePhase}
                 onUpdatePlan={updatePlan}
+                onDayPxChange={setGanttDayPx}
                 onOpenCalendar={setCalendarPhase}
                 onAddTask={addTask}
                 onUpdateTask={updateTask}

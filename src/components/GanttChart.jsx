@@ -161,6 +161,7 @@ function buildMonthHeaders(planStart, totalDays, dayPx, locale) {
       label: cursor.toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
       left: dayOffset * dayPx,
       width: clampedDays * dayPx,
+      days: clampedDays,
     })
 
     dayOffset += daysInSlice
@@ -203,6 +204,7 @@ export default function GanttChart({
   onDeleteTask,
   onReorderPhases,
   onUpdatePlan,
+  onDayPxChange,
   compact = false,
   printMode = false,
   forceDayPx = null,
@@ -218,8 +220,25 @@ export default function GanttChart({
   const dayPx       = forceDayPx  ?? dayPxState
   const effectiveLW = forceLabelW ?? labelW
 
-  function zoomIn()  { setDayPxState(v => clampDayPx(Math.round(v * 1.4))) }
-  function zoomOut() { setDayPxState(v => clampDayPx(Math.round(v / 1.4))) }
+  function setZoom(v) { const next = clampDayPx(Math.round(v)); setDayPxState(next); onDayPxChange?.(next) }
+  function zoomIn()  { setZoom(dayPxState * 1.4) }
+  function zoomOut() { setZoom(dayPxState / 1.4) }
+
+  function handleMonthResizeStart(e, mh) {
+    e.preventDefault()
+    const startX = e.clientX
+    function onMouseMove(me) {
+      const newWidth = mh.width + (me.clientX - startX)
+      setZoom(newWidth / mh.days)
+    }
+    function onMouseUp() {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }
+
   const [resizing, setResizing] = useState(false)
   const scrollRef = useRef(null)
 
@@ -447,13 +466,21 @@ export default function GanttChart({
                   </span>
                 </div>
               ))}
-              {/* Separators — exactly same left as row grid lines */}
+              {/* Separators — draggable to resize zoom */}
               {monthHeaders.map((mh, i) => (
                 <div
                   key={`sep-${i}`}
-                  className="absolute top-0 bottom-0 pointer-events-none"
-                  style={{ left: mh.left + mh.width, width: 2, backgroundColor: t.monthLine }}
-                />
+                  className="absolute top-0 bottom-0"
+                  style={{
+                    left: mh.left + mh.width - 3,
+                    width: 8,
+                    cursor: printMode ? 'default' : 'col-resize',
+                    zIndex: 6,
+                  }}
+                  onMouseDown={printMode ? undefined : e => handleMonthResizeStart(e, mh)}
+                >
+                  <div className="absolute top-0 bottom-0" style={{ left: 3, width: 2, backgroundColor: t.monthLine, pointerEvents: 'none' }} />
+                </div>
               ))}
             </div>
           </div>
