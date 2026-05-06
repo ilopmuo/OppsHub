@@ -28,7 +28,7 @@ export function getItems(phase) {
   return []
 }
 
-function BulletList({ items, isEditable, onChange, color }) {
+function BulletList({ items, isEditable, onChange, color, s }) {
   const [editIdx, setEditIdx] = useState(null)
   const inputRef = useRef(null)
 
@@ -87,7 +87,7 @@ function BulletList({ items, isEditable, onChange, color }) {
                 fontStyle: item ? 'normal' : 'italic',
               }}
             >
-              {item || 'Sin texto'}
+              {item || s.noText}
             </span>
           )}
           {isEditable && (
@@ -112,7 +112,7 @@ function BulletList({ items, isEditable, onChange, color }) {
           onMouseLeave={e => e.currentTarget.style.color = '#3a3a3a'}
         >
           <Plus style={{ width: 11, height: 11 }} />
-          Añadir
+          {s.add}
         </button>
       )}
       {!isEditable && items.length === 0 && (
@@ -124,7 +124,8 @@ function BulletList({ items, isEditable, onChange, color }) {
 
 // ── Named export: pure print markup, no hooks ────────────────
 export function ScopePrintArea({ plan, phases }) {
-  const { lang } = useLang()
+  const { lang, t } = useLang()
+  const s = t('scope')
   const locale = lang === 'en' ? 'en-US' : 'es-ES'
   const statusMeta = lang === 'en' ? STATUS_META_EN : STATUS_META
   const visiblePhases = (phases || []).filter(p => !p.is_milestone)
@@ -139,7 +140,7 @@ export function ScopePrintArea({ plan, phases }) {
           )}
           <div>
             <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{plan?.name}</h1>
-            <p style={{ margin: '3px 0 0', fontSize: 12, color: '#666' }}>Documento de alcance</p>
+            <p style={{ margin: '3px 0 0', fontSize: 12, color: '#666' }}>{s.printSubtitle}</p>
             {plan?.client_name && <p style={{ margin: '2px 0 0', fontSize: 11, color: '#999' }}>{plan.client_name}</p>}
           </div>
         </div>
@@ -211,7 +212,8 @@ export function ScopePrintArea({ plan, phases }) {
 
 // ── Default export: interactive screen view ──────────────────
 export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
-  const { lang } = useLang()
+  const { lang, t } = useLang()
+  const s = t('scope')
   const locale = lang === 'en' ? 'en-US' : 'es-ES'
   const statusMeta = lang === 'en' ? STATUS_META_EN : STATUS_META
 
@@ -219,7 +221,7 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
   const totalItems = visiblePhases.reduce((s, p) => s + getItems(p).length, 0)
 
   function handlePrint() {
-    if (plan) document.title = `${plan.name} — Alcance`
+    if (plan) document.title = `${plan.name} — ${s.tabLabel}`
     window.print()
     setTimeout(() => { document.title = 'OppsHub' }, 1000)
   }
@@ -228,9 +230,9 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
     <div style={{ padding: '24px 24px 48px' }}>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-base font-semibold" style={{ color: '#f5f5f7' }}>Alcance del proyecto</h2>
+          <h2 className="text-base font-semibold" style={{ color: '#f5f5f7' }}>{s.title}</h2>
           <p className="text-xs mt-0.5" style={{ color: '#6e6e73' }}>
-            {totalItems} entregables · {visiblePhases.length} fases
+            {totalItems} {s.deliverables} · {visiblePhases.length} {s.phases}
           </p>
         </div>
         <button
@@ -241,7 +243,7 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
           onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#6e6e73' }}
         >
           <FileDown style={{ width: 13, height: 13 }} />
-          Exportar PDF
+          {s.exportPdf}
         </button>
       </div>
 
@@ -250,7 +252,7 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
           className="flex items-center justify-center rounded-2xl"
           style={{ height: 160, border: '1px solid rgba(255,255,255,0.06)', color: '#3a3a3a', fontSize: 13 }}
         >
-          Añade fases al plan para definir el alcance
+          {s.empty}
         </div>
       )}
 
@@ -304,6 +306,7 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
                   isEditable={isEditable}
                   onChange={next => onUpdatePhase(phase.id, { scope_items: next })}
                   color={color}
+                  s={s}
                 />
               </div>
             </div>

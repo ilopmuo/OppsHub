@@ -120,7 +120,7 @@ export default function PlanPublicView() {
           <div className="flex items-center gap-3">
             {/* Tabs */}
             <div className="flex items-center gap-0.5 p-0.5 rounded-xl" style={{ backgroundColor: '#1a1a1a' }}>
-              {[{ id: 'gantt', label: 'Gantt' }, { id: 'scope', label: 'Alcance' }].map(tab => (
+              {[{ id: 'gantt', label: 'Gantt' }, { id: 'scope', label: t('scope.tabLabel') }].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
