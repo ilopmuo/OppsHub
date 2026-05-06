@@ -395,19 +395,30 @@ export default function GanttChart({
                 const x2 = effectiveLW + daysBetween(planStart, phase.start_date) * dayPx
                 const y2 = phaseIdx * ROW + ROW / 2
                 const c  = (dep.color || '#bf5af2') + '70'
-                const dx = Math.abs(x2 - x1)
-                const cpOff = Math.max(dx * 0.45, 40)
+                const dx = x2 - x1
                 const ah = 7
+
+                // When there's enough horizontal space: S-curve
+                // When bars are close/overlapping: L-shaped dogleg routing around
+                const THRESHOLD = 60
+                let pathD, arrowPoints
+                if (dx > THRESHOLD) {
+                  const cpOff = dx * 0.45
+                  pathD = `M ${x1} ${y1} C ${x1 + cpOff} ${y1}, ${x2 - cpOff} ${y2}, ${x2} ${y2}`
+                  arrowPoints = `${x2},${y2} ${x2 - ah * 1.5},${y2 - ah / 2} ${x2 - ah * 1.5},${y2 + ah / 2}`
+                } else {
+                  const ex = Math.max(x1 + 22, x2 + 22)
+                  pathD = `M ${x1} ${y1} L ${ex} ${y1} L ${ex} ${y2} L ${x2} ${y2}`
+                  arrowPoints = `${x2},${y2} ${x2 + ah * 1.5},${y2 - ah / 2} ${x2 + ah * 1.5},${y2 + ah / 2}`
+                }
+
                 return (
                   <g key={`dep-${phase.id}`}>
                     <path
-                      d={`M ${x1} ${y1} C ${x1 + cpOff} ${y1}, ${x2 - cpOff} ${y2}, ${x2} ${y2}`}
-                      fill="none" stroke={c} strokeWidth={1.5}
+                      d={pathD}
+                      fill="none" stroke={c} strokeWidth={1.5} strokeLinejoin="round"
                     />
-                    <polygon
-                      points={`${x2},${y2} ${x2 - ah * 1.5},${y2 - ah / 2} ${x2 - ah * 1.5},${y2 + ah / 2}`}
-                      fill={c}
-                    />
+                    <polygon points={arrowPoints} fill={c} />
                   </g>
                 )
               })}
