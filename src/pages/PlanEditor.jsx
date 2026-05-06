@@ -81,9 +81,8 @@ export default function PlanEditor() {
   // Calculate zoom first (assumes week sub-header hidden, i.e. dayPx < 24)
   const printGanttH = 32 + phases.length * 44
   const printZoom   = Math.min(1, PRINT_PAGE_H / (PRINT_HEADER_H + printGanttH))
-  // Compensate zoom so bars fill the full page width after scaling:
-  // (PRINT_LABEL_W + totalDays * dayPx) * zoom ≈ PRINT_PAGE_W
-  const printDayPx  = Math.max(2, Math.floor((PRINT_PAGE_W / printZoom - PRINT_LABEL_W) / printTotalDays))
+  // Compensate zoom so bars fill the page width, leaving ~140px for the legend
+  const printDayPx  = Math.max(2, Math.floor((PRINT_PAGE_W / printZoom - PRINT_LABEL_W - 140) / printTotalDays))
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#000000' }}>
