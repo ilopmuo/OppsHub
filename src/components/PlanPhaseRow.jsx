@@ -325,7 +325,7 @@ export default function PlanPhaseRow({
               <span
                 className="absolute pointer-events-none"
                 style={{
-                  left: left + barW + 6,
+                  left: left + barW + 18,
                   top: '50%',
                   transform: 'translateY(-50%)',
                   fontSize: 10,
