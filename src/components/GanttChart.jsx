@@ -2,11 +2,11 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { ZoomIn, ZoomOut, Plus, Trash2 } from 'lucide-react'
 import PlanPhaseRow from './PlanPhaseRow'
 import { daysBetween, mhDateToPixel, mhPixelToDate } from '../hooks/usePlan'
+import { useLang } from '../contexts/LanguageContext'
 
 function localDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
-import { useLang } from '../contexts/LanguageContext'
 
 // ── Legend panel ──────────────────────────────────────────────
 function LegendPanel({ items = [], isEditable, onUpdate, printMode }) {

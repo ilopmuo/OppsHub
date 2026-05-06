@@ -116,6 +116,7 @@ export function today() {
 // Each entry has: { left, width, dayPx, days, startDate, monthKey }
 
 export function mhDateToPixel(dateStr, monthHeaders) {
+  if (!monthHeaders || monthHeaders.length === 0) return 0
   for (let i = 0; i < monthHeaders.length - 1; i++) {
     if (dateStr < monthHeaders[i + 1].startDate) {
       return monthHeaders[i].left + daysBetween(monthHeaders[i].startDate, dateStr) * monthHeaders[i].dayPx
@@ -126,6 +127,7 @@ export function mhDateToPixel(dateStr, monthHeaders) {
 }
 
 export function mhPixelToDate(px, monthHeaders) {
+  if (!monthHeaders || monthHeaders.length === 0) return ''
   for (let i = 0; i < monthHeaders.length; i++) {
     const mh = monthHeaders[i]
     if (px < mh.left + mh.width || i === monthHeaders.length - 1) {
@@ -133,7 +135,7 @@ export function mhPixelToDate(px, monthHeaders) {
       return addDays(mh.startDate, days)
     }
   }
-  return monthHeaders[0]?.startDate ?? ''
+  return monthHeaders[0].startDate
 }
 
 // Adds n working days (Mon–Fri, skipping Madrid holidays) to a date.
