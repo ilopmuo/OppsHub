@@ -510,7 +510,7 @@ export default function GanttChart({
               <div
                 key={i}
                 className="absolute top-0 bottom-0 pointer-events-none"
-                style={{ left: effectiveLW + mh.left, width: 2, backgroundColor: t.monthLine }}
+                style={{ left: effectiveLW + mh.left + mh.width, width: 2, backgroundColor: t.monthLine }}
               />
             ))}
 
