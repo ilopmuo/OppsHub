@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { Loader2, Calendar, Clock, Building2 } from 'lucide-react'
 import GanttChart from '../components/GanttChart'
 import PlanInsights from '../components/PlanInsights'
+import PlanScope from '../components/PlanScope'
 import { useLang } from '../contexts/LanguageContext'
 
 function formatDate(dateStr, locale) {
@@ -18,10 +19,11 @@ export default function PlanPublicView() {
   const { lang, toggleLang, t } = useLang()
   const locale = lang === 'en' ? 'en-US' : 'es-ES'
   const p = t('plans')
-  const [plan,    setPlan]    = useState(null)
-  const [phases,  setPhases]  = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState(null)
+  const [plan,      setPlan]      = useState(null)
+  const [phases,    setPhases]    = useState([])
+  const [loading,   setLoading]   = useState(true)
+  const [error,     setError]     = useState(null)
+  const [activeTab, setActiveTab] = useState('gantt')
 
   useEffect(() => {
     async function fetchPlan() {
@@ -115,15 +117,34 @@ export default function PlanPublicView() {
             <span style={{ color: '#3a3a3a' }}>/</span>
             <span className="text-sm truncate max-w-xs" style={{ color: '#6e6e73' }}>{plan.name}</span>
           </div>
-          <button
-            onClick={toggleLang}
-            className="text-xs px-2.5 py-1.5 rounded-lg transition-all font-medium"
-            style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
-          >
-            {lang === 'es' ? 'EN' : 'ES'}
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Tabs */}
+            <div className="flex items-center gap-0.5 p-0.5 rounded-xl" style={{ backgroundColor: '#1a1a1a' }}>
+              {[{ id: 'gantt', label: 'Gantt' }, { id: 'scope', label: 'Alcance' }].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className="px-4 py-1.5 rounded-lg text-xs font-medium transition-all"
+                  style={{
+                    backgroundColor: activeTab === tab.id ? '#2a2a2a' : 'transparent',
+                    color: activeTab === tab.id ? '#f5f5f7' : '#6e6e73',
+                    border: 'none', cursor: 'pointer',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={toggleLang}
+              className="text-xs px-2.5 py-1.5 rounded-lg transition-all font-medium"
+              style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+            >
+              {lang === 'es' ? 'EN' : 'ES'}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -160,17 +181,17 @@ export default function PlanPublicView() {
           </div>
         </div>
 
-        {/* Gantt */}
-        <div className="mb-8 gantt-print-area" style={{ minHeight: 200 }}>
-          <GanttChart
-            plan={plan}
-            phases={phases}
-            isEditable={false}
-          />
-        </div>
-
-        {/* Reports */}
-        <PlanInsights plan={plan} phases={phases} hideExport />
+        {/* Tab content */}
+        {activeTab === 'gantt' ? (
+          <>
+            <div className="mb-8 gantt-print-area" style={{ minHeight: 200 }}>
+              <GanttChart plan={plan} phases={phases} isEditable={false} />
+            </div>
+            <PlanInsights plan={plan} phases={phases} hideExport />
+          </>
+        ) : (
+          <PlanScope plan={plan} phases={phases} isEditable={false} onUpdatePhase={null} />
+        )}
 
         {/* Phase list (print-friendly summary) */}
         {phases.length > 0 && (

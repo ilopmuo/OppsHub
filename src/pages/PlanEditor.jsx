@@ -8,6 +8,7 @@ import PlanSidebar from '../components/PlanSidebar'
 import PlanPhaseCalendar from '../components/PlanPhaseCalendar'
 import usePlan, { daysBetween } from '../hooks/usePlan'
 import PlanInsights from '../components/PlanInsights'
+import PlanScope from '../components/PlanScope'
 import toast from 'react-hot-toast'
 
 export default function PlanEditor() {
@@ -26,6 +27,7 @@ export default function PlanEditor() {
 
   const { t } = useLang()
   const p = t('plans')
+  const [activeTab,     setActiveTab]     = useState('gantt')
   const [calendarPhase, setCalendarPhase] = useState(null)
   const [sidebarOpen,   setSidebarOpen]   = useState(false)
   const [ganttDayPx,      setGanttDayPx]      = useState(null)
@@ -139,6 +141,24 @@ export default function PlanEditor() {
             </span>
           )}
 
+          {/* Tabs */}
+          <div className="flex items-center gap-0.5 p-0.5 rounded-xl mx-2" style={{ backgroundColor: '#1a1a1a' }}>
+            {[{ id: 'gantt', label: 'Gantt' }, { id: 'scope', label: 'Alcance' }].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="px-4 py-1.5 rounded-lg text-xs font-medium transition-all"
+                style={{
+                  backgroundColor: activeTab === tab.id ? '#2a2a2a' : 'transparent',
+                  color: activeTab === tab.id ? '#f5f5f7' : '#6e6e73',
+                  border: 'none', cursor: 'pointer',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
           <div className="flex-1" />
 
           <button
@@ -159,31 +179,40 @@ export default function PlanEditor() {
         {/* Main content: Gantt + optional sticky side panel */}
         <div className="flex flex-1 min-h-0" style={{ alignItems: 'flex-start' }}>
 
-          {/* Gantt column — expands to fill available width */}
+          {/* Main column — expands to fill available width */}
           <div className="flex-1 min-w-0">
-            <div className="p-6 gantt-print-area">
-              <GanttChart
+            {activeTab === 'gantt' ? (
+              <>
+                <div className="p-6 gantt-print-area">
+                  <GanttChart
+                    plan={plan}
+                    phases={phases}
+                    isEditable={true}
+                    snapshots={snapshots}
+                    activeSnapshotId={activeSnapshotId}
+                    onMove={movePhase}
+                    onResize={resizePhase}
+                    onUpdatePhase={updatePhase}
+                    onUpdatePlan={updatePlan}
+                    onDayPxChange={setGanttDayPx}
+                    onMonthScalesChange={setGanttMonthScales}
+                    onOpenCalendar={setCalendarPhase}
+                    onAddTask={addTask}
+                    onUpdateTask={updateTask}
+                    onDeleteTask={deleteTask}
+                    onReorderPhases={reorderPhases}
+                  />
+                </div>
+                <PlanInsights plan={plan} phases={phases} />
+              </>
+            ) : (
+              <PlanScope
                 plan={plan}
                 phases={phases}
                 isEditable={true}
-                snapshots={snapshots}
-                activeSnapshotId={activeSnapshotId}
-                onMove={movePhase}
-                onResize={resizePhase}
                 onUpdatePhase={updatePhase}
-                onUpdatePlan={updatePlan}
-                onDayPxChange={setGanttDayPx}
-                onMonthScalesChange={setGanttMonthScales}
-                onOpenCalendar={setCalendarPhase}
-                onAddTask={addTask}
-                onUpdateTask={updateTask}
-                onDeleteTask={deleteTask}
-                onReorderPhases={reorderPhases}
               />
-            </div>
-
-            {/* Below-fold: charts + stats */}
-            <PlanInsights plan={plan} phases={phases} />
+            )}
           </div>
 
           {/* Collapsible side panel */}
