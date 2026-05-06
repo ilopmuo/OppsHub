@@ -249,8 +249,8 @@ export default function PlanEditor() {
                 )}
                 <div style={{ display: 'flex', gap: 20, marginTop: 4, fontSize: 11, color: '#999' }}>
                   <span>{plan.start_date} — {printLastEnd}</span>
-                  {printTotalHours > 0 && <span>{printTotalHours}h planificadas</span>}
-                  <span>{phases.length} fase{phases.length !== 1 ? 's' : ''}</span>
+                  {printTotalHours > 0 && <span>{printTotalHours}h {p.planned}</span>}
+                  <span>{phases.length} {phases.length !== 1 ? p.phases : p.phase}</span>
                 </div>
               </div>
             </div>
