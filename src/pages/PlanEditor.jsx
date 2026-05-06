@@ -74,9 +74,12 @@ export default function PlanEditor() {
   const PRINT_PAGE_H   = 620  // conservative: browser chrome + page footer eat ~80px of the theoretical 703px
   const PRINT_HEADER_H = 110  // plan-name header + branding + some breathing room
 
+  const printLegendItems = plan.legend || []
+  const PRINT_LEGEND_W   = printLegendItems.length > 0 ? 150 : 0  // legend panel width + gap
+
   const printLastEnd    = phases.reduce((acc, p) => p.end_date > acc ? p.end_date : acc, plan.start_date)
   const printTotalDays  = Math.max(daysBetween(plan.start_date, printLastEnd) + 1, 14)
-  const printDayPx      = Math.max(2, Math.floor((PRINT_PAGE_W - PRINT_LABEL_W) / (printTotalDays + 7)))
+  const printDayPx      = Math.max(2, Math.floor((PRINT_PAGE_W - PRINT_LABEL_W - PRINT_LEGEND_W) / (printTotalDays + 14)))
   const printTotalHours = phases.reduce((s, p) => s + Number(p.hours || 0), 0)
 
   // How tall the Gantt rows will be (headers + one 44px row per phase)
@@ -267,15 +270,41 @@ export default function PlanEditor() {
               <span style={{ fontSize: 13, fontWeight: 600, color: '#333', letterSpacing: '-0.01em' }}>OppsHub</span>
             </div>
           </div>
-          {/* Gantt scaled to fit the page */}
-          <GanttChart
-            plan={plan}
-            phases={phases}
-            isEditable={false}
-            printMode={true}
-            forceDayPx={printDayPx}
-            forceLabelW={PRINT_LABEL_W}
-          />
+          {/* Gantt + legend side by side */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 0 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <GanttChart
+                plan={plan}
+                phases={phases}
+                isEditable={false}
+                printMode={true}
+                forceDayPx={printDayPx}
+                forceLabelW={PRINT_LABEL_W}
+              />
+            </div>
+            {printLegendItems.length > 0 && (
+              <div style={{
+                width: PRINT_LEGEND_W - 8,
+                flexShrink: 0,
+                marginLeft: 8,
+                padding: '8px 10px',
+                border: '1px solid #ddd',
+                borderRadius: 10,
+                alignSelf: 'flex-end',
+                marginBottom: 2,
+              }}>
+                <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#888', marginBottom: 6 }}>
+                  {p.legend}
+                </div>
+                {printLegendItems.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: i < printLegendItems.length - 1 ? 4 : 0 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: item.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: '#333' }}>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

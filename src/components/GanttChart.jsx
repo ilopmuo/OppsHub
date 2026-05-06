@@ -560,13 +560,15 @@ export default function GanttChart({
             ))}
           </div>
 
-          {/* Legend */}
-          <LegendPanel
-            items={plan.legend || []}
-            isEditable={isEditable && !!onUpdatePlan}
-            onUpdate={items => onUpdatePlan?.({ legend: items })}
-            printMode={printMode}
-          />
+          {/* Legend — only in interactive mode; print renders it externally */}
+          {!printMode && (
+            <LegendPanel
+              items={plan.legend || []}
+              isEditable={isEditable && !!onUpdatePlan}
+              onUpdate={items => onUpdatePlan?.({ legend: items })}
+              printMode={false}
+            />
+          )}
 
         </div>
       </div>
