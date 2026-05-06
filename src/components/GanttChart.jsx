@@ -115,21 +115,25 @@ export default function GanttChart({
 
   // Print-mode color theme
   const t = printMode ? {
-    bg:         'white',
-    headerBg:   '#f5f5f5',
-    border:     '1px solid rgba(0,0,0,0.12)',
-    borderFaint:'1px solid rgba(0,0,0,0.07)',
-    textMuted:  '#555',
-    textFaint:  '#aaa',
-    gridLine:   'rgba(0,0,0,0.06)',
+    bg:          'white',
+    headerBg:    '#f5f5f5',
+    border:      '1px solid rgba(0,0,0,0.12)',
+    borderFaint: '1px solid rgba(0,0,0,0.07)',
+    monthBorder: '2px solid rgba(0,0,0,0.18)',
+    monthLine:   'rgba(0,0,0,0.14)',
+    textMuted:   '#555',
+    textFaint:   '#aaa',
+    gridLine:    'rgba(0,0,0,0.06)',
   } : {
-    bg:         '#111111',
-    headerBg:   '#111111',
-    border:     '1px solid rgba(255,255,255,0.06)',
-    borderFaint:'1px solid rgba(255,255,255,0.04)',
-    textMuted:  '#6e6e73',
-    textFaint:  '#3a3a3a',
-    gridLine:   'rgba(255,255,255,0.03)',
+    bg:          '#111111',
+    headerBg:    '#111111',
+    border:      '1px solid rgba(255,255,255,0.06)',
+    borderFaint: '1px solid rgba(255,255,255,0.04)',
+    monthBorder: '2px solid rgba(255,255,255,0.12)',
+    monthLine:   'rgba(255,255,255,0.08)',
+    textMuted:   '#6e6e73',
+    textFaint:   '#3a3a3a',
+    gridLine:    'rgba(255,255,255,0.03)',
   }
 
   const handleLabelResizeStart = useCallback((e) => {
@@ -307,7 +311,7 @@ export default function GanttChart({
                   className="absolute top-0 bottom-0 flex items-center"
                   style={{
                     left: mh.left, width: mh.width,
-                    borderRight: t.borderFaint,
+                    borderRight: t.monthBorder,
                     paddingLeft: 8, overflow: 'hidden',
                   }}
                 >
@@ -365,12 +369,21 @@ export default function GanttChart({
               </div>
             )}
 
-            {/* Column grid lines */}
+            {/* Column grid lines — weeks */}
             {weekMarkers.map((wm, i) => (
               <div
                 key={i}
                 className="absolute top-0 bottom-0 pointer-events-none"
                 style={{ left: effectiveLW + wm.left, width: 1, backgroundColor: t.gridLine }}
+              />
+            ))}
+
+            {/* Column grid lines — months (more prominent) */}
+            {monthHeaders.map((mh, i) => (
+              <div
+                key={i}
+                className="absolute top-0 bottom-0 pointer-events-none"
+                style={{ left: effectiveLW + mh.left, width: 2, backgroundColor: t.monthLine }}
               />
             ))}
 
