@@ -272,62 +272,72 @@ export default function PlanPhaseRow({
             />
           ) : (
             /* ── Regular bar ───────────────────────────────── */
-            <div
-              className="absolute top-1/2 -translate-y-1/2 rounded-lg flex items-center overflow-hidden"
-              style={{
-                left:   left,
-                width:  barW,
-                height: 28,
-                zIndex: 1,
-                background: progress > 0
-                  ? `linear-gradient(to right, ${color} ${progress}%, ${color}55 ${progress}%)`
-                  : color,
-                cursor: isEditable ? 'grab' : 'default',
-                userSelect: 'none',
-                boxShadow: statusColor
-                  ? `0 2px 8px ${color}40, inset 0 0 0 1.5px ${statusColor}`
-                  : `0 2px 8px ${color}40`,
-              }}
-              onMouseDown={isEditable ? handleDragStart : undefined}
-              title={`${phase.start_date} → ${phase.end_date}${phase.hours ? ` · ${phase.hours}h` : ''}${progress > 0 ? ` · ${progress}%` : ''}`}
-            >
-              {barW > 80 && (
-                <span
-                  className="px-2.5 text-xs font-medium truncate pointer-events-none"
-                  style={{ color: '#000', opacity: 0.8 }}
-                >
-                  {width}d{phase.hours > 0 ? ` · ${phase.hours}h` : ''}{progress > 0 ? ` · ${progress}%` : ''}
-                </span>
-              )}
+            <>
+              <div
+                className="absolute top-1/2 -translate-y-1/2 rounded-lg flex items-center overflow-hidden"
+                style={{
+                  left:   left,
+                  width:  barW,
+                  height: 28,
+                  zIndex: 1,
+                  background: progress > 0
+                    ? `linear-gradient(to right, ${color} ${progress}%, ${color}55 ${progress}%)`
+                    : color,
+                  cursor: isEditable ? 'grab' : 'default',
+                  userSelect: 'none',
+                  boxShadow: statusColor
+                    ? `0 2px 8px ${color}40, inset 0 0 0 1.5px ${statusColor}`
+                    : `0 2px 8px ${color}40`,
+                }}
+                onMouseDown={isEditable ? handleDragStart : undefined}
+                title={`${phase.start_date} → ${phase.end_date}${phase.hours ? ` · ${phase.hours}h` : ''}${progress > 0 ? ` · ${progress}%` : ''}`}
+              >
+                {/* Task completion stripe */}
+                {totalTasks > 0 && (
+                  <div
+                    className="absolute bottom-0 left-0 rounded-b-lg"
+                    style={{
+                      width: `${(doneTasks / totalTasks) * 100}%`,
+                      height: 3,
+                      backgroundColor: 'rgba(0,0,0,0.4)',
+                    }}
+                  />
+                )}
 
-              {/* Task completion stripe */}
-              {totalTasks > 0 && barW > 60 && (
-                <div
-                  className="absolute bottom-0 left-0 rounded-b-lg"
-                  style={{
-                    width: `${(doneTasks / totalTasks) * 100}%`,
-                    height: 3,
-                    backgroundColor: 'rgba(0,0,0,0.4)',
-                  }}
-                />
-              )}
-
-              {/* Resize handle */}
-              {isEditable && (
-                <div
-                  ref={resizeRef}
-                  className="absolute right-0 top-0 bottom-0 w-3 rounded-r-lg flex items-center justify-center"
-                  style={{ cursor: 'ew-resize', color: 'rgba(0,0,0,0.5)' }}
-                  onMouseDown={handleResizeStart}
-                  title="Arrastra para cambiar duración"
-                >
-                  <div className="flex gap-px">
-                    <div style={{ width: 1.5, height: 10, backgroundColor: 'currentColor', borderRadius: 1 }} />
-                    <div style={{ width: 1.5, height: 10, backgroundColor: 'currentColor', borderRadius: 1 }} />
+                {/* Resize handle */}
+                {isEditable && (
+                  <div
+                    ref={resizeRef}
+                    className="absolute right-0 top-0 bottom-0 w-3 rounded-r-lg flex items-center justify-center"
+                    style={{ cursor: 'ew-resize', color: 'rgba(0,0,0,0.5)' }}
+                    onMouseDown={handleResizeStart}
+                    title="Arrastra para cambiar duración"
+                  >
+                    <div className="flex gap-px">
+                      <div style={{ width: 1.5, height: 10, backgroundColor: 'currentColor', borderRadius: 1 }} />
+                      <div style={{ width: 1.5, height: 10, backgroundColor: 'currentColor', borderRadius: 1 }} />
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+
+              {/* Stats label — always visible, to the right of the bar */}
+              <span
+                className="absolute pointer-events-none"
+                style={{
+                  left: left + barW + 6,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  fontSize: 10,
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap',
+                  color: printMode ? '#555' : '#6e6e73',
+                  zIndex: 2,
+                }}
+              >
+                {width}d{phase.hours > 0 ? ` · ${phase.hours}h` : ''}{progress > 0 ? ` · ${progress}%` : ''}
+              </span>
+            </>
           )}
         </div>
       </div>
