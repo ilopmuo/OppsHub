@@ -113,7 +113,7 @@ export default function PlanPhaseRow({
   return (
     <div>
       {/* ── Row ─────────────────────────────────────────────── */}
-      <div className="flex items-center" style={{ height: 44 }}>
+      <div className="flex items-center" style={{ height: 44, alignItems: printMode ? 'center' : undefined }}>
 
         {/* Label column */}
         <div
@@ -172,8 +172,12 @@ export default function PlanPhaseRow({
 
             <span
               ref={nameRef}
-              className="text-xs truncate"
-              style={{ color: printMode ? '#111' : '#f5f5f7', fontWeight: 500 }}
+              className={printMode ? 'text-xs' : 'text-xs truncate'}
+              style={{
+                color: printMode ? '#111' : '#f5f5f7',
+                fontWeight: 500,
+                ...(printMode && { whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.25, fontSize: 10 }),
+              }}
               onMouseEnter={e => {
                 if (isTruncated) {
                   const r = e.currentTarget.getBoundingClientRect()

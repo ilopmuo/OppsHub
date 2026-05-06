@@ -69,7 +69,7 @@ export default function PlanEditor() {
   // A4 landscape usable area at 96 CSS dpi with 12mm top/bottom + 15mm left/right margins:
   //   width : (297 - 30) mm  = 267 mm = ~1009 px
   //   height: (210 - 24) mm  = 186 mm = ~703  px
-  const PRINT_LABEL_W  = 150
+  const PRINT_LABEL_W  = 220
   const PRINT_PAGE_W   = 1009
   const PRINT_PAGE_H   = 620  // conservative: browser chrome + page footer eat ~80px of the theoretical 703px
   const PRINT_HEADER_H = 110  // plan-name header + branding + some breathing room
