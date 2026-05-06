@@ -280,9 +280,11 @@ export default function PlanPhaseRow({
                   width:  barW,
                   height: 28,
                   zIndex: 1,
-                  background: progress > 0
-                    ? `linear-gradient(to right, ${color} ${progress}%, ${color}55 ${progress}%)`
-                    : color,
+                  background: progress === 100
+                    ? color
+                    : progress > 0
+                      ? `linear-gradient(to right, ${color} ${progress}%, ${color}44 ${progress}%)`
+                      : `${color}44`,
                   cursor: isEditable ? 'grab' : 'default',
                   userSelect: 'none',
                   boxShadow: statusColor
