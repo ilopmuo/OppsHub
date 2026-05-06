@@ -35,7 +35,7 @@ function LegendPanel({ items = [], isEditable, onUpdate, printMode }) {
   return (
     <div
       style={{
-        position: 'absolute', bottom: 10, right: 10,
+        position: 'absolute', top: 10, right: 10,
         backgroundColor: bg,
         border,
         borderRadius: 10,
