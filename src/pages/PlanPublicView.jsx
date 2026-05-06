@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { Loader2, Calendar, Clock, Building2 } from 'lucide-react'
 import GanttChart from '../components/GanttChart'
 import PlanInsights from '../components/PlanInsights'
-import PlanScope from '../components/PlanScope'
+import PlanScope, { ScopePrintArea } from '../components/PlanScope'
 import { useLang } from '../contexts/LanguageContext'
 
 function formatDate(dateStr, locale) {
@@ -275,6 +275,13 @@ export default function PlanPublicView() {
           </div>
         )}
       </main>
+
+      {/* Print-only: scope document */}
+      {activeTab === 'scope' && (
+        <div className="print-only" style={{ display: 'none' }}>
+          <ScopePrintArea plan={plan} phases={phases} />
+        </div>
+      )}
 
       {/* Footer */}
       <footer

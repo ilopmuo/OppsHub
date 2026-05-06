@@ -21,7 +21,7 @@ function formatDate(dateStr, locale) {
   })
 }
 
-function getItems(phase) {
+export function getItems(phase) {
   const s = phase.scope_items
   if (Array.isArray(s)) return s
   if (Array.isArray(s?.included)) return s.included
@@ -122,6 +122,94 @@ function BulletList({ items, isEditable, onChange, color }) {
   )
 }
 
+// ── Named export: pure print markup, no hooks ────────────────
+export function ScopePrintArea({ plan, phases }) {
+  const { lang } = useLang()
+  const locale = lang === 'en' ? 'en-US' : 'es-ES'
+  const statusMeta = lang === 'en' ? STATUS_META_EN : STATUS_META
+  const visiblePhases = (phases || []).filter(p => !p.is_milestone)
+
+  return (
+    <div style={{ fontFamily: 'Inter, system-ui, sans-serif', padding: '24px 32px', backgroundColor: '#fff', color: '#111' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingBottom: 14, borderBottom: '2px solid #e5e5e5' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          {plan?.project?.icon_url && (
+            <img src={plan.project.icon_url} alt="" style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 6, flexShrink: 0, marginTop: 2 }} />
+          )}
+          <div>
+            <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{plan?.name}</h1>
+            <p style={{ margin: '3px 0 0', fontSize: 12, color: '#666' }}>Documento de alcance</p>
+            {plan?.client_name && <p style={{ margin: '2px 0 0', fontSize: 11, color: '#999' }}>{plan.client_name}</p>}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <svg width="18" height="18" viewBox="0 0 44 44" fill="none">
+            <rect width="44" height="44" rx="10" fill="#1a1a1a"/>
+            <rect x="10" y="10" width="10" height="10" rx="2" fill="white"/>
+            <rect x="24" y="10" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
+            <rect x="10" y="24" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
+            <rect x="24" y="24" width="10" height="10" rx="2" fill="white"/>
+          </svg>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#333' }}>OppsHub</span>
+        </div>
+      </div>
+
+      {/* Phases */}
+      {visiblePhases.map((phase, idx) => {
+        const items = getItems(phase)
+        const status = computePhaseStatus(phase)
+        const meta = statusMeta[status]
+        const durationDays = daysBetween(phase.start_date, phase.end_date) + 1
+        const color = phase.color || '#bf5af2'
+
+        return (
+          <div key={phase.id} style={{ marginBottom: 20, pageBreakInside: 'avoid' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 12px',
+              backgroundColor: '#f8f8f8',
+              borderLeft: `4px solid ${color}`,
+              borderRadius: '0 6px 6px 0',
+              marginBottom: 10,
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>{phase.name}</span>
+                  {meta && (
+                    <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, backgroundColor: meta.color + '20', color: meta.color, fontWeight: 600 }}>
+                      {meta.label}
+                    </span>
+                  )}
+                </div>
+                <span style={{ fontSize: 11, color: '#666', marginTop: 2, display: 'block' }}>
+                  {formatDate(phase.start_date, locale)} → {formatDate(phase.end_date, locale)} · {durationDays}d{phase.hours > 0 ? ` · ${phase.hours}h` : ''}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ paddingLeft: 12 }}>
+              {items.length === 0 ? (
+                <p style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>—</p>
+              ) : items.map((item, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 5 }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: color, flexShrink: 0, marginTop: 5, display: 'inline-block' }} />
+                  <span style={{ fontSize: 12, lineHeight: 1.5, color: '#222' }}>{item}</span>
+                </div>
+              ))}
+            </div>
+
+            {idx < visiblePhases.length - 1 && (
+              <div style={{ borderBottom: '1px solid #eee', marginTop: 16 }} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Default export: interactive screen view ──────────────────
 export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
   const { lang } = useLang()
   const locale = lang === 'en' ? 'en-US' : 'es-ES'
@@ -137,174 +225,91 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
   }
 
   return (
-    <>
-      {/* Screen view */}
-      <div className="no-print" style={{ padding: '24px 24px 48px' }}>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-base font-semibold" style={{ color: '#f5f5f7' }}>Alcance del proyecto</h2>
-            <p className="text-xs mt-0.5" style={{ color: '#6e6e73' }}>
-              {totalItems} entregables · {visiblePhases.length} fases
-            </p>
-          </div>
-          <button
-            onClick={handlePrint}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors"
-            style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73', border: 'none', cursor: 'pointer' }}
-            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#f5f5f7' }}
-            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#6e6e73' }}
-          >
-            <FileDown style={{ width: 13, height: 13 }} />
-            Exportar PDF
-          </button>
+    <div style={{ padding: '24px 24px 48px' }}>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-base font-semibold" style={{ color: '#f5f5f7' }}>Alcance del proyecto</h2>
+          <p className="text-xs mt-0.5" style={{ color: '#6e6e73' }}>
+            {totalItems} entregables · {visiblePhases.length} fases
+          </p>
         </div>
-
-        {visiblePhases.length === 0 && (
-          <div
-            className="flex items-center justify-center rounded-2xl"
-            style={{ height: 160, border: '1px solid rgba(255,255,255,0.06)', color: '#3a3a3a', fontSize: 13 }}
-          >
-            Añade fases al plan para definir el alcance
-          </div>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {visiblePhases.map(phase => {
-            const items  = getItems(phase)
-            const status = computePhaseStatus(phase)
-            const meta   = status ? statusMeta[status] : null
-            const StatusIcon = meta?.icon
-            const durationDays = daysBetween(phase.start_date, phase.end_date) + 1
-            const color = phase.color || '#bf5af2'
-
-            return (
-              <div
-                key={phase.id}
-                className="rounded-2xl overflow-hidden"
-                style={{ border: '1px solid rgba(255,255,255,0.06)', backgroundColor: '#111111' }}
-              >
-                {/* Phase header */}
-                <div
-                  className="flex items-center gap-3 px-5 py-3"
-                  style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', borderLeft: `3px solid ${color}` }}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold" style={{ color: '#f5f5f7' }}>{phase.name}</span>
-                      {meta && (
-                        <span
-                          className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
-                          style={{ backgroundColor: meta.color + '18', color: meta.color }}
-                        >
-                          <StatusIcon style={{ width: 10, height: 10 }} />
-                          {meta.label}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                      <span className="text-xs" style={{ color: '#6e6e73' }}>
-                        {formatDate(phase.start_date, locale)} → {formatDate(phase.end_date, locale)}
-                      </span>
-                      <span className="text-xs" style={{ color: '#3a3a3a' }}>{durationDays}d</span>
-                      {phase.hours > 0 && (
-                        <span className="text-xs" style={{ color: '#3a3a3a' }}>{phase.hours}h</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bullet list */}
-                <div className="px-5 py-4">
-                  <BulletList
-                    items={items}
-                    isEditable={isEditable}
-                    onChange={next => onUpdatePhase(phase.id, { scope_items: next })}
-                    color={color}
-                  />
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        <button
+          onClick={handlePrint}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors"
+          style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73', border: 'none', cursor: 'pointer' }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#f5f5f7' }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#6e6e73' }}
+        >
+          <FileDown style={{ width: 13, height: 13 }} />
+          Exportar PDF
+        </button>
       </div>
 
-      {/* Print-only scope document */}
-      <div className="print-only" style={{ display: 'none', fontFamily: 'Inter, system-ui, sans-serif', padding: '24px 32px', backgroundColor: '#fff', color: '#111' }}>
-        {/* Print header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingBottom: 14, borderBottom: '2px solid #e5e5e5' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            {plan?.project?.icon_url && (
-              <img src={plan.project.icon_url} alt="" style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 6, flexShrink: 0, marginTop: 2 }} />
-            )}
-            <div>
-              <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{plan?.name}</h1>
-              <p style={{ margin: '3px 0 0', fontSize: 12, color: '#666' }}>Documento de alcance</p>
-              {plan?.client_name && <p style={{ margin: '2px 0 0', fontSize: 11, color: '#999' }}>{plan.client_name}</p>}
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 44 44" fill="none">
-              <rect width="44" height="44" rx="10" fill="#1a1a1a"/>
-              <rect x="10" y="10" width="10" height="10" rx="2" fill="white"/>
-              <rect x="24" y="10" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
-              <rect x="10" y="24" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
-              <rect x="24" y="24" width="10" height="10" rx="2" fill="white"/>
-            </svg>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#333' }}>OppsHub</span>
-          </div>
+      {visiblePhases.length === 0 && (
+        <div
+          className="flex items-center justify-center rounded-2xl"
+          style={{ height: 160, border: '1px solid rgba(255,255,255,0.06)', color: '#3a3a3a', fontSize: 13 }}
+        >
+          Añade fases al plan para definir el alcance
         </div>
+      )}
 
-        {/* Phases */}
-        {visiblePhases.map((phase, idx) => {
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {visiblePhases.map(phase => {
           const items  = getItems(phase)
           const status = computePhaseStatus(phase)
-          const meta   = lang === 'en' ? STATUS_META_EN[status] : STATUS_META[status]
+          const meta   = status ? statusMeta[status] : null
+          const StatusIcon = meta?.icon
           const durationDays = daysBetween(phase.start_date, phase.end_date) + 1
           const color = phase.color || '#bf5af2'
 
           return (
-            <div key={phase.id} style={{ marginBottom: 20, pageBreakInside: 'avoid' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '8px 12px',
-                backgroundColor: '#f8f8f8',
-                borderLeft: `4px solid ${color}`,
-                borderRadius: '0 6px 6px 0',
-                marginBottom: 10,
-              }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700 }}>{phase.name}</span>
+            <div
+              key={phase.id}
+              className="rounded-2xl overflow-hidden"
+              style={{ border: '1px solid rgba(255,255,255,0.06)', backgroundColor: '#111111' }}
+            >
+              <div
+                className="flex items-center gap-3 px-5 py-3"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', borderLeft: `3px solid ${color}` }}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold" style={{ color: '#f5f5f7' }}>{phase.name}</span>
                     {meta && (
-                      <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, backgroundColor: meta.color + '20', color: meta.color, fontWeight: 600 }}>
+                      <span
+                        className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+                        style={{ backgroundColor: meta.color + '18', color: meta.color }}
+                      >
+                        <StatusIcon style={{ width: 10, height: 10 }} />
                         {meta.label}
                       </span>
                     )}
                   </div>
-                  <span style={{ fontSize: 11, color: '#666', marginTop: 2, display: 'block' }}>
-                    {formatDate(phase.start_date, locale)} → {formatDate(phase.end_date, locale)} · {durationDays}d{phase.hours > 0 ? ` · ${phase.hours}h` : ''}
-                  </span>
+                  <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                    <span className="text-xs" style={{ color: '#6e6e73' }}>
+                      {formatDate(phase.start_date, locale)} → {formatDate(phase.end_date, locale)}
+                    </span>
+                    <span className="text-xs" style={{ color: '#3a3a3a' }}>{durationDays}d</span>
+                    {phase.hours > 0 && (
+                      <span className="text-xs" style={{ color: '#3a3a3a' }}>{phase.hours}h</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div style={{ paddingLeft: 12 }}>
-                {items.length === 0 ? (
-                  <p style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>—</p>
-                ) : items.map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 5 }}>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: color, flexShrink: 0, marginTop: 5, display: 'inline-block' }} />
-                    <span style={{ fontSize: 12, lineHeight: 1.5, color: '#222' }}>{item}</span>
-                  </div>
-                ))}
+              <div className="px-5 py-4">
+                <BulletList
+                  items={items}
+                  isEditable={isEditable}
+                  onChange={next => onUpdatePhase(phase.id, { scope_items: next })}
+                  color={color}
+                />
               </div>
-
-              {idx < visiblePhases.length - 1 && (
-                <div style={{ borderBottom: '1px solid #eee', marginTop: 16 }} />
-              )}
             </div>
           )
         })}
       </div>
-    </>
+    </div>
   )
 }

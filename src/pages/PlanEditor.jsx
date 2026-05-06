@@ -8,7 +8,7 @@ import PlanSidebar from '../components/PlanSidebar'
 import PlanPhaseCalendar from '../components/PlanPhaseCalendar'
 import usePlan, { daysBetween } from '../hooks/usePlan'
 import PlanInsights from '../components/PlanInsights'
-import PlanScope from '../components/PlanScope'
+import PlanScope, { ScopePrintArea } from '../components/PlanScope'
 import toast from 'react-hot-toast'
 
 export default function PlanEditor() {
@@ -262,6 +262,13 @@ export default function PlanEditor() {
           phase={calendarPhase}
           onClose={() => setCalendarPhase(null)}
         />
+      )}
+
+      {/* Print-only: scope document */}
+      {activeTab === 'scope' && (
+        <div className="print-only" style={{ display: 'none' }}>
+          <ScopePrintArea plan={plan} phases={phases} />
+        </div>
       )}
 
       {/* Print-only area — landscape A4 — only when Gantt tab is active */}
