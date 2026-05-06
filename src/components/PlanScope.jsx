@@ -4,14 +4,14 @@ import { computePhaseStatus, daysBetween } from '../hooks/usePlan'
 import { useLang } from '../contexts/LanguageContext'
 
 const STATUS_META = {
-  on_track: { label: 'En plazo',   color: '#30d158', icon: Check },
-  at_risk:  { label: 'En riesgo',  color: '#ff9f0a', icon: AlertTriangle },
-  delayed:  { label: 'Retrasado',  color: '#ff453a', icon: Clock },
+  on_track: { label: 'En plazo',  color: '#30d158', icon: Check },
+  at_risk:  { label: 'En riesgo', color: '#ff9f0a', icon: AlertTriangle },
+  delayed:  { label: 'Retrasado', color: '#ff453a', icon: Clock },
 }
 const STATUS_META_EN = {
-  on_track: { label: 'On track',  color: '#30d158', icon: Check },
-  at_risk:  { label: 'At risk',   color: '#ff9f0a', icon: AlertTriangle },
-  delayed:  { label: 'Delayed',   color: '#ff453a', icon: Clock },
+  on_track: { label: 'On track', color: '#30d158', icon: Check },
+  at_risk:  { label: 'At risk',  color: '#ff9f0a', icon: AlertTriangle },
+  delayed:  { label: 'Delayed',  color: '#ff453a', icon: Clock },
 }
 
 function formatDate(dateStr, locale) {
@@ -21,7 +21,14 @@ function formatDate(dateStr, locale) {
   })
 }
 
-function BulletList({ items, section, isEditable, onChange, color }) {
+function getItems(phase) {
+  const s = phase.scope_items
+  if (Array.isArray(s)) return s
+  if (Array.isArray(s?.included)) return s.included
+  return []
+}
+
+function BulletList({ items, isEditable, onChange, color }) {
   const [editIdx, setEditIdx] = useState(null)
   const inputRef = useRef(null)
 
@@ -31,16 +38,16 @@ function BulletList({ items, section, isEditable, onChange, color }) {
 
   function addItem() {
     const next = [...items, '']
-    onChange(section, next)
+    onChange(next)
     setEditIdx(next.length - 1)
   }
 
   function updateItem(idx, val) {
-    onChange(section, items.map((it, i) => i === idx ? val : it))
+    onChange(items.map((it, i) => i === idx ? val : it))
   }
 
   function deleteItem(idx) {
-    onChange(section, items.filter((_, i) => i !== idx))
+    onChange(items.filter((_, i) => i !== idx))
     setEditIdx(null)
   }
 
@@ -49,19 +56,11 @@ function BulletList({ items, section, isEditable, onChange, color }) {
     else setEditIdx(null)
   }
 
-  const dotColor = section === 'included' ? color : 'rgba(255,255,255,0.2)'
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       {items.map((item, i) => (
         <div key={i} className="flex items-start gap-2 group">
-          <div
-            style={{
-              width: 6, height: 6, borderRadius: '50%',
-              backgroundColor: dotColor,
-              flexShrink: 0, marginTop: 6,
-            }}
-          />
+          <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: color, flexShrink: 0, marginTop: 6 }} />
           {isEditable && editIdx === i ? (
             <input
               ref={inputRef}
@@ -129,19 +128,7 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
   const statusMeta = lang === 'en' ? STATUS_META_EN : STATUS_META
 
   const visiblePhases = phases.filter(p => !p.is_milestone)
-
-  function getScopeItems(phase) {
-    const s = phase.scope_items
-    return {
-      included: Array.isArray(s?.included) ? s.included : [],
-      excluded: Array.isArray(s?.excluded) ? s.excluded : [],
-    }
-  }
-
-  function handleChange(phase, section, items) {
-    const current = getScopeItems(phase)
-    onUpdatePhase(phase.id, { scope_items: { ...current, [section]: items } })
-  }
+  const totalItems = visiblePhases.reduce((s, p) => s + getItems(p).length, 0)
 
   function handlePrint() {
     if (plan) document.title = `${plan.name} — Alcance`
@@ -149,21 +136,15 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
     setTimeout(() => { document.title = 'OppsHub' }, 1000)
   }
 
-  const totalIncluded = visiblePhases.reduce((s, p) => s + getScopeItems(p).included.length, 0)
-  const totalExcluded = visiblePhases.reduce((s, p) => s + getScopeItems(p).excluded.length, 0)
-
   return (
     <>
       {/* Screen view */}
       <div className="no-print" style={{ padding: '24px 24px 48px' }}>
-        {/* Header row */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-base font-semibold" style={{ color: '#f5f5f7' }}>
-              Alcance del proyecto
-            </h2>
+            <h2 className="text-base font-semibold" style={{ color: '#f5f5f7' }}>Alcance del proyecto</h2>
             <p className="text-xs mt-0.5" style={{ color: '#6e6e73' }}>
-              {totalIncluded} entregables · {totalExcluded} exclusiones · {visiblePhases.length} fases
+              {totalItems} entregables · {visiblePhases.length} fases
             </p>
           </div>
           <button
@@ -187,13 +168,14 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {visiblePhases.map(phase => {
-            const scope  = getScopeItems(phase)
+            const items  = getItems(phase)
             const status = computePhaseStatus(phase)
             const meta   = status ? statusMeta[status] : null
             const StatusIcon = meta?.icon
             const durationDays = daysBetween(phase.start_date, phase.end_date) + 1
+            const color = phase.color || '#bf5af2'
 
             return (
               <div
@@ -204,10 +186,7 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
                 {/* Phase header */}
                 <div
                   className="flex items-center gap-3 px-5 py-3"
-                  style={{
-                    borderBottom: '1px solid rgba(255,255,255,0.06)',
-                    borderLeft: `3px solid ${phase.color || '#bf5af2'}`,
-                  }}
+                  style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', borderLeft: `3px solid ${color}` }}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -234,41 +213,14 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
                   </div>
                 </div>
 
-                {/* Included / Excluded columns */}
-                <div className="grid grid-cols-2" style={{ gap: 0 }}>
-                  {/* Included */}
-                  <div className="px-5 py-4" style={{ borderRight: '1px solid rgba(255,255,255,0.04)' }}>
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: phase.color || '#bf5af2' }} />
-                      <span className="text-xs font-semibold" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                        Incluido
-                      </span>
-                    </div>
-                    <BulletList
-                      items={scope.included}
-                      section="included"
-                      isEditable={isEditable}
-                      onChange={(sec, items) => handleChange(phase, sec, items)}
-                      color={phase.color || '#bf5af2'}
-                    />
-                  </div>
-
-                  {/* Excluded */}
-                  <div className="px-5 py-4">
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.2)' }} />
-                      <span className="text-xs font-semibold" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                        No incluido
-                      </span>
-                    </div>
-                    <BulletList
-                      items={scope.excluded}
-                      section="excluded"
-                      isEditable={isEditable}
-                      onChange={(sec, items) => handleChange(phase, sec, items)}
-                      color={phase.color || '#bf5af2'}
-                    />
-                  </div>
+                {/* Bullet list */}
+                <div className="px-5 py-4">
+                  <BulletList
+                    items={items}
+                    isEditable={isEditable}
+                    onChange={next => onUpdatePhase(phase.id, { scope_items: next })}
+                    color={color}
+                  />
                 </div>
               </div>
             )
@@ -304,19 +256,19 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
 
         {/* Phases */}
         {visiblePhases.map((phase, idx) => {
-          const scope  = getScopeItems(phase)
+          const items  = getItems(phase)
           const status = computePhaseStatus(phase)
           const meta   = lang === 'en' ? STATUS_META_EN[status] : STATUS_META[status]
           const durationDays = daysBetween(phase.start_date, phase.end_date) + 1
+          const color = phase.color || '#bf5af2'
 
           return (
             <div key={phase.id} style={{ marginBottom: 20, pageBreakInside: 'avoid' }}>
-              {/* Phase header */}
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '8px 12px',
                 backgroundColor: '#f8f8f8',
-                borderLeft: `4px solid ${phase.color || '#bf5af2'}`,
+                borderLeft: `4px solid ${color}`,
                 borderRadius: '0 6px 6px 0',
                 marginBottom: 10,
               }}>
@@ -335,32 +287,15 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePhase }) {
                 </div>
               </div>
 
-              {/* Two columns */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, paddingLeft: 12 }}>
-                {/* Included */}
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#555', marginBottom: 6 }}>Incluido</p>
-                  {scope.included.length === 0 ? (
-                    <p style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>—</p>
-                  ) : scope.included.map((item, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 4 }}>
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: phase.color || '#bf5af2', flexShrink: 0, marginTop: 5 }} />
-                      <span style={{ fontSize: 12, lineHeight: 1.5, color: '#222' }}>{item}</span>
-                    </div>
-                  ))}
-                </div>
-                {/* Excluded */}
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#555', marginBottom: 6 }}>No incluido</p>
-                  {scope.excluded.length === 0 ? (
-                    <p style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>—</p>
-                  ) : scope.excluded.map((item, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 4 }}>
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: '#ccc', flexShrink: 0, marginTop: 5 }} />
-                      <span style={{ fontSize: 12, lineHeight: 1.5, color: '#222' }}>{item}</span>
-                    </div>
-                  ))}
-                </div>
+              <div style={{ paddingLeft: 12 }}>
+                {items.length === 0 ? (
+                  <p style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>—</p>
+                ) : items.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 5 }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: color, flexShrink: 0, marginTop: 5, display: 'inline-block' }} />
+                    <span style={{ fontSize: 12, lineHeight: 1.5, color: '#222' }}>{item}</span>
+                  </div>
+                ))}
               </div>
 
               {idx < visiblePhases.length - 1 && (
