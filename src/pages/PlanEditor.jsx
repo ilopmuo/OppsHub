@@ -264,8 +264,8 @@ export default function PlanEditor() {
         />
       )}
 
-      {/* Print-only area — landscape A4 */}
-      <div className="print-only" style={{ display: 'none' }}>
+      {/* Print-only area — landscape A4 — only when Gantt tab is active */}
+      {activeTab === 'gantt' && <div className="print-only" style={{ display: 'none' }}>
         <div style={{ fontFamily: 'Inter, system-ui, sans-serif', padding: '0 8px', zoom: printZoom, transformOrigin: 'top left' }}>
           {/* Header */}
           <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '2px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
@@ -313,7 +313,7 @@ export default function PlanEditor() {
             forcedMonthScales={ganttMonthScales}
           />
         </div>
-      </div>
+      </div>}
     </div>
   )
 }
