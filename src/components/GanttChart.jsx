@@ -539,7 +539,7 @@ export default function GanttChart({
           {/* ── Phase rows ───────────────────────────────────── */}
           <div className="relative" id="gantt-rows-container">
             {/* Today marker — hidden in print */}
-            {!printMode && todayOffset >= 0 && todayOffset <= totalDays + 14 && (
+            {!printMode && todayLeft >= 0 && todayLeft <= canvasW && (
               <div
                 className="absolute top-0 bottom-0 z-20 pointer-events-none"
                 style={{ left: effectiveLW + todayLeft, width: 1.5, backgroundColor: '#ff453a', opacity: 0.7 }}
