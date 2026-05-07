@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Trash2, ChevronDown, ChevronRight, ChevronUp, Link2, Copy, Check, AlertTriangle, Flag, CalendarDays, GitBranch, RotateCcw, CheckCircle2, Diamond, AlignLeft, GitMerge } from 'lucide-react'
 import PlanPhaseTaskList from './PlanPhaseTaskList'
 import { calcEndDateFromHours, workingDaysBetween, addDays, daysBetween, computePhaseStatus } from '../hooks/usePlan'
+import { useLang } from '../contexts/LanguageContext'
 import toast from 'react-hot-toast'
 
 const PHASE_COLORS = ['#bf5af2', '#64d2ff', '#30d158', '#ff9f0a', '#ff453a', '#ff6b35', '#0ea5e9']
@@ -431,6 +432,8 @@ export default function PlanSidebar({
   wide = false,
 }) {
   const [copied,           setCopied]           = useState(false)
+  const { t } = useLang()
+  const p = t('plans')
   const [confirmDelete,    setConfirmDelete]     = useState(false)
   const [creatingSnapshot, setCreatingSnapshot] = useState(false)
   const [newSnapshotName,  setNewSnapshotName]  = useState('')
@@ -795,7 +798,7 @@ export default function PlanSidebar({
 
         {/* PDF branding */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
-          <p className="text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Logo en PDF</p>
+          <p className="text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>{p.pdfLogo}</p>
 
           {/* Toggle OppsHub */}
           <label className="flex items-center gap-2 mb-2 cursor-pointer select-none">
@@ -805,7 +808,7 @@ export default function PlanSidebar({
               onChange={e => onUpdatePlan({ pdf_logo_url: e.target.checked ? null : '' })}
               style={{ accentColor: '#bf5af2', width: 13, height: 13 }}
             />
-            <span className="text-xs" style={{ color: '#d1d1d6' }}>Mostrar logo OppsHub</span>
+            <span className="text-xs" style={{ color: '#d1d1d6' }}>{p.showOppsHub}</span>
           </label>
 
           {/* Custom logo URL input — shown when OppsHub is hidden */}
@@ -814,7 +817,7 @@ export default function PlanSidebar({
               <input
                 value={plan.pdf_logo_url || ''}
                 onChange={e => onUpdatePlan({ pdf_logo_url: e.target.value || '' })}
-                placeholder="URL de tu logo..."
+                placeholder={p.customLogoUrl}
                 style={{ ...inputStyle, fontSize: 12 }}
                 onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
@@ -827,7 +830,7 @@ export default function PlanSidebar({
                     style={{ height: 24, maxWidth: 80, objectFit: 'contain', borderRadius: 4, backgroundColor: '#fff', padding: 2 }}
                     onError={e => e.target.style.display = 'none'}
                   />
-                  <span className="text-xs" style={{ color: '#3a3a3a' }}>Vista previa</span>
+                  <span className="text-xs" style={{ color: '#3a3a3a' }}>{p.logoPreview}</span>
                 </div>
               )}
             </div>

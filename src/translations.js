@@ -21,6 +21,10 @@ export const translations = {
       notFoundPublic: 'Plan no encontrado o enlace no válido.',
       planned: 'planificadas',
       legend: 'Leyenda',
+      pdfLogo: 'Logo en PDF',
+      showOppsHub: 'Mostrar logo OppsHub',
+      customLogoUrl: 'URL de tu logo...',
+      logoPreview: 'Vista previa',
     },
     scope: {
       tabLabel: 'Alcance',
@@ -137,6 +141,10 @@ export const translations = {
       notFoundPublic: 'Plan not found or invalid link.',
       planned: 'planned',
       legend: 'Legend',
+      pdfLogo: 'PDF logo',
+      showOppsHub: 'Show OppsHub logo',
+      customLogoUrl: 'Your logo URL...',
+      logoPreview: 'Preview',
     },
     scope: {
       tabLabel: 'Scope',
