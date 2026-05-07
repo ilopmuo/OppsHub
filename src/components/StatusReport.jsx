@@ -596,43 +596,56 @@ function phaseMetrics(phase) {
            scheduleStatus, scheduleColor, scheduleLabel }
 }
 
+// ── Gantt section (own block, between 01 and 02) ─────────────────────────────
+function PlanGanttSection({ projectId }) {
+  const [plan,   setPlan]   = useState(null)
+  const [phases, setPhases] = useState([])
+
+  useEffect(() => {
+    async function load() {
+      const { data: plans } = await supabase
+        .from('project_plans').select('*').eq('project_id', projectId).limit(1)
+      if (!plans?.length) return
+      setPlan(plans[0])
+      const { data: ph } = await supabase
+        .from('plan_phases').select('*, plan_tasks(*)').eq('plan_id', plans[0].id).order('order_index')
+      setPhases((ph ?? []).map(p => ({ ...p, plan_tasks: (p.plan_tasks ?? []).sort((a, b) => a.order_index - b.order_index) })))
+    }
+    load()
+  }, [projectId])
+
+  if (!plan || !phases.length) return null
+
+  return (
+    <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, backgroundColor: '#111111', overflow: 'hidden' }}>
+      <GanttChart plan={plan} phases={phases} isEditable={false} />
+    </div>
+  )
+}
+
 function DeliveringValueSection({ projectId }) {
-  const [plan, setPlan]         = useState(null)
-  const [allPhases, setAllPhases] = useState([])
-  const [hasPlan, setHasPlan]   = useState(null)
+  const [phases, setPhases] = useState([])
+  const [hasPlan, setHasPlan] = useState(null)
   const [showAllPhases, setShowAllPhases] = useState(false)
   const PHASES_VISIBLE = 4
 
   useEffect(() => {
     async function load() {
       const { data: plans } = await supabase
-        .from('project_plans')
-        .select('*')
-        .eq('project_id', projectId)
-        .limit(1)
-
+        .from('project_plans').select('id').eq('project_id', projectId).limit(1)
       if (plans?.length) {
         setHasPlan(true)
-        setPlan(plans[0])
         const { data: ph } = await supabase
           .from('plan_phases')
-          .select('*, plan_tasks(*)')
-          .eq('plan_id', plans[0].id)
-          .order('order_index')
-
-        setAllPhases((ph ?? []).map(phase => ({
-          ...phase,
-          plan_tasks: (phase.plan_tasks || []).sort((a, b) => a.order_index - b.order_index),
-        })))
+          .select('id, name, color, start_date, end_date, hours, is_milestone, progress')
+          .eq('plan_id', plans[0].id).order('order_index')
+        setPhases((ph ?? []).filter(p => !p.is_milestone))
       } else {
         setHasPlan(false)
       }
     }
     load()
   }, [projectId])
-
-  // Non-milestone phases for progress metrics
-  const phases = allPhases.filter(p => !p.is_milestone)
 
   // Derived plan stats
   const phasesWithMetrics = phases.map(p => ({ ...p, metrics: phaseMetrics(p) }))
@@ -650,17 +663,6 @@ function DeliveringValueSection({ projectId }) {
       {hasPlan === false && (
         <div style={{ ...CARD, marginBottom: 16 }}>
           <p className="text-sm" style={{ color: '#6e6e73' }}>Sin plan vinculado a este proyecto. Crea uno en la tab Plan para ver métricas de progreso.</p>
-        </div>
-      )}
-
-      {plan && allPhases.length > 0 && (
-        <div style={{ ...CARD, marginBottom: 16, padding: 0, overflow: 'hidden' }}>
-          <p className="text-xs font-medium px-5 pt-4 pb-3" style={{ color: '#6e6e73', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            Diagrama de Gantt
-          </p>
-          <div style={{ overflowX: 'auto' }}>
-            <GanttChart plan={plan} phases={allPhases} isEditable={false} />
-          </div>
         </div>
       )}
 
@@ -1489,9 +1491,20 @@ function SnapshotView({ snapshot }) {
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px 64px' }}>
-      {sections.map((sec, i) => (
-        <div key={sec.number} style={{ marginBottom: i < sections.length - 1 ? 48 : 0 }}>
-          <SectionHeader number={sec.number} title={sec.title} subtitle={sec.subtitle}
+      {[
+        ...sections.slice(0, 1),
+        { number: 'gantt', isGantt: true },
+        ...sections.slice(1),
+      ].map((sec, i, arr) => (
+        <div key={sec.number} style={{ marginBottom: i < arr.length - 1 ? 48 : 0 }}>
+          {sec.isGantt ? (
+            snapPlan && allSnapPhases.length > 0
+              ? <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, backgroundColor: '#111111', overflow: 'hidden' }}>
+                  <GanttChart plan={snapPlan} phases={allSnapPhases} isEditable={false} />
+                </div>
+              : null
+          ) : (
+          <><SectionHeader number={sec.number} title={sec.title} subtitle={sec.subtitle}
             status={snapSectionStatuses[sec.number]} />
 
           {sec.number === '01' && (
@@ -1595,16 +1608,6 @@ function SnapshotView({ snapshot }) {
 
           {sec.number === '03' && (
             <div className="mb-2">
-              {snapPlan && allSnapPhases.length > 0 && (
-                <div style={{ ...CARD, marginBottom: 16, padding: 0, overflow: 'hidden' }}>
-                  <p className="text-xs font-medium px-5 pt-4 pb-3" style={{ color: '#6e6e73', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    Diagrama de Gantt
-                  </p>
-                  <div style={{ overflowX: 'auto' }}>
-                    <GanttChart plan={snapPlan} phases={allSnapPhases} isEditable={false} />
-                  </div>
-                </div>
-              )}
               {phases.length === 0
                 ? <div style={CARD}><p className="text-sm" style={{ color: '#6e6e73' }}>Sin plan vinculado.</p></div>
                 : <>
@@ -1760,7 +1763,9 @@ function SnapshotView({ snapshot }) {
             </div>
           )}
 
-          {i < sections.length - 1 && <div style={{ marginTop: 48, borderTop: '1px solid rgba(255,255,255,0.05)' }} />}
+          </>
+          )}
+          {i < arr.length - 1 && <div style={{ marginTop: 48, borderTop: '1px solid rgba(255,255,255,0.05)' }} />}
         </div>
       ))}
     </div>
@@ -2063,15 +2068,25 @@ export default function StatusReport({ project: initialProject, members, tasks }
       {selectedVersion ? (
         <SnapshotView snapshot={selectedVersion.snapshot} />
       ) : (
-        sections.map((s, i) => (
-          <div key={s.number} style={{ marginBottom: i < sections.length - 1 ? 48 : 0 }}>
-            <SectionHeader
-              number={s.number} title={s.title} subtitle={s.subtitle}
-              status={sectionStatuses[s.number]}
-              onStatusChange={val => updateSectionStatus(s.number, val)}
-            />
-            {s.content}
-            {i < sections.length - 1 && (
+        [
+          ...sections.slice(0, 1),
+          { number: 'gantt', isGantt: true },
+          ...sections.slice(1),
+        ].map((s, i, arr) => (
+          <div key={s.number} style={{ marginBottom: i < arr.length - 1 ? 48 : 0 }}>
+            {s.isGantt ? (
+              <PlanGanttSection projectId={project.id} />
+            ) : (
+              <>
+                <SectionHeader
+                  number={s.number} title={s.title} subtitle={s.subtitle}
+                  status={sectionStatuses[s.number]}
+                  onStatusChange={val => updateSectionStatus(s.number, val)}
+                />
+                {s.content}
+              </>
+            )}
+            {i < arr.length - 1 && (
               <div style={{ marginTop: 48, borderTop: '1px solid rgba(255,255,255,0.05)' }} />
             )}
           </div>
