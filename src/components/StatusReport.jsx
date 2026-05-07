@@ -617,7 +617,7 @@ function PlanGanttSection({ projectId }) {
   if (!plan || !phases.length) return null
 
   return (
-    <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, backgroundColor: '#111111', overflow: 'hidden' }}>
+    <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, backgroundColor: '#111111', overflow: 'hidden', margin: '0 -24px' }}>
       <GanttChart plan={plan} phases={phases} isEditable={false} />
     </div>
   )
@@ -1490,7 +1490,7 @@ function SnapshotView({ snapshot }) {
   ]
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px 64px' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px 64px' }}>
       {[
         ...sections.slice(0, 1),
         { number: 'gantt', isGantt: true },
@@ -1499,7 +1499,7 @@ function SnapshotView({ snapshot }) {
         <div key={sec.number} style={{ marginBottom: i < arr.length - 1 ? 48 : 0 }}>
           {sec.isGantt ? (
             snapPlan && allSnapPhases.length > 0
-              ? <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, backgroundColor: '#111111', overflow: 'hidden' }}>
+              ? <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, backgroundColor: '#111111', overflow: 'hidden', margin: '0 -24px' }}>
                   <GanttChart plan={snapPlan} phases={allSnapPhases} isEditable={false} />
                 </div>
               : null
@@ -1958,7 +1958,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
   const autoName = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 24px 64px' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 24px 64px' }}>
 
       {/* ── Version bar ── */}
       <div className="flex items-center justify-between mb-8 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
