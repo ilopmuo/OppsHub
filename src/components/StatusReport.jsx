@@ -387,10 +387,11 @@ function SystemStabilitySection({ projectId }) {
 
     const existing = statsMap[monthYear]
     const payload = {
-      project_id:   projectId,
-      month_year:   monthYear,
-      open_count:   field === 'open'   ? val : (existing?.open_count   ?? 0),
-      closed_count: field === 'closed' ? val : (existing?.closed_count ?? 0),
+      project_id:         projectId,
+      month_year:         monthYear,
+      open_count:         field === 'open'        ? val : (existing?.open_count         ?? 0),
+      in_progress_count:  field === 'in_progress' ? val : (existing?.in_progress_count  ?? 0),
+      closed_count:       field === 'closed'      ? val : (existing?.closed_count       ?? 0),
     }
 
     const { error } = await supabase
@@ -401,9 +402,7 @@ function SystemStabilitySection({ projectId }) {
     setStats(prev => {
       const idx = prev.findIndex(s => s.month_year === monthYear)
       if (idx >= 0) {
-        const next = [...prev]
-        next[idx] = { ...next[idx], ...payload }
-        return next
+        const next = [...prev]; next[idx] = { ...next[idx], ...payload }; return next
       }
       return [...prev, payload]
     })
@@ -412,7 +411,9 @@ function SystemStabilitySection({ projectId }) {
 
   function startEdit(monthYear, field) {
     const existing = statsMap[monthYear]
-    const current = field === 'open' ? (existing?.open_count ?? '') : (existing?.closed_count ?? '')
+    const current = field === 'open' ? (existing?.open_count ?? '')
+      : field === 'in_progress' ? (existing?.in_progress_count ?? '')
+      : (existing?.closed_count ?? '')
     setEditing(prev => ({ ...prev, [`${monthYear}_${field}`]: String(current === 0 ? '' : current) }))
   }
 
@@ -420,38 +421,49 @@ function SystemStabilitySection({ projectId }) {
   const now = new Date()
   const thisMonth = isoMonth(now)
   const thisMonthStats = statsMap[thisMonth]
-  const totalOpenThisMonth   = thisMonthStats?.open_count   ?? 0
-  const totalClosedThisMonth = thisMonthStats?.closed_count ?? 0
+  const totalOpenThisMonth       = thisMonthStats?.open_count        ?? 0
+  const totalInProgressThisMonth = thisMonthStats?.in_progress_count ?? 0
+  const totalClosedThisMonth     = thisMonthStats?.closed_count      ?? 0
   const yearStats = stats.filter(s => s.month_year.startsWith(String(now.getFullYear())))
-  const totalOpenYear   = yearStats.reduce((sum, s) => sum + (s.open_count   ?? 0), 0)
-  const totalClosedYear = yearStats.reduce((sum, s) => sum + (s.closed_count ?? 0), 0)
+  const totalOpenYear       = yearStats.reduce((sum, s) => sum + (s.open_count        ?? 0), 0)
+  const totalInProgressYear = yearStats.reduce((sum, s) => sum + (s.in_progress_count ?? 0), 0)
+  const totalClosedYear     = yearStats.reduce((sum, s) => sum + (s.closed_count      ?? 0), 0)
+  // Backlog acumulado = proxy de aging: bugs abiertos históricos que aún no se han cerrado
+  const backlog = stats.reduce((sum, s) => sum + (s.open_count ?? 0) + (s.in_progress_count ?? 0) - (s.closed_count ?? 0), 0)
 
   // Chart data
   const chartData = months.map(m => ({
-    month: monthLabel(m),
-    abiertos: statsMap[m]?.open_count ?? 0,
-    cerrados: statsMap[m]?.closed_count ?? 0,
+    month:      monthLabel(m),
+    abiertos:   statsMap[m]?.open_count        ?? 0,
+    en_progreso: statsMap[m]?.in_progress_count ?? 0,
+    cerrados:   statsMap[m]?.closed_count      ?? 0,
   }))
 
   // Donut: totals across all loaded months
-  const totalOpen   = stats.reduce((s, r) => s + (r.open_count ?? 0), 0)
-  const totalClosed = stats.reduce((s, r) => s + (r.closed_count ?? 0), 0)
+  const totalOpen       = stats.reduce((s, r) => s + (r.open_count        ?? 0), 0)
+  const totalInProgress = stats.reduce((s, r) => s + (r.in_progress_count ?? 0), 0)
+  const totalClosed     = stats.reduce((s, r) => s + (r.closed_count      ?? 0), 0)
   const donutData = [
-    { name: 'Abiertos', value: totalOpen,   color: '#ff453a' },
-    { name: 'Cerrados', value: totalClosed, color: '#30d158' },
+    { name: 'Abiertos',    value: totalOpen,       color: '#ff453a' },
+    { name: 'En progreso', value: totalInProgress, color: '#ff9f0a' },
+    { name: 'Cerrados',    value: totalClosed,     color: '#30d158' },
   ].filter(d => d.value > 0)
   if (donutData.length === 0) donutData.push({ name: 'Sin datos', value: 1, color: '#2a2a2a' })
 
+  const FIELD_COLORS = { open: '#ff453a', in_progress: '#ff9f0a', closed: '#30d158' }
+  const FIELD_BG     = { open: 'rgba(255,69,58,0.06)', in_progress: 'rgba(255,159,10,0.06)', closed: 'rgba(48,209,88,0.06)' }
+
   function CellBtn({ monthYear, field }) {
     const key = `${monthYear}_${field}`
-    const isEditing = editing[key] !== undefined
-    const val = field === 'open' ? statsMap[monthYear]?.open_count : statsMap[monthYear]?.closed_count
-    const color = field === 'open' ? '#ff453a' : '#30d158'
+    const isEditingCell = editing[key] !== undefined
+    const val = field === 'open' ? statsMap[monthYear]?.open_count
+      : field === 'in_progress' ? statsMap[monthYear]?.in_progress_count
+      : statsMap[monthYear]?.closed_count
+    const color = FIELD_COLORS[field]
 
-    if (isEditing) return (
+    if (isEditingCell) return (
       <input
-        autoFocus
-        type="number" min="0"
+        autoFocus type="number" min="0"
         style={{ ...INPUT, width: 64, padding: '3px 6px', textAlign: 'center', fontSize: 12 }}
         value={editing[key]}
         onChange={e => setEditing(prev => ({ ...prev, [key]: e.target.value }))}
@@ -468,7 +480,7 @@ function SystemStabilitySection({ projectId }) {
           cursor: 'pointer', fontSize: 13, fontWeight: val ? 600 : 400,
           color: val ? color : '#3a3a3a',
           padding: '3px 10px', minWidth: 56, textAlign: 'center',
-          backgroundColor: val ? (field === 'open' ? 'rgba(255,69,58,0.06)' : 'rgba(48,209,88,0.06)') : 'rgba(255,255,255,0.02)',
+          backgroundColor: val ? FIELD_BG[field] : 'rgba(255,255,255,0.02)',
           transition: 'background 0.15s',
         }}>
         {val ?? '—'}
@@ -476,41 +488,52 @@ function SystemStabilitySection({ projectId }) {
     )
   }
 
+  const SEP = <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+
   return (
     <div className="mb-2">
-      {/* KPIs — agrupados por período y por tipo */}
+      {/* KPIs — agrupados por período */}
       <div className="grid grid-cols-2 gap-4 mb-4">
-        {/* Este mes */}
         <div style={{ ...CARD, padding: '16px 20px' }}>
-          <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Este mes
-          </p>
-          <div className="flex gap-6">
+          <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Este mes</p>
+          <div className="flex gap-5">
             <div>
               <p className="text-xs mb-1" style={{ color: '#ff453a' }}>Abiertos</p>
               <p className="text-2xl font-bold" style={{ color: totalOpenThisMonth > 0 ? '#ff453a' : '#f5f5f7' }}>{totalOpenThisMonth}</p>
             </div>
-            <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+            {SEP}
+            <div>
+              <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>En progreso</p>
+              <p className="text-2xl font-bold" style={{ color: totalInProgressThisMonth > 0 ? '#ff9f0a' : '#f5f5f7' }}>{totalInProgressThisMonth}</p>
+            </div>
+            {SEP}
             <div>
               <p className="text-xs mb-1" style={{ color: '#30d158' }}>Cerrados</p>
               <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{totalClosedThisMonth}</p>
             </div>
           </div>
         </div>
-        {/* Este año */}
         <div style={{ ...CARD, padding: '16px 20px' }}>
-          <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Este año
-          </p>
-          <div className="flex gap-6">
+          <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Este año</p>
+          <div className="flex gap-5">
             <div>
               <p className="text-xs mb-1" style={{ color: '#ff453a' }}>Abiertos</p>
               <p className="text-2xl font-bold" style={{ color: totalOpenYear > 0 ? '#ff453a' : '#f5f5f7' }}>{totalOpenYear}</p>
             </div>
-            <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+            {SEP}
+            <div>
+              <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>En progreso</p>
+              <p className="text-2xl font-bold" style={{ color: totalInProgressYear > 0 ? '#ff9f0a' : '#f5f5f7' }}>{totalInProgressYear}</p>
+            </div>
+            {SEP}
             <div>
               <p className="text-xs mb-1" style={{ color: '#30d158' }}>Cerrados</p>
               <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{totalClosedYear}</p>
+            </div>
+            {SEP}
+            <div>
+              <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>Backlog</p>
+              <p className="text-2xl font-bold" style={{ color: backlog > 0 ? '#ff453a' : '#30d158' }}>{Math.max(0, backlog)}</p>
             </div>
           </div>
         </div>
@@ -519,14 +542,12 @@ function SystemStabilitySection({ projectId }) {
       {/* Monthly input table */}
       <div style={CARD} className="mb-4">
         <p className="text-xs font-medium mb-1" style={{ color: '#6e6e73' }}>Bugs por mes — haz click en cualquier celda para editar</p>
-        <p className="text-xs mb-4" style={{ color: '#3a3a3a' }}>Introduce directamente el número de bugs abiertos y cerrados cada mes</p>
+        <p className="text-xs mb-4" style={{ color: '#3a3a3a' }}>El backlog acumulado (abiertos + en progreso − cerrados) indica cuántos bugs siguen sin resolver</p>
         <div className="overflow-x-auto">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <th style={{ color: '#6e6e73', fontWeight: 500, textAlign: 'left', paddingBottom: 8, whiteSpace: 'nowrap', width: 72 }}>
-                  Mes
-                </th>
+                <th style={{ color: '#6e6e73', fontWeight: 500, textAlign: 'left', paddingBottom: 8, whiteSpace: 'nowrap', width: 90 }}>Mes</th>
                 {months.map(m => (
                   <th key={m} style={{ color: m === thisMonth ? '#f5f5f7' : '#6e6e73', fontWeight: m === thisMonth ? 600 : 500,
                                        textAlign: 'center', paddingBottom: 8, minWidth: 80, whiteSpace: 'nowrap' }}>
@@ -537,10 +558,11 @@ function SystemStabilitySection({ projectId }) {
             </thead>
             <tbody>
               {[
-                { field: 'open',   label: 'Abiertos', color: '#ff453a' },
-                { field: 'closed', label: 'Cerrados', color: '#30d158' },
-              ].map(row => (
-                <tr key={row.field}>
+                { field: 'open',        label: 'Abiertos',    color: '#ff453a' },
+                { field: 'in_progress', label: 'En progreso', color: '#ff9f0a' },
+                { field: 'closed',      label: 'Cerrados',    color: '#30d158' },
+              ].map((row, ri, rows) => (
+                <tr key={row.field} style={{ borderTop: ri > 0 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
                   <td style={{ padding: '8px 0', color: row.color, fontWeight: 500 }}>{row.label}</td>
                   {months.map(m => (
                     <td key={m} style={{ textAlign: 'center', padding: '6px 4px' }}>
@@ -557,15 +579,16 @@ function SystemStabilitySection({ projectId }) {
       {/* Charts */}
       <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-4">
         <div style={CARD}>
-          <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Evolución de bugs (últimos 12 meses)</p>
+          <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Evolución de bugs (últimos 6 meses)</p>
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={chartData} barSize={8} barGap={2}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
               <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-              <Bar dataKey="abiertos" fill="#ff453a" radius={[3,3,0,0]} name="Abiertos" />
-              <Bar dataKey="cerrados" fill="#30d158" radius={[3,3,0,0]} name="Cerrados" />
+              <Bar dataKey="abiertos"    fill="#ff453a" radius={[3,3,0,0]} name="Abiertos" />
+              <Bar dataKey="en_progreso" fill="#ff9f0a" radius={[3,3,0,0]} name="En progreso" />
+              <Bar dataKey="cerrados"    fill="#30d158" radius={[3,3,0,0]} name="Cerrados" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -1455,12 +1478,15 @@ function SnapshotView({ snapshot }) {
   // Bug stats
   const bugMap     = Object.fromEntries(bugStats.map(b => [b.month_year, b]))
   const snapBugs   = bugMap[snapMonth]
-  const bugChartData = months6.map(m => ({ month: monthLabel(m), abiertos: bugMap[m]?.open_count ?? 0, cerrados: bugMap[m]?.closed_count ?? 0 }))
-  const totalBugOpen   = bugStats.reduce((s, b) => s + (b.open_count ?? 0), 0)
-  const totalBugClosed = bugStats.reduce((s, b) => s + (b.closed_count ?? 0), 0)
+  const bugChartData = months6.map(m => ({ month: monthLabel(m), abiertos: bugMap[m]?.open_count ?? 0, en_progreso: bugMap[m]?.in_progress_count ?? 0, cerrados: bugMap[m]?.closed_count ?? 0 }))
+  const totalBugOpen       = bugStats.reduce((s, b) => s + (b.open_count        ?? 0), 0)
+  const totalBugInProgress = bugStats.reduce((s, b) => s + (b.in_progress_count ?? 0), 0)
+  const totalBugClosed     = bugStats.reduce((s, b) => s + (b.closed_count      ?? 0), 0)
+  const bugBacklog = Math.max(0, totalBugOpen + totalBugInProgress - totalBugClosed)
   const bugDonut = [
-    { name: 'Abiertos', value: totalBugOpen,   color: '#ff453a' },
-    { name: 'Cerrados', value: totalBugClosed, color: '#30d158' },
+    { name: 'Abiertos',    value: totalBugOpen,       color: '#ff453a' },
+    { name: 'En progreso', value: totalBugInProgress, color: '#ff9f0a' },
+    { name: 'Cerrados',    value: totalBugClosed,     color: '#30d158' },
   ].filter(d => d.value > 0)
   if (!bugDonut.length) bugDonut.push({ name: 'Sin datos', value: 1, color: '#2a2a2a' })
 
@@ -1601,10 +1627,15 @@ function SnapshotView({ snapshot }) {
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div style={{ ...CARD, padding: '16px 20px' }}>
                   <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Este mes</p>
-                  <div className="flex gap-6">
+                  <div className="flex gap-5">
                     <div>
                       <p className="text-xs mb-1" style={{ color: '#ff453a' }}>Abiertos</p>
                       <p className="text-2xl font-bold" style={{ color: (snapBugs?.open_count ?? 0) > 0 ? '#ff453a' : '#f5f5f7' }}>{snapBugs?.open_count ?? 0}</p>
+                    </div>
+                    <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+                    <div>
+                      <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>En progreso</p>
+                      <p className="text-2xl font-bold" style={{ color: (snapBugs?.in_progress_count ?? 0) > 0 ? '#ff9f0a' : '#f5f5f7' }}>{snapBugs?.in_progress_count ?? 0}</p>
                     </div>
                     <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
                     <div>
@@ -1615,15 +1646,25 @@ function SnapshotView({ snapshot }) {
                 </div>
                 <div style={{ ...CARD, padding: '16px 20px' }}>
                   <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Acumulado</p>
-                  <div className="flex gap-6">
+                  <div className="flex gap-5">
                     <div>
                       <p className="text-xs mb-1" style={{ color: '#ff453a' }}>Abiertos</p>
                       <p className="text-2xl font-bold" style={{ color: totalBugOpen > 0 ? '#ff453a' : '#f5f5f7' }}>{totalBugOpen}</p>
                     </div>
                     <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
                     <div>
+                      <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>En progreso</p>
+                      <p className="text-2xl font-bold" style={{ color: totalBugInProgress > 0 ? '#ff9f0a' : '#f5f5f7' }}>{totalBugInProgress}</p>
+                    </div>
+                    <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+                    <div>
                       <p className="text-xs mb-1" style={{ color: '#30d158' }}>Cerrados</p>
                       <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{totalBugClosed}</p>
+                    </div>
+                    <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+                    <div>
+                      <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>Backlog</p>
+                      <p className="text-2xl font-bold" style={{ color: bugBacklog > 0 ? '#ff453a' : '#30d158' }}>{bugBacklog}</p>
                     </div>
                   </div>
                 </div>
@@ -1637,8 +1678,9 @@ function SnapshotView({ snapshot }) {
                       <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
                       <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                      <Bar dataKey="abiertos" fill="#ff453a" radius={[3,3,0,0]} name="Abiertos" />
-                      <Bar dataKey="cerrados" fill="#30d158" radius={[3,3,0,0]} name="Cerrados" />
+                      <Bar dataKey="abiertos"    fill="#ff453a" radius={[3,3,0,0]} name="Abiertos" />
+                      <Bar dataKey="en_progreso" fill="#ff9f0a" radius={[3,3,0,0]} name="En progreso" />
+                      <Bar dataKey="cerrados"    fill="#30d158" radius={[3,3,0,0]} name="Cerrados" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
