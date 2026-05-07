@@ -1663,7 +1663,7 @@ function SnapshotView({ snapshot, lang = 'es', presentationMode = false }) {
     <div className="sr-print-container" style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px 64px' }}>
       {[
         ...sections.slice(0, 1),
-        { number: 'gantt', isGantt: true },
+        ...(presentationMode ? [] : [{ number: 'gantt', isGantt: true }]),
         ...sections.slice(1),
       ].map((sec, i, arr) => (
         <div key={sec.number} className="sr-slide" style={{ marginBottom: i < arr.length - 1 ? 48 : 0 }}>
@@ -2325,7 +2325,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
       ) : (
         [
           ...sections.slice(0, 1),
-          { number: 'gantt', isGantt: true },
+          ...(presentationMode ? [] : [{ number: 'gantt', isGantt: true }]),
           ...sections.slice(1),
         ].map((s, i, arr) => (
           <div key={s.number} className="sr-slide" style={{ marginBottom: i < arr.length - 1 ? 48 : 0 }}>
