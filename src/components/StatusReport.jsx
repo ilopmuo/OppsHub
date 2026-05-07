@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, PieChart, Pie, Cell,
 } from 'recharts'
-import { Pencil, ChevronDown, ChevronUp } from 'lucide-react'
+import { Pencil, ChevronDown, ChevronUp, Save, Clock } from 'lucide-react'
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const CARD = {
@@ -55,6 +55,15 @@ function lastNMonths(n) {
   return months
 }
 function last12Months() { return lastNMonths(12) }
+function lastNMonthsFrom(n, fromIso) {
+  const from = new Date(fromIso + 'T00:00:00')
+  const months = []
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(from.getFullYear(), from.getMonth() - i, 1)
+    months.push(isoMonth(d))
+  }
+  return months
+}
 function initials(m) {
   if (m?.display_name) return m.display_name.slice(0, 2).toUpperCase()
   if (m?.email) return m.email.split('@')[0].slice(0, 2).toUpperCase()
@@ -1354,6 +1363,380 @@ function OpportunitiesSection({ project, onSave }) {
   )
 }
 
+// ── Snapshot read-only view ───────────────────────────────────────────────────
+function SnapshotView({ snapshot }) {
+  const proj        = snapshot.project ?? {}
+  const resources   = snapshot.resources ?? []
+  const bugStats    = snapshot.bug_stats ?? []
+  const phases      = snapshot.phases ?? []
+  const teamKpis    = snapshot.team_kpis ?? []
+  const effort      = snapshot.effort ?? []
+  const financial   = snapshot.financial ?? null
+  const invoices    = snapshot.invoices ?? []
+  const allocations = snapshot.allocations ?? []
+  const snapDate    = snapshot.date ?? new Date().toISOString().slice(0, 10)
+
+  function phaseMetAt(phase) {
+    const ref   = new Date(snapDate + 'T00:00:00')
+    const start = new Date(phase.start_date + 'T00:00:00')
+    const end   = new Date(phase.end_date   + 'T00:00:00')
+    const totalDays = Math.max(1, Math.round((end - start) / 86400000))
+    const elapsed   = Math.round((ref - start) / 86400000)
+    const timePct   = Math.min(100, Math.max(0, elapsed / totalDays * 100))
+    const progress  = phase.progress ?? 0
+    const isCompleted = progress >= 100
+    const isUpcoming  = ref < start
+    const isOverdue   = ref > end && !isCompleted
+    let color, label
+    if (isCompleted)              { color = '#30d158'; label = 'Completada' }
+    else if (isUpcoming)          { color = '#6e6e73'; label = 'Pendiente' }
+    else if (isOverdue)           { color = '#ff453a'; label = 'Retrasada' }
+    else if (timePct - progress > 25) { color = '#ff9f0a'; label = 'En riesgo' }
+    else                          { color = '#64d2ff'; label = 'En plazo' }
+    return { timePct, progress, color, label, isUpcoming, isCompleted }
+  }
+
+  const months6    = lastNMonthsFrom(6, snapDate)
+  const months4    = lastNMonthsFrom(4, snapDate)
+  const snapMonth  = snapDate.slice(0, 7)
+
+  // Bug stats
+  const bugMap     = Object.fromEntries(bugStats.map(b => [b.month_year, b]))
+  const snapBugs   = bugMap[snapMonth]
+  const bugChartData = months6.map(m => ({ month: monthLabel(m), abiertos: bugMap[m]?.open_count ?? 0, cerrados: bugMap[m]?.closed_count ?? 0 }))
+  const totalBugOpen   = bugStats.reduce((s, b) => s + (b.open_count ?? 0), 0)
+  const totalBugClosed = bugStats.reduce((s, b) => s + (b.closed_count ?? 0), 0)
+  const bugDonut = [
+    { name: 'Abiertos', value: totalBugOpen,   color: '#ff453a' },
+    { name: 'Cerrados', value: totalBugClosed, color: '#30d158' },
+  ].filter(d => d.value > 0)
+  if (!bugDonut.length) bugDonut.push({ name: 'Sin datos', value: 1, color: '#2a2a2a' })
+
+  // Phases
+  const phasesWithMet   = phases.map(p => ({ ...p, met: phaseMetAt(p) }))
+  const overallPct      = phases.length ? Math.round(phases.reduce((s, p) => s + (p.progress ?? 0), 0) / phases.length) : 0
+  const completedPhases = phasesWithMet.filter(p => p.met.isCompleted).length
+  const totalHoursSnap  = phases.reduce((s, p) => s + (p.hours ?? 0), 0)
+
+  // Team KPIs
+  const kpiMap      = Object.fromEntries(teamKpis.map(k => [k.month_year, k]))
+  const currentKpis = kpiMap[snapMonth] ?? { tasks_closed: 0, bugs_closed: 0, in_progress: 0 }
+  function donutFor(kpis) {
+    const data = [
+      { name: 'Tareas cerradas', value: kpis.tasks_closed ?? 0, color: '#30d158' },
+      { name: 'Bugs cerrados',   value: kpis.bugs_closed  ?? 0, color: '#ff9f0a' },
+      { name: 'En progreso',     value: kpis.in_progress  ?? 0, color: '#64d2ff' },
+    ].filter(d => d.value > 0)
+    if (!data.length) data.push({ name: 'Sin datos', value: 1, color: '#2a2a2a' })
+    return data
+  }
+  const effortMap  = Object.fromEntries(effort.map(e => [e.month_year, e.hours]))
+  const effortData = months4.map(m => ({ month: monthLabel(m), horas: effortMap[m] ?? 0 }))
+
+  // Profitability
+  const cur      = financial?.currency ?? '€'
+  const contract = financial?.contract_value ?? 0
+  const target   = financial?.target_margin ?? 20
+  const etd = (financial?.effort_to_date ?? 0) + resources.reduce((sum, r) => {
+    const h = allocations
+      .filter(a => a.resource_id === r.id && a.week_start <= snapDate)
+      .reduce((s, a) => s + (a.actual_hours || 0), 0)
+    return sum + (h + (r.hours_to_date || 0)) * (r.hourly_rate || 0)
+  }, 0)
+  const billed  = invoices.length ? invoices.reduce((s, i) => s + i.amount, 0) : (financial?.invoiced_to_date ?? 0)
+  const profit  = billed - etd
+  const margin  = billed > 0 ? (profit / billed) * 100 : 0
+  const maxVal  = Math.max(contract, etd, billed, 1)
+  const ph      = profitHealth(margin, target)
+
+  const TYPE_LABELS   = { implementation: 'Implementación', maintenance: 'Mantenimiento' }
+  const STATUS_LABELS = { on_track: 'On track', at_risk: 'At risk', blocked: 'Blocked' }
+  const STATUS_COLORS = { on_track: '#30d158', at_risk: '#ff9f0a', blocked: '#ff453a' }
+  const CSAT_STATES   = [
+    { value: 'good',    color: '#30d158', shadow: 'rgba(48,209,88,0.5)' },
+    { value: 'regular', color: '#ff9f0a', shadow: 'rgba(255,159,10,0.5)' },
+    { value: 'bad',     color: '#ff453a', shadow: 'rgba(255,69,58,0.5)' },
+  ]
+  const isImpl = proj.type === 'implementation'
+
+  const sections = [
+    { number: '01', title: 'What is the status of my project?',   subtitle: 'Tipo de proyecto, satisfacción del cliente y asignación del equipo' },
+    { number: '02', title: 'Is my system stable?',                subtitle: 'Bugs registrados, estado y evolución mensual' },
+    { number: '03', title: 'Are we delivering value?',            subtitle: 'Progreso del plan, fases y estado del proyecto' },
+    { number: '04', title: 'Is my team working well?',            subtitle: 'Tareas cerradas, bugs resueltos, trabajo en progreso y esfuerzo' },
+    { number: '05', title: 'Is the project profitable?',          subtitle: 'Presupuesto, costes y facturación' },
+    { number: '06', title: 'Opportunities & Challenges',          subtitle: 'Nuevas oportunidades de negocio y retos actuales' },
+  ]
+
+  return (
+    <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px 64px' }}>
+      {sections.map((sec, i) => (
+        <div key={sec.number} style={{ marginBottom: i < sections.length - 1 ? 48 : 0 }}>
+          <SectionHeader number={sec.number} title={sec.title} subtitle={sec.subtitle} />
+
+          {sec.number === '01' && (
+            <div className="flex flex-col gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div style={CARD}>
+                  <p className="text-xs mb-3" style={{ color: '#6e6e73' }}>Tipo de proyecto</p>
+                  <span className="text-sm font-semibold px-3 py-1 rounded-full"
+                    style={{ backgroundColor: isImpl ? 'rgba(100,210,255,0.12)' : 'rgba(191,90,242,0.12)', color: isImpl ? '#64d2ff' : '#bf5af2' }}>
+                    {TYPE_LABELS[proj.type] ?? proj.type}
+                  </span>
+                  {!isImpl && proj.renewal_date && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>Fecha de renovación</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.renewal_date)}</p></div>}
+                  {isImpl  && proj.deadline      && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>Deadline</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.deadline)}</p></div>}
+                  <div className="mt-3">
+                    <p className="text-xs" style={{ color: '#6e6e73' }}>Estado</p>
+                    <span className="text-sm font-medium mt-0.5 inline-block" style={{ color: STATUS_COLORS[proj.status] ?? '#f5f5f7' }}>
+                      {STATUS_LABELS[proj.status] ?? proj.status}
+                    </span>
+                  </div>
+                </div>
+                <div style={CARD}>
+                  <p className="text-xs mb-3" style={{ color: '#6e6e73' }}>Team allocation ({resources.length} recurso{resources.length !== 1 ? 's' : ''})</p>
+                  {resources.length === 0 ? <p className="text-xs" style={{ color: '#6e6e73' }}>Sin recursos.</p> : (
+                    <div className="flex flex-col gap-3">
+                      <div className="grid gap-2 text-xs" style={{ color: '#6e6e73', gridTemplateColumns: '1fr auto auto' }}>
+                        <span>Nombre / Rol</span><span style={{ textAlign: 'right' }}>€/h</span><span style={{ textAlign: 'right', minWidth: 64 }}>Dedicación</span>
+                      </div>
+                      {resources.map((r, ri) => (
+                        <div key={ri} className="grid gap-2 items-center" style={{ gridTemplateColumns: '1fr auto auto' }}>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate" style={{ color: '#f5f5f7' }}>{r.name}</p>
+                            {r.role && <p className="text-xs truncate" style={{ color: '#6e6e73' }}>{r.role}</p>}
+                          </div>
+                          <span className="text-xs font-mono" style={{ color: '#6e6e73', textAlign: 'right' }}>{r.hourly_rate != null ? `${r.hourly_rate}€` : '—'}</span>
+                          <span className="text-xs font-medium" style={{ color: '#f5f5f7', textAlign: 'right', minWidth: 56 }}>{r.dedication_pct != null ? `${r.dedication_pct}%` : '—'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={CARD}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-medium" style={{ color: '#6e6e73' }}>Customer satisfaction</p>
+                  <div className="flex items-center gap-2.5">
+                    {CSAT_STATES.map(cs => (
+                      <div key={cs.value} style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: cs.color,
+                        boxShadow: proj.customer_satisfaction_status === cs.value ? `0 0 8px 3px ${cs.shadow}` : 'none',
+                        opacity: proj.customer_satisfaction_status && proj.customer_satisfaction_status !== cs.value ? 0.25 : 1 }} />
+                    ))}
+                  </div>
+                </div>
+                {proj.customer_satisfaction_text
+                  ? <div style={{ fontSize: 15, lineHeight: 1.7, color: '#f5f5f7' }} dangerouslySetInnerHTML={{ __html: proj.customer_satisfaction_text }} />
+                  : <p style={{ color: '#3a3a3a', fontStyle: 'italic', fontSize: 13 }}>Sin texto</p>}
+              </div>
+            </div>
+          )}
+
+          {sec.number === '02' && (
+            <div className="mb-2">
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <KpiCard label="Bugs abiertos este mes"  value={snapBugs?.open_count ?? 0}  color={(snapBugs?.open_count ?? 0) > 0 ? '#ff453a' : '#30d158'} />
+                <KpiCard label="Bugs cerrados este mes"  value={snapBugs?.closed_count ?? 0} color="#30d158" />
+                <KpiCard label="Total abiertos acumulado" value={totalBugOpen} color="#f5f5f7" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-4">
+                <div style={CARD}>
+                  <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Evolución de bugs</p>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <BarChart data={bugChartData} barSize={8} barGap={2}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                      <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                      <Bar dataKey="abiertos" fill="#ff453a" radius={[3,3,0,0]} name="Abiertos" />
+                      <Bar dataKey="cerrados" fill="#30d158" radius={[3,3,0,0]} name="Cerrados" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div style={CARD} className="flex flex-col items-center justify-center">
+                  <p className="text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Total acumulado</p>
+                  <PieChart width={140} height={140}>
+                    <Pie data={bugDonut} cx={65} cy={65} innerRadius={42} outerRadius={60} dataKey="value" paddingAngle={2}>
+                      {bugDonut.map((d, i) => <Cell key={i} fill={d.color} />)}
+                    </Pie>
+                    <Tooltip contentStyle={TOOLTIP_STYLE} />
+                  </PieChart>
+                  <div className="flex flex-col gap-1 mt-1">
+                    {bugDonut.filter(d => d.name !== 'Sin datos').map(d => (
+                      <div key={d.name} className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
+                        <span className="text-xs" style={{ color: '#6e6e73' }}>{d.name}: {d.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {sec.number === '03' && (
+            <div className="mb-2">
+              {phases.length === 0
+                ? <div style={CARD}><p className="text-sm" style={{ color: '#6e6e73' }}>Sin plan vinculado.</p></div>
+                : <>
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                      <KpiCard label="Progreso global" value={`${overallPct}%`} color={overallPct >= 75 ? '#30d158' : overallPct >= 40 ? '#64d2ff' : '#ff9f0a'} />
+                      <KpiCard label="Fases completadas" value={`${completedPhases}/${phases.length}`} color="#f5f5f7" />
+                      <KpiCard label="Horas planificadas" value={totalHoursSnap > 0 ? `${totalHoursSnap}h` : '—'} color="#64d2ff" />
+                    </div>
+                    <div style={CARD}>
+                      <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Fases</p>
+                      <div className="flex flex-col gap-4">
+                        {phasesWithMet.map(phase => {
+                          const m = phase.met
+                          return (
+                            <div key={phase.id} style={{ opacity: m.isUpcoming ? 0.5 : 1 }}>
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
+                                  <span className="text-sm font-medium truncate" style={{ color: '#f5f5f7' }}>{phase.name}</span>
+                                </div>
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ml-3"
+                                  style={{ backgroundColor: `${m.color}15`, color: m.color }}>{m.label}</span>
+                              </div>
+                              <div className="relative h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
+                                <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${m.timePct}%`, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+                                <div className="absolute inset-y-0 left-0 rounded-full transition-all" style={{ width: `${m.progress}%`, backgroundColor: phase.color }} />
+                              </div>
+                              <div className="flex justify-between mt-1">
+                                <span className="text-xs" style={{ color: '#3a3a3a' }}>
+                                  {new Date(phase.start_date + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                  {' → '}
+                                  {new Date(phase.end_date + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                </span>
+                                <span className="text-xs font-semibold" style={{ color: phase.color }}>{m.progress}%</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </>
+              }
+            </div>
+          )}
+
+          {sec.number === '04' && (
+            <div className="mb-2">
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <KpiCard label="Tareas cerradas" value={currentKpis.tasks_closed ?? 0} color="#30d158" />
+                <KpiCard label="Bugs cerrados"   value={currentKpis.bugs_closed  ?? 0} color="#ff9f0a" />
+                <KpiCard label="En progreso"     value={currentKpis.in_progress  ?? 0} color="#64d2ff" />
+              </div>
+              <div style={CARD} className="mb-4">
+                <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Distribución del trabajo por mes</p>
+                <div className="flex gap-4 overflow-x-auto">
+                  {months4.map(m => {
+                    const kpis = kpiMap[m] ?? { tasks_closed: 0, bugs_closed: 0, in_progress: 0 }
+                    const data = donutFor(kpis)
+                    return (
+                      <div key={m} className="flex flex-col items-center shrink-0" style={{ minWidth: 130 }}>
+                        <span className="text-xs font-medium mb-1" style={{ color: m === snapMonth ? '#f5f5f7' : '#6e6e73' }}>{monthLabel(m)}</span>
+                        <PieChart width={120} height={120}>
+                          <Pie data={data} cx={55} cy={55} innerRadius={34} outerRadius={50} dataKey="value" paddingAngle={2}>
+                            {data.map((d, i) => <Cell key={i} fill={d.color} />)}
+                          </Pie>
+                          <Tooltip contentStyle={TOOLTIP_STYLE} />
+                        </PieChart>
+                        <div className="flex flex-col gap-0.5 mt-1 w-full">
+                          {data.filter(d => d.name !== 'Sin datos').map(d => (
+                            <div key={d.name} className="flex items-center gap-1">
+                              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                              <span style={{ color: '#6e6e73', fontSize: 10 }}>{d.name} ({d.value})</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              <div style={CARD}>
+                <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Evolución del esfuerzo (horas)</p>
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={effortData} barSize={16}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                    <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                    <Bar dataKey="horas" fill="#64d2ff" radius={[4,4,0,0]} name="Horas" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {sec.number === '05' && (
+            <div className="mb-2">
+              {!financial && resources.length === 0
+                ? <div style={CARD}><p className="text-sm" style={{ color: '#6e6e73' }}>Sin datos financieros.</p></div>
+                : <>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <KpiCard label="Presupuesto"   value={fmtMoney(contract, cur)} color="#f5f5f7" />
+                      <KpiCard label="Coste ETD"     value={fmtMoney(etd, cur)}      color="#64d2ff" />
+                      <KpiCard label="Facturado"     value={fmtMoney(billed, cur)}   color="#30d158" />
+                      <KpiCard label="Margen actual" value={billed > 0 ? `${margin.toFixed(1)}%` : '—'} color={ph.color} />
+                    </div>
+                    <div style={CARD}>
+                      <div className="flex items-center justify-between mb-4">
+                        <p className="text-xs font-medium" style={{ color: '#6e6e73' }}>Estado financiero</p>
+                        <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: `${ph.color}18`, color: ph.color }}>{ph.label}</span>
+                      </div>
+                      <div className="flex flex-col gap-3">
+                        {[
+                          { label: 'Presupuesto',      val: contract, pct: 100,                                     color: 'rgba(255,255,255,0.12)' },
+                          { label: 'Coste real (ETD)', val: etd,      pct: Math.min(100, etd    / maxVal * 100),    color: '#64d2ff' },
+                          { label: 'Facturado',        val: billed,   pct: Math.min(100, billed / maxVal * 100),   color: '#30d158' },
+                        ].map(row => (
+                          <div key={row.label}>
+                            <div className="flex justify-between text-xs mb-1.5" style={{ color: '#6e6e73' }}>
+                              <span>{row.label}</span>
+                              <span style={{ color: row.color === 'rgba(255,255,255,0.12)' ? '#f5f5f7' : row.color }}>{fmtMoney(row.val, cur)}</span>
+                            </div>
+                            <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
+                              <div className="h-full rounded-full" style={{ width: `${row.pct}%`, backgroundColor: row.color }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-6 mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div><p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>Margen objetivo</p><p className="text-sm font-semibold" style={{ color: '#f5f5f7' }}>{target}%</p></div>
+                        <div><p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>Beneficio actual</p><p className="text-sm font-semibold" style={{ color: profit >= 0 ? '#30d158' : '#ff453a' }}>{fmtMoney(profit, cur)}</p></div>
+                      </div>
+                    </div>
+                  </>
+              }
+            </div>
+          )}
+
+          {sec.number === '06' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div style={CARD}>
+                <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>What are the new business opportunities?</p>
+                <p style={{ fontSize: 13, lineHeight: 1.6, color: proj.opportunities ? '#d1d1d6' : '#3a3a3a', fontStyle: proj.opportunities ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
+                  {proj.opportunities || 'Sin contenido'}
+                </p>
+              </div>
+              <div style={CARD}>
+                <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>What are the challenges?</p>
+                <p style={{ fontSize: 13, lineHeight: 1.6, color: proj.challenges ? '#d1d1d6' : '#3a3a3a', fontStyle: proj.challenges ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
+                  {proj.challenges || 'Sin contenido'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {i < sections.length - 1 && <div style={{ marginTop: 48, borderTop: '1px solid rgba(255,255,255,0.05)' }} />}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Placeholder style injection (once) ───────────────────────────────────────
 const CSAT_STYLE_ID = 'csat-editor-style'
 if (typeof document !== 'undefined' && !document.getElementById(CSAT_STYLE_ID)) {
@@ -1373,9 +1756,100 @@ if (typeof document !== 'undefined' && !document.getElementById(CSAT_STYLE_ID)) 
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function StatusReport({ project: initialProject, members, tasks }) {
   const [project, setProject] = useState(initialProject)
-
-  // Sync if parent updates project
   useEffect(() => { setProject(initialProject) }, [initialProject])
+
+  // ── Version management ────────────────────────────────────────
+  const [versions,         setVersions]         = useState([])
+  const [selectedVersion,  setSelectedVersion]  = useState(null)
+  const [showVersionList,  setShowVersionList]  = useState(false)
+  const [showSaveForm,     setShowSaveForm]     = useState(false)
+  const [newVersionName,   setNewVersionName]   = useState('')
+  const [savingVersion,    setSavingVersion]    = useState(false)
+  const versionListRef = useRef(null)
+
+  useEffect(() => {
+    supabase.from('status_report_versions')
+      .select('id, name, created_at')
+      .eq('project_id', initialProject.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setVersions(data ?? []))
+  }, [initialProject.id])
+
+  useEffect(() => {
+    if (!showVersionList) return
+    function handler(e) { if (versionListRef.current && !versionListRef.current.contains(e.target)) setShowVersionList(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showVersionList])
+
+  async function saveVersion() {
+    if (!newVersionName.trim()) { toast.error('Escribe un nombre'); return }
+    setSavingVersion(true)
+    try {
+      const [
+        { data: resources },
+        { data: bugStats },
+        { data: plans },
+        { data: teamKpis },
+        { data: effort },
+        { data: financial },
+        { data: invoices },
+      ] = await Promise.all([
+        supabase.from('project_resources').select('*').eq('project_id', project.id),
+        supabase.from('project_bug_stats').select('*').eq('project_id', project.id),
+        supabase.from('project_plans').select('id').eq('project_id', project.id).limit(1),
+        supabase.from('project_team_kpis').select('*').eq('project_id', project.id),
+        supabase.from('project_effort').select('*').eq('project_id', project.id),
+        supabase.from('project_financials').select('*').eq('project_id', project.id).maybeSingle(),
+        supabase.from('project_invoices').select('amount').eq('project_id', project.id),
+      ])
+      let phases = []
+      if (plans?.length) {
+        const { data: ph } = await supabase.from('plan_phases')
+          .select('id, name, color, start_date, end_date, hours, is_milestone, progress')
+          .eq('plan_id', plans[0].id).order('order_index')
+        phases = (ph ?? []).filter(p => !p.is_milestone)
+      }
+      const resourceIds = (resources ?? []).map(r => r.id)
+      let allocations = []
+      if (resourceIds.length) {
+        const { data: allocs } = await supabase.from('resource_allocations')
+          .select('resource_id, week_start, hours, actual_hours').in('resource_id', resourceIds)
+        allocations = allocs ?? []
+      }
+      const snapshot = {
+        date: new Date().toISOString().slice(0, 10),
+        project: {
+          type: project.type, status: project.status,
+          deadline: project.deadline, renewal_date: project.renewal_date,
+          customer_satisfaction_status: project.customer_satisfaction_status,
+          customer_satisfaction_text: project.customer_satisfaction_text,
+          opportunities: project.opportunities, challenges: project.challenges,
+        },
+        resources: resources ?? [], bug_stats: bugStats ?? [], phases,
+        team_kpis: teamKpis ?? [], effort: effort ?? [],
+        financial: financial ?? null, invoices: invoices ?? [], allocations,
+      }
+      const { data: saved, error } = await supabase.from('status_report_versions')
+        .insert({ project_id: project.id, name: newVersionName.trim(), snapshot })
+        .select('id, name, created_at').single()
+      if (error) { toast.error('Error al guardar'); return }
+      setVersions(prev => [saved, ...prev])
+      setNewVersionName('')
+      setShowSaveForm(false)
+      toast.success(`Versión "${saved.name}" guardada`)
+    } finally {
+      setSavingVersion(false)
+    }
+  }
+
+  async function loadVersion(versionId) {
+    const { data, error } = await supabase.from('status_report_versions')
+      .select('id, name, created_at, snapshot').eq('id', versionId).single()
+    if (error || !data) { toast.error('Error al cargar'); return }
+    setSelectedVersion(data)
+    setShowVersionList(false)
+  }
 
   function handleProjectUpdate(updates) {
     setProject(p => ({ ...p, ...updates }))
@@ -1430,17 +1904,129 @@ export default function StatusReport({ project: initialProject, members, tasks }
     },
   ]
 
+  const autoName = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 24px 64px' }}>
-      {sections.map((s, i) => (
-        <div key={s.number} style={{ marginBottom: i < sections.length - 1 ? 48 : 0 }}>
-          <SectionHeader number={s.number} title={s.title} subtitle={s.subtitle} />
-          {s.content}
-          {i < sections.length - 1 && (
-            <div style={{ marginTop: 48, borderTop: '1px solid rgba(255,255,255,0.05)' }} />
+
+      {/* ── Version bar ── */}
+      <div className="flex items-center justify-between mb-8 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        {/* Selector */}
+        <div ref={versionListRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowVersionList(v => !v)}
+            className="flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-xl"
+            style={{
+              backgroundColor: selectedVersion ? 'rgba(191,90,242,0.1)' : 'rgba(255,255,255,0.06)',
+              color: selectedVersion ? '#bf5af2' : '#f5f5f7',
+              border: `1px solid ${selectedVersion ? 'rgba(191,90,242,0.2)' : 'rgba(255,255,255,0.08)'}`,
+              cursor: 'pointer',
+            }}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            {selectedVersion ? selectedVersion.name : 'Versión actual'}
+            <ChevronDown className="w-3 h-3" />
+          </button>
+
+          {showVersionList && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 50,
+              backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 240, overflow: 'hidden',
+            }}>
+              <button
+                onClick={() => { setSelectedVersion(null); setShowVersionList(false) }}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left"
+                style={{ background: !selectedVersion ? 'rgba(255,255,255,0.06)' : 'none', border: 'none', cursor: 'pointer', color: '#f5f5f7', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = !selectedVersion ? 'rgba(255,255,255,0.06)' : 'transparent'}
+              >
+                <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#30d158', flexShrink: 0 }} />
+                Versión actual (en vivo)
+              </button>
+              {versions.map(v => (
+                <button key={v.id}
+                  onClick={() => loadVersion(v.id)}
+                  className="w-full flex flex-col px-4 py-2.5 text-left"
+                  style={{ background: selectedVersion?.id === v.id ? 'rgba(255,255,255,0.06)' : 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = selectedVersion?.id === v.id ? 'rgba(255,255,255,0.06)' : 'transparent'}
+                >
+                  <span className="text-sm font-medium" style={{ color: '#f5f5f7' }}>{v.name}</span>
+                  <span className="text-xs" style={{ color: '#6e6e73' }}>
+                    {new Date(v.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                </button>
+              ))}
+              {versions.length === 0 && <p className="px-4 py-3 text-xs" style={{ color: '#3a3a3a' }}>Sin versiones guardadas</p>}
+            </div>
           )}
         </div>
-      ))}
+
+        {/* Right side: save form or back button */}
+        {!selectedVersion && (
+          <div className="flex items-center gap-2">
+            {showSaveForm ? (
+              <>
+                <input
+                  autoFocus
+                  value={newVersionName}
+                  onChange={e => setNewVersionName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveVersion(); if (e.key === 'Escape') setShowSaveForm(false) }}
+                  placeholder={autoName}
+                  style={{ ...INPUT, width: 210, padding: '5px 10px', fontSize: 12 }}
+                />
+                <button onClick={saveVersion} disabled={savingVersion}
+                  className="text-xs px-3 py-1.5 rounded-xl font-semibold"
+                  style={{ backgroundColor: '#f5f5f7', color: '#000', border: 'none', cursor: 'pointer' }}>
+                  {savingVersion ? 'Guardando…' : 'Guardar'}
+                </button>
+                <button onClick={() => setShowSaveForm(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6e6e73', fontSize: 16, lineHeight: 1 }}>×</button>
+              </>
+            ) : (
+              <button
+                onClick={() => { setNewVersionName(autoName); setShowSaveForm(true) }}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
+                style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#f5f5f7' }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#6e6e73' }}
+              >
+                <Save className="w-3 h-3" />
+                Guardar versión
+              </button>
+            )}
+          </div>
+        )}
+
+        {selectedVersion && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs" style={{ color: '#6e6e73' }}>
+              {new Date(selectedVersion.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </span>
+            <button onClick={() => setSelectedVersion(null)}
+              className="text-xs px-3 py-1.5 rounded-xl font-medium"
+              style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#f5f5f7', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
+              Volver a versión actual
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Content ── */}
+      {selectedVersion ? (
+        <SnapshotView snapshot={selectedVersion.snapshot} />
+      ) : (
+        sections.map((s, i) => (
+          <div key={s.number} style={{ marginBottom: i < sections.length - 1 ? 48 : 0 }}>
+            <SectionHeader number={s.number} title={s.title} subtitle={s.subtitle} />
+            {s.content}
+            {i < sections.length - 1 && (
+              <div style={{ marginTop: 48, borderTop: '1px solid rgba(255,255,255,0.05)' }} />
+            )}
+          </div>
+        ))
+      )}
     </div>
   )
 }
