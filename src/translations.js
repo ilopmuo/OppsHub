@@ -44,6 +44,11 @@ export const translations = {
       outOfScopeTitle: 'Fuera de alcance',
       outOfScopeDesc: 'Qué no está incluido en este proyecto',
       outOfScopePlaceholder: 'Añadir elemento fuera de alcance...',
+      start: 'Inicio',
+      end: 'Fin',
+      hours: 'Horas',
+      phasesCount: 'Fases',
+      client: 'Cliente',
     },
     insights: {
       duration: 'Duración',
@@ -155,6 +160,11 @@ export const translations = {
       outOfScopeTitle: 'Out of scope',
       outOfScopeDesc: 'What is not included in this project',
       outOfScopePlaceholder: 'Add out of scope item...',
+      start: 'Start',
+      end: 'End',
+      hours: 'Hours',
+      phasesCount: 'Phases',
+      client: 'Client',
     },
     insights: {
       duration: 'Duration',

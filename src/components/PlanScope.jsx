@@ -174,16 +174,16 @@ export function ScopePrintArea({ plan, phases }) {
       {/* Project info */}
       <div style={{ display: 'flex', gap: 24, marginBottom: 18, flexWrap: 'wrap' }}>
         {plan?.start_date && (
-          <div><p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', margin: '0 0 3px' }}>Inicio</p><p style={{ fontSize: 12, color: '#333', margin: 0 }}>{formatDate(plan.start_date, locale)}</p></div>
+          <div><p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', margin: '0 0 3px' }}>{s.start}</p><p style={{ fontSize: 12, color: '#333', margin: 0 }}>{formatDate(plan.start_date, locale)}</p></div>
         )}
         {lastEnd && (
-          <div><p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', margin: '0 0 3px' }}>Fin</p><p style={{ fontSize: 12, color: '#333', margin: 0 }}>{formatDate(lastEnd, locale)}</p></div>
+          <div><p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', margin: '0 0 3px' }}>{s.end}</p><p style={{ fontSize: 12, color: '#333', margin: 0 }}>{formatDate(lastEnd, locale)}</p></div>
         )}
         {totalHours > 0 && (
-          <div><p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', margin: '0 0 3px' }}>Horas</p><p style={{ fontSize: 12, color: '#333', margin: 0 }}>{totalHours}h</p></div>
+          <div><p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', margin: '0 0 3px' }}>{s.hours}</p><p style={{ fontSize: 12, color: '#333', margin: 0 }}>{totalHours}h</p></div>
         )}
         {visiblePhases.length > 0 && (
-          <div><p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', margin: '0 0 3px' }}>Fases</p><p style={{ fontSize: 12, color: '#333', margin: 0 }}>{visiblePhases.length}</p></div>
+          <div><p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', margin: '0 0 3px' }}>{s.phasesCount}</p><p style={{ fontSize: 12, color: '#333', margin: 0 }}>{visiblePhases.length}</p></div>
         )}
       </div>
 
@@ -285,9 +285,16 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePlan, onUp
   useEffect(() => { if (delEditIdx !== null) delInputRef.current?.focus() }, [delEditIdx])
 
   function handlePrint() {
+    const style = document.createElement('style')
+    style.id = '__scope-portrait__'
+    style.textContent = '@page { size: A4 portrait; margin: 15mm 20mm; }'
+    document.head.appendChild(style)
     if (plan) document.title = `${plan.name} — ${s.tabLabel}`
     window.print()
-    setTimeout(() => { document.title = 'OppsHub' }, 1000)
+    setTimeout(() => {
+      document.title = 'OppsHub'
+      document.getElementById('__scope-portrait__')?.remove()
+    }, 1000)
   }
 
   function addDeliverable() {
@@ -336,25 +343,25 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePlan, onUp
         <div className="flex flex-wrap gap-3 mb-4">
           {plan?.start_date && (
             <div className="rounded-xl px-3 py-2" style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <p className="text-xs" style={{ color: '#6e6e73', margin: '0 0 2px' }}>Inicio</p>
+              <p className="text-xs" style={{ color: '#6e6e73', margin: '0 0 2px' }}>{s.start}</p>
               <p className="text-xs font-medium" style={{ color: '#f5f5f7', margin: 0 }}>{formatDate(plan.start_date, locale)}</p>
             </div>
           )}
           {lastEnd && (
             <div className="rounded-xl px-3 py-2" style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <p className="text-xs" style={{ color: '#6e6e73', margin: '0 0 2px' }}>Fin</p>
+              <p className="text-xs" style={{ color: '#6e6e73', margin: '0 0 2px' }}>{s.end}</p>
               <p className="text-xs font-medium" style={{ color: '#f5f5f7', margin: 0 }}>{formatDate(lastEnd, locale)}</p>
             </div>
           )}
           {totalHours > 0 && (
             <div className="rounded-xl px-3 py-2" style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <p className="text-xs" style={{ color: '#6e6e73', margin: '0 0 2px' }}>Horas</p>
+              <p className="text-xs" style={{ color: '#6e6e73', margin: '0 0 2px' }}>{s.hours}</p>
               <p className="text-xs font-medium" style={{ color: '#f5f5f7', margin: 0 }}>{totalHours}h</p>
             </div>
           )}
           {plan?.client_name && (
             <div className="rounded-xl px-3 py-2" style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <p className="text-xs" style={{ color: '#6e6e73', margin: '0 0 2px' }}>Cliente</p>
+              <p className="text-xs" style={{ color: '#6e6e73', margin: '0 0 2px' }}>{s.client}</p>
               <p className="text-xs font-medium" style={{ color: '#f5f5f7', margin: 0 }}>{plan.client_name}</p>
             </div>
           )}
