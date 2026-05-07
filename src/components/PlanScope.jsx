@@ -152,16 +152,23 @@ export function ScopePrintArea({ plan, phases }) {
             {plan?.client_name && <p style={{ margin: '2px 0 0', fontSize: 11, color: '#999' }}>{plan.client_name}</p>}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <svg width="18" height="18" viewBox="0 0 44 44" fill="none">
-            <rect width="44" height="44" rx="10" fill="#1a1a1a"/>
-            <rect x="10" y="10" width="10" height="10" rx="2" fill="white"/>
-            <rect x="24" y="10" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
-            <rect x="10" y="24" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
-            <rect x="24" y="24" width="10" height="10" rx="2" fill="white"/>
-          </svg>
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#333' }}>OppsHub</span>
-        </div>
+        {plan?.pdf_logo_url
+          ? <img src={plan.pdf_logo_url} alt="" style={{ height: 28, maxWidth: 110, objectFit: 'contain', flexShrink: 0 }} />
+          : (plan?.pdf_logo_url === null || plan?.pdf_logo_url === undefined)
+            ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <svg width="18" height="18" viewBox="0 0 44 44" fill="none">
+                  <rect width="44" height="44" rx="10" fill="#1a1a1a"/>
+                  <rect x="10" y="10" width="10" height="10" rx="2" fill="white"/>
+                  <rect x="24" y="10" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
+                  <rect x="10" y="24" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
+                  <rect x="24" y="24" width="10" height="10" rx="2" fill="white"/>
+                </svg>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#333' }}>OppsHub</span>
+              </div>
+            )
+            : null
+        }
       </div>
 
       {/* Project info */}

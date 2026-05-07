@@ -793,6 +793,47 @@ export default function PlanSidebar({
           El cliente puede ver el plan en modo lectura sin necesidad de cuenta.
         </p>
 
+        {/* PDF branding */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+          <p className="text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Logo en PDF</p>
+
+          {/* Toggle OppsHub */}
+          <label className="flex items-center gap-2 mb-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={plan.pdf_logo_url === null || plan.pdf_logo_url === undefined}
+              onChange={e => onUpdatePlan({ pdf_logo_url: e.target.checked ? null : '' })}
+              style={{ accentColor: '#bf5af2', width: 13, height: 13 }}
+            />
+            <span className="text-xs" style={{ color: '#d1d1d6' }}>Mostrar logo OppsHub</span>
+          </label>
+
+          {/* Custom logo URL input — shown when OppsHub is hidden */}
+          {plan.pdf_logo_url !== null && plan.pdf_logo_url !== undefined && (
+            <div>
+              <input
+                value={plan.pdf_logo_url || ''}
+                onChange={e => onUpdatePlan({ pdf_logo_url: e.target.value || '' })}
+                placeholder="URL de tu logo..."
+                style={{ ...inputStyle, fontSize: 12 }}
+                onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'}
+                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+              />
+              {plan.pdf_logo_url && (
+                <div className="mt-2 flex items-center gap-2">
+                  <img
+                    src={plan.pdf_logo_url}
+                    alt="Logo preview"
+                    style={{ height: 24, maxWidth: 80, objectFit: 'contain', borderRadius: 4, backgroundColor: '#fff', padding: 2 }}
+                    onError={e => e.target.style.display = 'none'}
+                  />
+                  <span className="text-xs" style={{ color: '#3a3a3a' }}>Vista previa</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <button
           onClick={onPrint}
           className="w-full py-2.5 rounded-xl text-sm font-medium transition-all"

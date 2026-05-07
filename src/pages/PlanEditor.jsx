@@ -298,17 +298,24 @@ export default function PlanEditor() {
                 </div>
               </div>
             </div>
-            {/* OppsHub branding */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-              <svg width="20" height="20" viewBox="0 0 44 44" fill="none">
-                <rect width="44" height="44" rx="10" fill="#1a1a1a"/>
-                <rect x="10" y="10" width="10" height="10" rx="2" fill="white"/>
-                <rect x="24" y="10" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
-                <rect x="10" y="24" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
-                <rect x="24" y="24" width="10" height="10" rx="2" fill="white"/>
-              </svg>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#333', letterSpacing: '-0.01em' }}>OppsHub</span>
-            </div>
+            {/* Branding */}
+            {plan.pdf_logo_url
+              ? <img src={plan.pdf_logo_url} alt="" style={{ height: 32, maxWidth: 120, objectFit: 'contain', flexShrink: 0 }} />
+              : plan.pdf_logo_url === null || plan.pdf_logo_url === undefined
+                ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+                    <svg width="20" height="20" viewBox="0 0 44 44" fill="none">
+                      <rect width="44" height="44" rx="10" fill="#1a1a1a"/>
+                      <rect x="10" y="10" width="10" height="10" rx="2" fill="white"/>
+                      <rect x="24" y="10" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
+                      <rect x="10" y="24" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
+                      <rect x="24" y="24" width="10" height="10" rx="2" fill="white"/>
+                    </svg>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#333', letterSpacing: '-0.01em' }}>OppsHub</span>
+                  </div>
+                )
+                : null
+            }
           </div>
           {/* Gantt scaled to fit the page */}
           <GanttChart
