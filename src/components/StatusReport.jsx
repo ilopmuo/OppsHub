@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import GanttChart from './GanttChart'
 import toast from 'react-hot-toast'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
@@ -596,8 +597,9 @@ function phaseMetrics(phase) {
 }
 
 function DeliveringValueSection({ projectId }) {
-  const [phases, setPhases] = useState([])
-  const [hasPlan, setHasPlan] = useState(null)
+  const [plan, setPlan]         = useState(null)
+  const [allPhases, setAllPhases] = useState([])
+  const [hasPlan, setHasPlan]   = useState(null)
   const [showAllPhases, setShowAllPhases] = useState(false)
   const PHASES_VISIBLE = 4
 
@@ -605,25 +607,32 @@ function DeliveringValueSection({ projectId }) {
     async function load() {
       const { data: plans } = await supabase
         .from('project_plans')
-        .select('id')
+        .select('*')
         .eq('project_id', projectId)
         .limit(1)
 
       if (plans?.length) {
         setHasPlan(true)
+        setPlan(plans[0])
         const { data: ph } = await supabase
           .from('plan_phases')
-          .select('id, name, color, start_date, end_date, hours, is_milestone, progress')
+          .select('*, plan_tasks(*)')
           .eq('plan_id', plans[0].id)
           .order('order_index')
 
-        setPhases((ph ?? []).filter(p => !p.is_milestone))
+        setAllPhases((ph ?? []).map(phase => ({
+          ...phase,
+          plan_tasks: (phase.plan_tasks || []).sort((a, b) => a.order_index - b.order_index),
+        })))
       } else {
         setHasPlan(false)
       }
     }
     load()
   }, [projectId])
+
+  // Non-milestone phases for progress metrics
+  const phases = allPhases.filter(p => !p.is_milestone)
 
   // Derived plan stats
   const phasesWithMetrics = phases.map(p => ({ ...p, metrics: phaseMetrics(p) }))
@@ -641,6 +650,17 @@ function DeliveringValueSection({ projectId }) {
       {hasPlan === false && (
         <div style={{ ...CARD, marginBottom: 16 }}>
           <p className="text-sm" style={{ color: '#6e6e73' }}>Sin plan vinculado a este proyecto. Crea uno en la tab Plan para ver métricas de progreso.</p>
+        </div>
+      )}
+
+      {plan && allPhases.length > 0 && (
+        <div style={{ ...CARD, marginBottom: 16, padding: 0, overflow: 'hidden' }}>
+          <p className="text-xs font-medium px-5 pt-4 pb-3" style={{ color: '#6e6e73', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            Diagrama de Gantt
+          </p>
+          <div style={{ overflowX: 'auto' }}>
+            <GanttChart plan={plan} phases={allPhases} isEditable={false} />
+          </div>
         </div>
       )}
 
@@ -1364,7 +1384,9 @@ function SnapshotView({ snapshot }) {
   const proj        = snapshot.project ?? {}
   const resources   = snapshot.resources ?? []
   const bugStats    = snapshot.bug_stats ?? []
-  const phases      = snapshot.phases ?? []
+  const snapPlan    = snapshot.plan ?? null
+  const allSnapPhases = snapshot.phases ?? []
+  const phases      = allSnapPhases.filter(p => !p.is_milestone)
   const teamKpis    = snapshot.team_kpis ?? []
   const effort      = snapshot.effort ?? []
   const financial   = snapshot.financial ?? null
@@ -1573,6 +1595,16 @@ function SnapshotView({ snapshot }) {
 
           {sec.number === '03' && (
             <div className="mb-2">
+              {snapPlan && allSnapPhases.length > 0 && (
+                <div style={{ ...CARD, marginBottom: 16, padding: 0, overflow: 'hidden' }}>
+                  <p className="text-xs font-medium px-5 pt-4 pb-3" style={{ color: '#6e6e73', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    Diagrama de Gantt
+                  </p>
+                  <div style={{ overflowX: 'auto' }}>
+                    <GanttChart plan={snapPlan} phases={allSnapPhases} isEditable={false} />
+                  </div>
+                </div>
+              )}
               {phases.length === 0
                 ? <div style={CARD}><p className="text-sm" style={{ color: '#6e6e73' }}>Sin plan vinculado.</p></div>
                 : <>
@@ -1801,12 +1833,17 @@ export default function StatusReport({ project: initialProject, members, tasks }
         supabase.from('project_financials').select('*').eq('project_id', project.id).maybeSingle(),
         supabase.from('project_invoices').select('amount').eq('project_id', project.id),
       ])
+      let snapPlan = null
       let phases = []
       if (plans?.length) {
+        snapPlan = plans[0]
         const { data: ph } = await supabase.from('plan_phases')
-          .select('id, name, color, start_date, end_date, hours, is_milestone, progress')
+          .select('*, plan_tasks(*)')
           .eq('plan_id', plans[0].id).order('order_index')
-        phases = (ph ?? []).filter(p => !p.is_milestone)
+        phases = (ph ?? []).map(phase => ({
+          ...phase,
+          plan_tasks: (phase.plan_tasks || []).sort((a, b) => a.order_index - b.order_index),
+        }))
       }
       const resourceIds = (resources ?? []).map(r => r.id)
       let allocations = []
@@ -1825,7 +1862,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
           opportunities: project.opportunities, challenges: project.challenges,
           status_report_section_statuses: project.status_report_section_statuses ?? {},
         },
-        resources: resources ?? [], bug_stats: bugStats ?? [], phases,
+        resources: resources ?? [], bug_stats: bugStats ?? [], plan: snapPlan, phases,
         team_kpis: teamKpis ?? [], effort: effort ?? [],
         financial: financial ?? null, invoices: invoices ?? [], allocations,
       }
