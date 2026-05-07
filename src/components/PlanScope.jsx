@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Plus, Trash2, FileDown, Check, AlertTriangle, Clock, Link } from 'lucide-react'
+import { Plus, Trash2, FileDown, Check, AlertTriangle, Clock, Link, ChevronDown } from 'lucide-react'
 import { computePhaseStatus, daysBetween } from '../hooks/usePlan'
 import { useLang } from '../contexts/LanguageContext'
 
@@ -36,6 +36,89 @@ function getDeliverables(plan) {
 
 function getOutOfScope(plan) {
   return Array.isArray(plan?.scope_out_of_scope) ? plan.scope_out_of_scope : []
+}
+
+function getLinkedIds(phase) {
+  return Array.isArray(phase?.scope_deliverable_ids) ? phase.scope_deliverable_ids : []
+}
+
+// ── Multi-deliverable checkbox dropdown ───────────────────────
+function DeliverableMultiSelect({ phase, deliverables, onUpdatePhase, s }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  const linkedIds = getLinkedIds(phase)
+
+  useEffect(() => {
+    if (!open) return
+    function onClickOutside(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [open])
+
+  function toggle(id) {
+    const next = linkedIds.includes(id) ? linkedIds.filter(x => x !== id) : [...linkedIds, id]
+    onUpdatePhase?.(phase.id, { scope_deliverable_ids: next })
+  }
+
+  const label = linkedIds.length === 0
+    ? s.linkDeliverable
+    : linkedIds.length === 1
+      ? (deliverables.find(d => d.id === linkedIds[0])?.title || s.linkDeliverable)
+      : `${linkedIds.length} ${s.linkDeliverable}`
+
+  return (
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          fontSize: 11, backgroundColor: linkedIds.length > 0 ? '#bf5af215' : '#1a1a1a',
+          border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6,
+          padding: '3px 8px', color: linkedIds.length > 0 ? '#bf5af2' : '#6e6e73',
+          cursor: 'pointer', outline: 'none',
+        }}
+        title={s.linkDeliverable}
+      >
+        <Link style={{ width: 9, height: 9 }} />
+        <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+        <ChevronDown style={{ width: 9, height: 9, flexShrink: 0 }} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 50,
+          backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 180, overflow: 'hidden',
+        }}>
+          {deliverables.map(d => {
+            const checked = linkedIds.includes(d.id)
+            return (
+              <button
+                key={d.id}
+                onClick={() => toggle(d.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                  padding: '8px 12px', background: 'none', border: 'none', cursor: 'pointer',
+                  borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'left',
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <div style={{
+                  width: 14, height: 14, borderRadius: 4, flexShrink: 0,
+                  border: checked ? 'none' : '1px solid rgba(255,255,255,0.2)',
+                  backgroundColor: checked ? '#bf5af2' : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {checked && <Check style={{ width: 9, height: 9, color: '#fff' }} />}
+                </div>
+                <span style={{ fontSize: 12, color: '#d1d1d6', flex: 1 }}>{d.title || s.deliverablePlaceholder}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Section wrapper ───────────────────────────────────────────
@@ -230,7 +313,8 @@ export function ScopePrintArea({ plan, phases }) {
               const meta = (status && status !== 'on_track') ? statusMeta[status] : null
               const durationDays = daysBetween(phase.start_date, phase.end_date) + 1
               const color = phase.color || '#bf5af2'
-              const linkedDel = deliverables.find(d => d.id === phase.scope_deliverable_id)
+              const linkedIds = getLinkedIds(phase)
+              const linkedDels = deliverables.filter(d => linkedIds.includes(d.id))
 
               return (
                 <div key={phase.id} style={{ pageBreakInside: 'avoid', border: '1px solid #e8e8e8', borderRadius: 8, overflow: 'hidden' }}>
@@ -242,9 +326,9 @@ export function ScopePrintArea({ plan, phases }) {
                         {meta && (
                           <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, backgroundColor: meta.color + '20', color: meta.color, fontWeight: 700 }}>{meta.label}</span>
                         )}
-                        {linkedDel && (
-                          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, backgroundColor: '#f0e8ff', color: '#7c3aed', fontWeight: 500 }}>→ {linkedDel.title}</span>
-                        )}
+                        {linkedDels.map(d => (
+                          <span key={d.id} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, backgroundColor: '#f0e8ff', color: '#7c3aed', fontWeight: 500 }}>→ {d.title}</span>
+                        ))}
                       </div>
                       <span style={{ fontSize: 11, color: '#888', marginTop: 2, display: 'block' }}>
                         {formatDate(phase.start_date, locale)} → {formatDate(phase.end_date, locale)} · {durationDays}d{phase.hours > 0 ? ` · ${phase.hours}h` : ''}
@@ -332,9 +416,10 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePlan, onUp
   function deleteDeliverable(idx) {
     const removed = deliverables[idx]
     onUpdatePlan?.({ scope_deliverables: deliverables.filter((_, i) => i !== idx) })
-    // unlink phases that were linked to this deliverable
+    // unlink phases that referenced this deliverable
     phases.forEach(ph => {
-      if (ph.scope_deliverable_id === removed.id) onUpdatePhase?.(ph.id, { scope_deliverable_id: null })
+      const ids = getLinkedIds(ph)
+      if (ids.includes(removed.id)) onUpdatePhase?.(ph.id, { scope_deliverable_ids: ids.filter(x => x !== removed.id) })
     })
     setDelEditIdx(null)
   }
@@ -487,7 +572,8 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePlan, onUp
             const StatusIcon = meta?.icon
             const durationDays = daysBetween(phase.start_date, phase.end_date) + 1
             const color = phase.color || '#bf5af2'
-            const linkedDel = deliverables.find(d => d.id === phase.scope_deliverable_id)
+            const linkedIds = getLinkedIds(phase)
+            const linkedDels = deliverables.filter(d => linkedIds.includes(d.id))
 
             return (
               <div key={phase.id} className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)', backgroundColor: '#111111' }}>
@@ -502,12 +588,12 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePlan, onUp
                           {meta.label}
                         </span>
                       )}
-                      {linkedDel && (
-                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#bf5af215', color: '#bf5af2' }}>
+                      {linkedDels.map(d => (
+                        <span key={d.id} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#bf5af215', color: '#bf5af2' }}>
                           <Link style={{ width: 9, height: 9 }} />
-                          {linkedDel.title}
+                          {d.title}
                         </span>
-                      )}
+                      ))}
                     </div>
                     <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                       <span className="text-xs" style={{ color: '#6e6e73' }}>{formatDate(phase.start_date, locale)} → {formatDate(phase.end_date, locale)}</span>
@@ -516,22 +602,9 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePlan, onUp
                     </div>
                   </div>
 
-                  {/* Deliverable link selector */}
+                  {/* Multi-deliverable link selector */}
                   {isEditable && deliverables.length > 0 && (
-                    <select
-                      value={phase.scope_deliverable_id || ''}
-                      onChange={e => onUpdatePhase?.(phase.id, { scope_deliverable_id: e.target.value || null })}
-                      style={{
-                        fontSize: 11, backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: 6, padding: '3px 6px', color: '#6e6e73', cursor: 'pointer', outline: 'none', flexShrink: 0,
-                      }}
-                      title={s.linkDeliverable}
-                    >
-                      <option value="">{s.noLink}</option>
-                      {deliverables.map(d => (
-                        <option key={d.id} value={d.id}>{d.title || s.deliverablePlaceholder}</option>
-                      ))}
-                    </select>
+                    <DeliverableMultiSelect phase={phase} deliverables={deliverables} onUpdatePhase={onUpdatePhase} s={s} />
                   )}
                 </div>
 
