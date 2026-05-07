@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import GanttChart from './GanttChart'
 import toast from 'react-hot-toast'
+import { useLang } from '../contexts/LanguageContext'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, PieChart, Pie, Cell,
@@ -38,10 +39,9 @@ const fi = e => e.target.style.borderColor = 'rgba(255,255,255,0.25)'
 const fo = e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function monthLabel(iso) {
-  // iso = 'YYYY-MM'
+function monthLabel(iso, locale = 'es-ES') {
   const [y, m] = iso.split('-')
-  return new Date(+y, +m - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
+  return new Date(+y, +m - 1, 1).toLocaleDateString(locale, { month: 'short', year: '2-digit' })
 }
 function isoMonth(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -81,9 +81,123 @@ function fmtNum(n) {
   if (isNaN(num)) return '—'
   return num.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
-function fmtDate(iso) {
+function fmtDate(iso, locale = 'es-ES') {
   if (!iso) return '—'
-  return new Date(iso + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(iso + 'T12:00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+// ── Strings (i18n) ───────────────────────────────────────────────────────────
+const SR = {
+  es: {
+    locale: 'es-ES',
+    // version bar
+    currentVersion: 'Versión actual', currentVersionLive: 'Versión actual (en vivo)',
+    noVersionsSaved: 'Sin versiones guardadas', saveVersion: 'Guardar versión',
+    save: 'Guardar', saving: 'Guardando…', backToCurrent: 'Volver a versión actual',
+    // section subtitles
+    sub01: 'Tipo de proyecto, satisfacción del cliente y asignación del equipo',
+    sub02: 'Bugs registrados, estado y evolución mensual',
+    sub03: 'Progreso del plan, fases y estado del proyecto',
+    sub04: 'Tareas cerradas, bugs resueltos, trabajo en progreso y esfuerzo del equipo este mes',
+    sub05: 'Snapshots semanales de presupuesto, costes y facturación',
+    sub06: 'Nuevas oportunidades de negocio y retos actuales',
+    // section 01
+    projectType: 'Tipo de proyecto', typeImpl: 'Implementación', typeMaint: 'Mantenimiento',
+    renewalDate: 'Fecha de renovación', deadline: 'Deadline', status: 'Estado',
+    teamAlloc: 'Team allocation', resource: 'recurso', resources: 'recursos',
+    noResources: 'Sin recursos. Añádelos en la tab Recursos & Finanzas.',
+    nameRole: 'Nombre / Rol', dedication: 'Dedicación',
+    satPlaceholder: 'Describe la satisfacción del cliente…',
+    // section 02
+    thisMonth: 'Este mes', thisYear: 'Este año',
+    open: 'Abiertos', inProgress: 'En progreso', closed: 'Cerrados', backlog: 'Backlog',
+    bugsPerMonth: 'Bugs por mes — haz click en cualquier celda para editar',
+    backlogDesc: 'El backlog acumulado (abiertos + en progreso − cerrados) indica cuántos bugs siguen sin resolver',
+    monthCol: 'Mes', bugEvolution: 'Evolución de bugs (últimos 6 meses)', totalAccumulated: 'Total acumulado',
+    // phase status labels
+    phaseCompleted: 'Completada', phasePending: 'Pendiente', phaseOverdue: 'Retrasada',
+    phaseAtRisk: 'En riesgo', phaseAhead: n => `+${n}% adelantado`, phaseBehind: n => `${n}% retrasado`, phaseOnTrack: 'En plazo',
+    // section 03
+    noPlan: 'Sin plan vinculado. Crea uno en la tab Plan para ver métricas de progreso.',
+    globalProgress: 'Progreso global', phasesCompleted: 'Fases completadas', plannedHours: 'Horas planificadas',
+    activePhase: 'Fase activa', timeElapsed: 'Tiempo transcurrido',
+    daysRemaining: n => `${n} días restantes`, daysOverdue: n => `${Math.abs(n)} días de retraso`,
+    progressLabel: 'Progreso', aheadMsg: n => `Vais ${n}% por delante del tiempo transcurrido`,
+    behindMsg: n => `Vais ${n}% por detrás del tiempo transcurrido`,
+    onTrackMsg: 'El ritmo está alineado con el tiempo transcurrido',
+    allPhases: 'Todas las fases', activeLabel: 'activa', showLess: 'Ver menos',
+    showMorePhases: n => `Ver ${n} fase${n > 1 ? 's' : ''} más`,
+    effortHoursLabel: 'Horas de esfuerzo del equipo por mes', clickToEdit: 'Haz click en una celda para editar',
+    effortEvolution: 'Evolución del esfuerzo (horas)', hoursBar: 'Horas',
+    // section 04
+    tasksClosedMonth: 'Tareas cerradas este mes', bugsClosedMonth: 'Bugs cerrados este mes',
+    workDistribution: 'Distribución del trabajo por mes', tasksClosed: 'Tareas cerradas', bugsClosed: 'Bugs cerrados',
+    // section 05
+    noFinancialData: 'Sin datos financieros. Configúralos en la pestaña Recursos & Finanzas.',
+    budget: 'Presupuesto', etdCost: 'Coste ETD', billed: 'Facturado', currentMargin: 'Margen actual',
+    financialStatus: 'Estado financiero', onTarget: 'En objetivo', critical: 'Crítico',
+    etdBar: 'Coste real (ETD)', targetMargin: 'Margen objetivo', currentProfit: 'Beneficio actual',
+    remainingBudget: 'Presupuesto restante',
+    // section 06
+    oppPlaceholder: 'Describe las oportunidades de negocio identificadas…',
+    chalPlaceholder: 'Describe los retos o bloqueos actuales…', saveChanges: 'Guardar cambios',
+    member: 'Miembro',
+  },
+  en: {
+    locale: 'en-US',
+    // version bar
+    currentVersion: 'Current version', currentVersionLive: 'Current version (live)',
+    noVersionsSaved: 'No saved versions', saveVersion: 'Save version',
+    save: 'Save', saving: 'Saving…', backToCurrent: 'Back to current version',
+    // section subtitles
+    sub01: 'Project type, customer satisfaction and team allocation',
+    sub02: 'Registered bugs, status and monthly evolution',
+    sub03: 'Plan progress, phases and project status',
+    sub04: 'Closed tasks, resolved bugs, work in progress and team effort this month',
+    sub05: 'Weekly snapshots of budget, costs and billing',
+    sub06: 'New business opportunities and current challenges',
+    // section 01
+    projectType: 'Project type', typeImpl: 'Implementation', typeMaint: 'Maintenance',
+    renewalDate: 'Renewal date', deadline: 'Deadline', status: 'Status',
+    teamAlloc: 'Team allocation', resource: 'resource', resources: 'resources',
+    noResources: 'No resources. Add them in the Resources & Finances tab.',
+    nameRole: 'Name / Role', dedication: 'Dedication',
+    satPlaceholder: 'Describe customer satisfaction…',
+    // section 02
+    thisMonth: 'This month', thisYear: 'This year',
+    open: 'Open', inProgress: 'In progress', closed: 'Closed', backlog: 'Backlog',
+    bugsPerMonth: 'Bugs per month — click any cell to edit',
+    backlogDesc: 'The accumulated backlog (open + in progress − closed) indicates how many bugs remain unresolved',
+    monthCol: 'Month', bugEvolution: 'Bug evolution (last 6 months)', totalAccumulated: 'Total accumulated',
+    // phase status labels
+    phaseCompleted: 'Completed', phasePending: 'Pending', phaseOverdue: 'Overdue',
+    phaseAtRisk: 'At risk', phaseAhead: n => `+${n}% ahead`, phaseBehind: n => `${n}% behind`, phaseOnTrack: 'On track',
+    // section 03
+    noPlan: 'No plan linked. Create one in the Plan tab to see progress metrics.',
+    globalProgress: 'Global progress', phasesCompleted: 'Phases completed', plannedHours: 'Planned hours',
+    activePhase: 'Active phase', timeElapsed: 'Time elapsed',
+    daysRemaining: n => `${n} days remaining`, daysOverdue: n => `${Math.abs(n)} days overdue`,
+    progressLabel: 'Progress', aheadMsg: n => `You are ${n}% ahead of the elapsed time`,
+    behindMsg: n => `You are ${n}% behind the elapsed time`,
+    onTrackMsg: 'The pace is aligned with the elapsed time',
+    allPhases: 'All phases', activeLabel: 'active', showLess: 'Show less',
+    showMorePhases: n => `Show ${n} more phase${n > 1 ? 's' : ''}`,
+    effortHoursLabel: 'Team effort hours per month', clickToEdit: 'Click a cell to edit',
+    effortEvolution: 'Effort evolution (hours)', hoursBar: 'Hours',
+    // section 04
+    tasksClosedMonth: 'Tasks closed this month', bugsClosedMonth: 'Bugs closed this month',
+    workDistribution: 'Monthly work distribution', tasksClosed: 'Tasks closed', bugsClosed: 'Bugs closed',
+    // section 05
+    noFinancialData: 'No financial data. Configure it in the Resources & Finances tab.',
+    budget: 'Budget', etdCost: 'ETD Cost', billed: 'Billed', currentMargin: 'Current margin',
+    financialStatus: 'Financial status', onTarget: 'On target', critical: 'Critical',
+    etdBar: 'Actual cost (ETD)', targetMargin: 'Target margin', currentProfit: 'Current profit',
+    remainingBudget: 'Remaining budget',
+    // section 06
+    oppPlaceholder: 'Describe the identified business opportunities…',
+    chalPlaceholder: 'Describe the current challenges or blockers…', saveChanges: 'Save changes',
+    member: 'Member',
+  },
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -141,7 +255,7 @@ function KpiCard({ label, value, color = '#f5f5f7', sub }) {
 }
 
 // ── Section 1: Project Status ─────────────────────────────────────────────────
-function ProjectStatusSection({ project, onSave }) {
+function ProjectStatusSection({ project, onSave, lang = 'es' }) {
   const isImpl = project.type === 'implementation'
 
   // Customer satisfaction — rich text editor
@@ -212,7 +326,8 @@ function ProjectStatusSection({ project, onSave }) {
     setEditingPct(prev => { const n = { ...prev }; delete n[id]; return n })
   }
 
-  const TYPE_LABELS = { implementation: 'Implementación', maintenance: 'Mantenimiento' }
+  const t = SR[lang] ?? SR.es
+  const TYPE_LABELS = { implementation: t.typeImpl, maintenance: t.typeMaint }
   const STATUS_LABELS = { on_track: 'On track', at_risk: 'At risk', blocked: 'Blocked' }
   const STATUS_COLORS = { on_track: '#30d158', at_risk: '#ff9f0a', blocked: '#ff453a' }
 
@@ -222,7 +337,7 @@ function ProjectStatusSection({ project, onSave }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Type + date */}
         <div style={CARD}>
-          <p className="text-xs mb-3" style={{ color: '#6e6e73' }}>Tipo de proyecto</p>
+          <p className="text-xs mb-3" style={{ color: '#6e6e73' }}>{t.projectType}</p>
           <span className="text-sm font-semibold px-3 py-1 rounded-full"
             style={{ backgroundColor: isImpl ? 'rgba(100,210,255,0.12)' : 'rgba(191,90,242,0.12)',
                      color: isImpl ? '#64d2ff' : '#bf5af2' }}>
@@ -230,18 +345,18 @@ function ProjectStatusSection({ project, onSave }) {
           </span>
           {!isImpl && project.renewal_date && (
             <div className="mt-3">
-              <p className="text-xs" style={{ color: '#6e6e73' }}>Fecha de renovación</p>
-              <p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(project.renewal_date)}</p>
+              <p className="text-xs" style={{ color: '#6e6e73' }}>{t.renewalDate}</p>
+              <p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(project.renewal_date, t.locale)}</p>
             </div>
           )}
           {isImpl && project.deadline && (
             <div className="mt-3">
-              <p className="text-xs" style={{ color: '#6e6e73' }}>Deadline</p>
-              <p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(project.deadline)}</p>
+              <p className="text-xs" style={{ color: '#6e6e73' }}>{t.deadline}</p>
+              <p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(project.deadline, t.locale)}</p>
             </div>
           )}
           <div className="mt-3">
-            <p className="text-xs" style={{ color: '#6e6e73' }}>Estado</p>
+            <p className="text-xs" style={{ color: '#6e6e73' }}>{t.status}</p>
             <span className="text-sm font-medium mt-0.5 inline-block"
               style={{ color: STATUS_COLORS[project.status] ?? '#f5f5f7' }}>
               {STATUS_LABELS[project.status] ?? project.status}
@@ -252,18 +367,16 @@ function ProjectStatusSection({ project, onSave }) {
         {/* Team allocation */}
         <div style={CARD}>
           <p className="text-xs mb-3" style={{ color: '#6e6e73' }}>
-            Team allocation ({resources.length} recurso{resources.length !== 1 ? 's' : ''})
+            {t.teamAlloc} ({resources.length} {resources.length !== 1 ? t.resources : t.resource})
           </p>
           {resources.length === 0 ? (
-            <p className="text-xs" style={{ color: '#6e6e73' }}>
-              Sin recursos. Añádelos en la tab Recursos &amp; Finanzas.
-            </p>
+            <p className="text-xs" style={{ color: '#6e6e73' }}>{t.noResources}</p>
           ) : (
             <div className="flex flex-col gap-3">
               <div className="grid gap-2 text-xs" style={{ color: '#6e6e73', gridTemplateColumns: '1fr auto auto' }}>
-                <span>Nombre / Rol</span>
+                <span>{t.nameRole}</span>
                 <span style={{ textAlign: 'right' }}>€/h</span>
-                <span style={{ textAlign: 'right', minWidth: 64 }}>Dedicación</span>
+                <span style={{ textAlign: 'right', minWidth: 64 }}>{t.dedication}</span>
               </div>
               {resources.map(r => {
                 const isEditing = editingPct[r.id] !== undefined
@@ -342,7 +455,7 @@ function ProjectStatusSection({ project, onSave }) {
           onInput={onEditorInput}
           onKeyUp={onEditorKeyUp}
           onMouseUp={onEditorKeyUp}
-          data-placeholder="Describe la satisfacción del cliente…"
+          data-placeholder={t.satPlaceholder}
           style={{
             minHeight: 180, outline: 'none',
             color: '#f5f5f7', fontSize: 15, fontFamily: 'inherit',
@@ -355,7 +468,7 @@ function ProjectStatusSection({ project, onSave }) {
           <button onClick={saveSat} disabled={satSaving}
             className="mt-3 px-3 py-1.5 rounded-xl text-xs font-semibold self-end"
             style={{ backgroundColor: '#f5f5f7', color: '#000', border: 'none', cursor: 'pointer' }}>
-            {satSaving ? 'Guardando…' : 'Guardar'}
+            {satSaving ? t.saving : t.save}
           </button>
         )}
       </div>
@@ -364,7 +477,7 @@ function ProjectStatusSection({ project, onSave }) {
 }
 
 // ── Section 2: System Stability ───────────────────────────────────────────────
-function SystemStabilitySection({ projectId }) {
+function SystemStabilitySection({ projectId, lang = 'es' }) {
   const [stats, setStats] = useState([])   // [{month_year, open_count, closed_count}]
   const [editing, setEditing] = useState({}) // { 'YYYY-MM_open' | 'YYYY-MM_closed' → string }
 
@@ -379,6 +492,7 @@ function SystemStabilitySection({ projectId }) {
       .then(({ data }) => setStats(data ?? []))
   }, [projectId])
 
+  const t = SR[lang] ?? SR.es
   const statsMap = Object.fromEntries(stats.map(s => [s.month_year, s]))
 
   async function saveCell(monthYear, field, rawVal) {
@@ -433,7 +547,7 @@ function SystemStabilitySection({ projectId }) {
 
   // Chart data
   const chartData = months.map(m => ({
-    month:      monthLabel(m),
+    month:      monthLabel(m, t.locale),
     abiertos:   statsMap[m]?.open_count        ?? 0,
     en_progreso: statsMap[m]?.in_progress_count ?? 0,
     cerrados:   statsMap[m]?.closed_count      ?? 0,
@@ -444,11 +558,11 @@ function SystemStabilitySection({ projectId }) {
   const totalInProgress = stats.reduce((s, r) => s + (r.in_progress_count ?? 0), 0)
   const totalClosed     = stats.reduce((s, r) => s + (r.closed_count      ?? 0), 0)
   const donutData = [
-    { name: 'Abiertos',    value: totalOpen,       color: '#ff453a' },
-    { name: 'En progreso', value: totalInProgress, color: '#ff9f0a' },
-    { name: 'Cerrados',    value: totalClosed,     color: '#30d158' },
+    { name: t.open,       value: totalOpen,       color: '#ff453a' },
+    { name: t.inProgress, value: totalInProgress, color: '#ff9f0a' },
+    { name: t.closed,     value: totalClosed,     color: '#30d158' },
   ].filter(d => d.value > 0)
-  if (donutData.length === 0) donutData.push({ name: 'Sin datos', value: 1, color: '#2a2a2a' })
+  if (donutData.length === 0) donutData.push({ name: '—', value: 1, color: '#2a2a2a' })
 
   const FIELD_COLORS = { open: '#ff453a', in_progress: '#ff9f0a', closed: '#30d158' }
   const FIELD_BG     = { open: 'rgba(255,69,58,0.06)', in_progress: 'rgba(255,159,10,0.06)', closed: 'rgba(48,209,88,0.06)' }
@@ -495,44 +609,44 @@ function SystemStabilitySection({ projectId }) {
       {/* KPIs — agrupados por período */}
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div style={{ ...CARD, padding: '16px 20px' }}>
-          <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Este mes</p>
+          <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.thisMonth}</p>
           <div className="flex gap-5">
             <div>
-              <p className="text-xs mb-1" style={{ color: '#ff453a' }}>Abiertos</p>
+              <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
               <p className="text-2xl font-bold" style={{ color: totalOpenThisMonth > 0 ? '#ff453a' : '#f5f5f7' }}>{totalOpenThisMonth}</p>
             </div>
             {SEP}
             <div>
-              <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>En progreso</p>
+              <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
               <p className="text-2xl font-bold" style={{ color: totalInProgressThisMonth > 0 ? '#ff9f0a' : '#f5f5f7' }}>{totalInProgressThisMonth}</p>
             </div>
             {SEP}
             <div>
-              <p className="text-xs mb-1" style={{ color: '#30d158' }}>Cerrados</p>
+              <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
               <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{totalClosedThisMonth}</p>
             </div>
           </div>
         </div>
         <div style={{ ...CARD, padding: '16px 20px' }}>
-          <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Este año</p>
+          <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.thisYear}</p>
           <div className="flex gap-5">
             <div>
-              <p className="text-xs mb-1" style={{ color: '#ff453a' }}>Abiertos</p>
+              <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
               <p className="text-2xl font-bold" style={{ color: totalOpenYear > 0 ? '#ff453a' : '#f5f5f7' }}>{totalOpenYear}</p>
             </div>
             {SEP}
             <div>
-              <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>En progreso</p>
+              <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
               <p className="text-2xl font-bold" style={{ color: totalInProgressYear > 0 ? '#ff9f0a' : '#f5f5f7' }}>{totalInProgressYear}</p>
             </div>
             {SEP}
             <div>
-              <p className="text-xs mb-1" style={{ color: '#30d158' }}>Cerrados</p>
+              <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
               <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{totalClosedYear}</p>
             </div>
             {SEP}
             <div>
-              <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>Backlog</p>
+              <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>{t.backlog}</p>
               <p className="text-2xl font-bold" style={{ color: backlog > 0 ? '#ff453a' : '#30d158' }}>{Math.max(0, backlog)}</p>
             </div>
           </div>
@@ -541,13 +655,13 @@ function SystemStabilitySection({ projectId }) {
 
       {/* Monthly input table */}
       <div style={CARD} className="mb-4">
-        <p className="text-xs font-medium mb-1" style={{ color: '#6e6e73' }}>Bugs por mes — haz click en cualquier celda para editar</p>
-        <p className="text-xs mb-4" style={{ color: '#3a3a3a' }}>El backlog acumulado (abiertos + en progreso − cerrados) indica cuántos bugs siguen sin resolver</p>
+        <p className="text-xs font-medium mb-1" style={{ color: '#6e6e73' }}>{t.bugsPerMonth}</p>
+        <p className="text-xs mb-4" style={{ color: '#3a3a3a' }}>{t.backlogDesc}</p>
         <div className="overflow-x-auto">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <th style={{ color: '#6e6e73', fontWeight: 500, textAlign: 'left', paddingBottom: 8, whiteSpace: 'nowrap', width: 90 }}>Mes</th>
+                <th style={{ color: '#6e6e73', fontWeight: 500, textAlign: 'left', paddingBottom: 8, whiteSpace: 'nowrap', width: 90 }}>{t.monthCol}</th>
                 {months.map(m => (
                   <th key={m} style={{ color: m === thisMonth ? '#f5f5f7' : '#6e6e73', fontWeight: m === thisMonth ? 600 : 500,
                                        textAlign: 'center', paddingBottom: 8, minWidth: 80, whiteSpace: 'nowrap' }}>
@@ -558,9 +672,9 @@ function SystemStabilitySection({ projectId }) {
             </thead>
             <tbody>
               {[
-                { field: 'open',        label: 'Abiertos',    color: '#ff453a' },
-                { field: 'in_progress', label: 'En progreso', color: '#ff9f0a' },
-                { field: 'closed',      label: 'Cerrados',    color: '#30d158' },
+                { field: 'open',        label: t.open,       color: '#ff453a' },
+                { field: 'in_progress', label: t.inProgress, color: '#ff9f0a' },
+                { field: 'closed',      label: t.closed,     color: '#30d158' },
               ].map((row, ri, rows) => (
                 <tr key={row.field} style={{ borderTop: ri > 0 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
                   <td style={{ padding: '8px 0', color: row.color, fontWeight: 500 }}>{row.label}</td>
@@ -579,21 +693,21 @@ function SystemStabilitySection({ projectId }) {
       {/* Charts */}
       <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-4">
         <div style={CARD}>
-          <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Evolución de bugs (últimos 6 meses)</p>
+          <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.bugEvolution}</p>
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={chartData} barSize={8} barGap={2}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
               <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-              <Bar dataKey="abiertos"    fill="#ff453a" radius={[3,3,0,0]} name="Abiertos" />
-              <Bar dataKey="en_progreso" fill="#ff9f0a" radius={[3,3,0,0]} name="En progreso" />
-              <Bar dataKey="cerrados"    fill="#30d158" radius={[3,3,0,0]} name="Cerrados" />
+              <Bar dataKey="abiertos"    fill="#ff453a" radius={[3,3,0,0]} name={t.open} />
+              <Bar dataKey="en_progreso" fill="#ff9f0a" radius={[3,3,0,0]} name={t.inProgress} />
+              <Bar dataKey="cerrados"    fill="#30d158" radius={[3,3,0,0]} name={t.closed} />
             </BarChart>
           </ResponsiveContainer>
         </div>
         <div style={CARD} className="flex flex-col items-center justify-center">
-          <p className="text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Total acumulado</p>
+          <p className="text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>{t.totalAccumulated}</p>
           <PieChart width={140} height={140}>
             <Pie data={donutData} cx={65} cy={65} innerRadius={42} outerRadius={60} dataKey="value" paddingAngle={2}>
               {donutData.map((d, i) => <Cell key={i} fill={d.color} />)}
@@ -617,7 +731,7 @@ function SystemStabilitySection({ projectId }) {
 // ── Section 3: Delivering Value ───────────────────────────────────────────────
 
 // Mirrors computePhaseStatus from usePlan.js using phase.progress (0-100)
-function phaseMetrics(phase) {
+function phaseMetrics(phase, lang = 'es') {
   const todayDate = new Date(); todayDate.setHours(0,0,0,0)
   const todayStr  = isoMonth(todayDate).slice(0,7) // not used for comparison below
   const start = new Date(phase.start_date + 'T00:00:00')
@@ -638,13 +752,14 @@ function phaseMetrics(phase) {
 
   // Same rules as computePhaseStatus
   let scheduleStatus, scheduleColor, scheduleLabel
-  if (isCompleted)          { scheduleStatus = 'done';    scheduleColor = '#30d158'; scheduleLabel = 'Completada' }
-  else if (isUpcoming)      { scheduleStatus = 'upcoming';scheduleColor = '#6e6e73'; scheduleLabel = 'Pendiente' }
-  else if (isOverdue)       { scheduleStatus = 'overdue'; scheduleColor = '#ff453a'; scheduleLabel = 'Retrasada' }
-  else if (timePct - progress > 25) { scheduleStatus = 'risk';   scheduleColor = '#ff9f0a'; scheduleLabel = 'En riesgo' }
-  else if (delta > 8)       { scheduleStatus = 'ahead';   scheduleColor = '#30d158'; scheduleLabel = `+${Math.round(delta)}% adelantado` }
-  else if (delta < -8)      { scheduleStatus = 'behind';  scheduleColor = '#ff9f0a'; scheduleLabel = `${Math.round(delta)}% retrasado` }
-  else                      { scheduleStatus = 'ontrack'; scheduleColor = '#64d2ff'; scheduleLabel = 'En plazo' }
+  const s = SR[lang] ?? SR.es
+  if (isCompleted)          { scheduleStatus = 'done';    scheduleColor = '#30d158'; scheduleLabel = s.phaseCompleted }
+  else if (isUpcoming)      { scheduleStatus = 'upcoming';scheduleColor = '#6e6e73'; scheduleLabel = s.phasePending }
+  else if (isOverdue)       { scheduleStatus = 'overdue'; scheduleColor = '#ff453a'; scheduleLabel = s.phaseOverdue }
+  else if (timePct - progress > 25) { scheduleStatus = 'risk';   scheduleColor = '#ff9f0a'; scheduleLabel = s.phaseAtRisk }
+  else if (delta > 8)       { scheduleStatus = 'ahead';   scheduleColor = '#30d158'; scheduleLabel = s.phaseAhead(Math.round(delta)) }
+  else if (delta < -8)      { scheduleStatus = 'behind';  scheduleColor = '#ff9f0a'; scheduleLabel = s.phaseBehind(Math.round(delta)) }
+  else                      { scheduleStatus = 'ontrack'; scheduleColor = '#64d2ff'; scheduleLabel = s.phaseOnTrack }
 
   return { timePct, progress, delta, daysRemaining, totalDays, elapsedDays,
            isCompleted, isUpcoming, isActive, isOverdue,
@@ -678,7 +793,7 @@ function PlanGanttSection({ projectId }) {
   )
 }
 
-function DeliveringValueSection({ projectId }) {
+function DeliveringValueSection({ projectId, lang = 'es' }) {
   const [phases, setPhases] = useState([])
   const [hasPlan, setHasPlan] = useState(null)
   const [showAllPhases, setShowAllPhases] = useState(false)
@@ -702,8 +817,9 @@ function DeliveringValueSection({ projectId }) {
     load()
   }, [projectId])
 
+  const t = SR[lang] ?? SR.es
   // Derived plan stats
-  const phasesWithMetrics = phases.map(p => ({ ...p, metrics: phaseMetrics(p) }))
+  const phasesWithMetrics = phases.map(p => ({ ...p, metrics: phaseMetrics(p, lang) }))
   const activePhase     = phasesWithMetrics.find(p => p.metrics.isActive)
   const totalHours      = phases.reduce((s, p) => s + (p.hours ?? 0), 0)
   const overallPct      = phases.length > 0
@@ -717,18 +833,18 @@ function DeliveringValueSection({ projectId }) {
     <div className="mb-2">
       {hasPlan === false && (
         <div style={{ ...CARD, marginBottom: 16 }}>
-          <p className="text-sm" style={{ color: '#6e6e73' }}>Sin plan vinculado a este proyecto. Crea uno en la tab Plan para ver métricas de progreso.</p>
+          <p className="text-sm" style={{ color: '#6e6e73' }}>{t.noPlan}</p>
         </div>
       )}
 
       {phases.length > 0 && (<>
         {/* Overall plan summary */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-          <KpiCard label="Progreso global" value={`${overallPct}%`}
+          <KpiCard label={t.globalProgress} value={`${overallPct}%`}
             color={overallPct >= 75 ? '#30d158' : overallPct >= 40 ? '#64d2ff' : '#ff9f0a'} />
-          <KpiCard label="Fases completadas" value={`${completedPhases}/${phases.length}`}
+          <KpiCard label={t.phasesCompleted} value={`${completedPhases}/${phases.length}`}
             color="#f5f5f7" />
-          <KpiCard label="Horas planificadas" value={totalHours > 0 ? `${totalHours}h` : '—'}
+          <KpiCard label={t.plannedHours} value={totalHours > 0 ? `${totalHours}h` : '—'}
             color="#64d2ff" />
         </div>
 
@@ -740,7 +856,7 @@ function DeliveringValueSection({ projectId }) {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: activePhase.color }} />
-                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: activePhase.color }}>Fase activa</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: activePhase.color }}>{t.activePhase}</span>
                 </div>
                 <span className="text-xs px-2.5 py-1 rounded-full font-medium"
                   style={{ backgroundColor: `${m.scheduleColor}18`, color: m.scheduleColor }}>
@@ -752,21 +868,21 @@ function DeliveringValueSection({ projectId }) {
               {/* Tiempo transcurrido */}
               <div className="mb-3">
                 <div className="flex justify-between text-xs mb-1.5" style={{ color: '#6e6e73' }}>
-                  <span>Tiempo transcurrido</span>
+                  <span>{t.timeElapsed}</span>
                   <span style={{ color: '#f5f5f7' }}>{Math.round(m.timePct)}%</span>
                 </div>
                 <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
                   <div className="h-full rounded-full" style={{ width: `${m.timePct}%`, backgroundColor: '#6e6e73' }} />
                 </div>
                 <p className="text-xs mt-1" style={{ color: '#6e6e73' }}>
-                  {m.daysRemaining > 0 ? `${m.daysRemaining} días restantes` : `${Math.abs(m.daysRemaining)} días de retraso`}
+                  {m.daysRemaining > 0 ? t.daysRemaining(m.daysRemaining) : t.daysOverdue(m.daysRemaining)}
                 </p>
               </div>
 
               {/* Progreso */}
               <div className="mb-4">
                 <div className="flex justify-between text-xs mb-1.5" style={{ color: '#6e6e73' }}>
-                  <span>Progreso</span>
+                  <span>{t.progressLabel}</span>
                   <span style={{ color: activePhase.color }}>{m.progress}%</span>
                 </div>
                 <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
@@ -781,9 +897,9 @@ function DeliveringValueSection({ projectId }) {
                   {m.scheduleStatus === 'ahead' ? '↑' : m.scheduleStatus === 'behind' ? '↓' : '→'}
                 </span>
                 <p className="text-xs" style={{ color: m.scheduleColor }}>
-                  {m.scheduleStatus === 'ahead'   && `Vais ${Math.round(m.delta)}% por delante del tiempo transcurrido`}
-                  {m.scheduleStatus === 'behind'  && `Vais ${Math.abs(Math.round(m.delta))}% por detrás del tiempo transcurrido`}
-                  {m.scheduleStatus === 'ontrack' && 'El ritmo está alineado con el tiempo transcurrido'}
+                  {m.scheduleStatus === 'ahead'   && t.aheadMsg(Math.round(m.delta))}
+                  {m.scheduleStatus === 'behind'  && t.behindMsg(Math.abs(Math.round(m.delta)))}
+                  {m.scheduleStatus === 'ontrack' && t.onTrackMsg}
                 </p>
               </div>
             </div>
@@ -792,7 +908,7 @@ function DeliveringValueSection({ projectId }) {
 
         {/* All phases */}
         <div style={CARD} className="mb-4">
-          <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Todas las fases</p>
+          <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.allPhases}</p>
           <div className="flex flex-col gap-4">
             {visiblePhases.map(phase => {
               const m = phase.metrics
@@ -805,7 +921,7 @@ function DeliveringValueSection({ projectId }) {
                       <span className="text-sm font-medium truncate" style={{ color: '#f5f5f7' }}>{phase.name}</span>
                       {isActive && (
                         <span className="text-xs px-1.5 py-0.5 rounded-full shrink-0"
-                          style={{ backgroundColor: `${phase.color}20`, color: phase.color }}>activa</span>
+                          style={{ backgroundColor: `${phase.color}20`, color: phase.color }}>{t.activeLabel}</span>
                       )}
                     </div>
                     <span className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ml-3"
@@ -823,9 +939,9 @@ function DeliveringValueSection({ projectId }) {
 
                   <div className="flex justify-between mt-1">
                     <span className="text-xs" style={{ color: '#3a3a3a' }}>
-                      {new Date(phase.start_date + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                      {new Date(phase.start_date + 'T00:00:00').toLocaleDateString(t.locale, { day: 'numeric', month: 'short' })}
                       {' → '}
-                      {new Date(phase.end_date + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                      {new Date(phase.end_date + 'T00:00:00').toLocaleDateString(t.locale, { day: 'numeric', month: 'short' })}
                     </span>
                     <span className="text-xs font-semibold" style={{ color: phase.color }}>{m.progress}%</span>
                   </div>
@@ -843,8 +959,8 @@ function DeliveringValueSection({ projectId }) {
               onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
               onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}>
               {showAllPhases
-                ? <><ChevronUp className="w-3.5 h-3.5" /> Ver menos</>
-                : <><ChevronDown className="w-3.5 h-3.5" /> Ver {hiddenCount} fase{hiddenCount > 1 ? 's' : ''} más</>
+                ? <><ChevronUp className="w-3.5 h-3.5" /> {t.showLess}</>
+                : <><ChevronDown className="w-3.5 h-3.5" /> {t.showMorePhases(hiddenCount)}</>
               }
             </button>
           )}
@@ -852,13 +968,13 @@ function DeliveringValueSection({ projectId }) {
       </>)}
 
       {/* Effort table + chart (global view) */}
-      <EffortOverview projectId={projectId} />
+      <EffortOverview projectId={projectId} lang={lang} />
     </div>
   )
 }
 
 // ── Effort Overview (monthly table + chart) — used in Global ─────────────────
-function EffortOverview({ projectId }) {
+function EffortOverview({ projectId, lang = 'es' }) {
   const [effort, setEffort] = useState([])
   const [editingEffort, setEditingEffort] = useState({})
   const months = lastNMonths(4)
@@ -884,13 +1000,14 @@ function EffortOverview({ projectId }) {
     setEditingEffort(prev => { const n = { ...prev }; delete n[monthYear]; return n })
   }
 
+  const t = SR[lang] ?? SR.es
   const effortMap = Object.fromEntries(effort.map(e => [e.month_year, e.hours]))
-  const chartData  = months.map(m => ({ month: monthLabel(m), horas: effortMap[m] ?? 0 }))
+  const chartData  = months.map(m => ({ month: monthLabel(m, t.locale), horas: effortMap[m] ?? 0 }))
 
   return (<>
     <div style={CARD} className="mb-4 mt-4">
-      <p className="text-xs font-medium mb-1" style={{ color: '#6e6e73' }}>Horas de esfuerzo del equipo por mes</p>
-      <p className="text-xs mb-4" style={{ color: '#3a3a3a' }}>Haz click en una celda para editar</p>
+      <p className="text-xs font-medium mb-1" style={{ color: '#6e6e73' }}>{t.effortHoursLabel}</p>
+      <p className="text-xs mb-4" style={{ color: '#3a3a3a' }}>{t.clickToEdit}</p>
       <div className="overflow-x-auto">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
@@ -939,14 +1056,14 @@ function EffortOverview({ projectId }) {
       </div>
     </div>
     <div style={CARD}>
-      <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Evolución del esfuerzo (horas)</p>
+      <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.effortEvolution}</p>
       <ResponsiveContainer width="100%" height={160}>
         <BarChart data={chartData} barSize={16}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
           <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-          <Bar dataKey="horas" fill="#64d2ff" radius={[4,4,0,0]} name="Horas" />
+          <Bar dataKey="horas" fill="#64d2ff" radius={[4,4,0,0]} name={t.hoursBar} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -954,7 +1071,7 @@ function EffortOverview({ projectId }) {
 }
 
 // ── Team Effort This Month ────────────────────────────────────────────────────
-function TeamEffortMonth({ projectId }) {
+function TeamEffortMonth({ projectId, lang = 'es' }) {
   // weeks: all Mondays within current month
   const now = new Date()
   const y = now.getFullYear(), mo = now.getMonth()
@@ -977,7 +1094,7 @@ function TeamEffortMonth({ projectId }) {
 
   function weekShortLabel(iso) {
     const d = new Date(iso + 'T00:00:00')
-    return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+    return d.toLocaleDateString((SR[lang] ?? SR.es).locale, { day: 'numeric', month: 'short' })
   }
 
   const [data, setData] = useState([])  // [{name, role, weeks: {weekStr: {planned,actual}}]
@@ -1094,15 +1211,18 @@ function TeamEffortMonth({ projectId }) {
 }
 
 // ── Section 4: Team Performance ───────────────────────────────────────────────
-const TEAM_KPI_FIELDS = [
-  { key: 'tasks_closed', label: 'Tareas cerradas este mes', color: '#30d158' },
-  { key: 'bugs_closed',  label: 'Bugs cerrados este mes',  color: '#ff9f0a' },
-  { key: 'in_progress',  label: 'En progreso',             color: '#64d2ff' },
-]
+function getTeamKpiFields(lang) {
+  const t = SR[lang] ?? SR.es
+  return [
+    { key: 'tasks_closed', label: t.tasksClosedMonth, color: '#30d158' },
+    { key: 'bugs_closed',  label: t.bugsClosedMonth,  color: '#ff9f0a' },
+    { key: 'in_progress',  label: t.inProgress,       color: '#64d2ff' },
+  ]
+}
 
 const EMPTY_KPIS = { tasks_closed: 0, bugs_closed: 0, in_progress: 0 }
 
-function TeamPerformanceSection({ projectId }) {
+function TeamPerformanceSection({ projectId, lang = 'es' }) {
   const months    = lastNMonths(4)  // [3 months ago … this month]
   const thisMonth = months[months.length - 1]
   const [allKpis, setAllKpis] = useState({})  // month_year → kpis row
@@ -1122,6 +1242,8 @@ function TeamPerformanceSection({ projectId }) {
       })
   }, [projectId])  // eslint-disable-line react-hooks/exhaustive-deps
 
+  const t = SR[lang] ?? SR.es
+  const TEAM_KPI_FIELDS = getTeamKpiFields(lang)
   const currentKpis = allKpis[thisMonth] ?? EMPTY_KPIS
 
   async function save(key, value) {
@@ -1177,9 +1299,9 @@ function TeamPerformanceSection({ projectId }) {
 
       {/* Bar chart — distribución por mes */}
       <div style={CARD}>
-        <p className="text-xs font-medium mb-1" style={{ color: '#6e6e73' }}>Distribución del trabajo por mes</p>
+        <p className="text-xs font-medium mb-1" style={{ color: '#6e6e73' }}>{t.workDistribution}</p>
         <div className="flex items-center gap-4 mb-4">
-          {[{ color: '#30d158', label: 'Tareas cerradas' }, { color: '#ff9f0a', label: 'Bugs cerrados' }, { color: '#64d2ff', label: 'En progreso' }].map(l => (
+          {[{ color: '#30d158', label: t.tasksClosed }, { color: '#ff9f0a', label: t.bugsClosed }, { color: '#64d2ff', label: t.inProgress }].map(l => (
             <div key={l.label} className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
               <span className="text-xs" style={{ color: '#6e6e73' }}>{l.label}</span>
@@ -1187,14 +1309,14 @@ function TeamPerformanceSection({ projectId }) {
           ))}
         </div>
         <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={months.map(m => ({ month: monthLabel(m), tareas: allKpis[m]?.tasks_closed ?? 0, bugs: allKpis[m]?.bugs_closed ?? 0, progreso: allKpis[m]?.in_progress ?? 0 }))} barSize={10} barGap={2}>
+          <BarChart data={months.map(m => ({ month: monthLabel(m, t.locale), tareas: allKpis[m]?.tasks_closed ?? 0, bugs: allKpis[m]?.bugs_closed ?? 0, progreso: allKpis[m]?.in_progress ?? 0 }))} barSize={10} barGap={2}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
             <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
             <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-            <Bar dataKey="tareas"   fill="#30d158" radius={[3,3,0,0]} name="Tareas cerradas" />
-            <Bar dataKey="bugs"     fill="#ff9f0a" radius={[3,3,0,0]} name="Bugs cerrados" />
-            <Bar dataKey="progreso" fill="#64d2ff" radius={[3,3,0,0]} name="En progreso" />
+            <Bar dataKey="tareas"   fill="#30d158" radius={[3,3,0,0]} name={t.tasksClosed} />
+            <Bar dataKey="bugs"     fill="#ff9f0a" radius={[3,3,0,0]} name={t.bugsClosed} />
+            <Bar dataKey="progreso" fill="#64d2ff" radius={[3,3,0,0]} name={t.inProgress} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -1210,14 +1332,15 @@ function fmtMoney(n, cur = '€') {
   if (abs >= 1000)    return `${sign}${cur}${(abs / 1000).toFixed(1)}k`
   return `${sign}${cur}${abs.toFixed(0)}`
 }
-function profitHealth(margin, target) {
-  if (margin >= target)      return { color: '#30d158', label: 'En objetivo' }
-  if (margin >= target / 2)  return { color: '#ff9f0a', label: 'En riesgo' }
-  return                            { color: '#ff453a', label: 'Crítico' }
+function profitHealth(margin, target, lang = 'es') {
+  const t = SR[lang] ?? SR.es
+  if (margin >= target)      return { color: '#30d158', label: t.onTarget }
+  if (margin >= target / 2)  return { color: '#ff9f0a', label: t.phaseAtRisk }
+  return                            { color: '#ff453a', label: t.critical }
 }
 
 // ── Section 5: Profitability ──────────────────────────────────────────────────
-function ProfitabilitySection({ projectId }) {
+function ProfitabilitySection({ projectId, lang = 'es' }) {
   const [fin,       setFin]       = useState(null)
   const [resources, setResources] = useState([])
   const [actual,    setActual]    = useState({})
@@ -1249,9 +1372,10 @@ function ProfitabilitySection({ projectId }) {
     load()
   }, [projectId])
 
+  const t = SR[lang] ?? SR.es
   if (!fin && resources.length === 0) return (
     <div style={CARD}>
-      <p className="text-sm" style={{ color: '#6e6e73' }}>Sin datos financieros. Configúralos en la pestaña Recursos &amp; Finanzas.</p>
+      <p className="text-sm" style={{ color: '#6e6e73' }}>{t.noFinancialData}</p>
     </div>
   )
 
@@ -1275,7 +1399,7 @@ function ProfitabilitySection({ projectId }) {
   const currentProfit = billed - etd
   const currentMargin = billed > 0 ? (currentProfit / billed) * 100 : 0
   const remainingBudget = contract - etd
-  const h = profitHealth(currentMargin, target)
+  const h = profitHealth(currentMargin, target, lang)
 
   // Bar widths (relative to contract)
   const maxVal = Math.max(contract, etd, billed, 1)
@@ -1286,17 +1410,17 @@ function ProfitabilitySection({ projectId }) {
     <div className="mb-2">
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <KpiCard label="Presupuesto" value={fmtMoney(contract, cur)} color="#f5f5f7" />
-        <KpiCard label="Coste ETD" value={fmtMoney(etd, cur)} color="#64d2ff" />
-        <KpiCard label="Facturado" value={fmtMoney(billed, cur)} color="#30d158" />
-        <KpiCard label="Margen actual" value={billed > 0 ? `${currentMargin.toFixed(1)}%` : '—'}
+        <KpiCard label={t.budget} value={fmtMoney(contract, cur)} color="#f5f5f7" />
+        <KpiCard label={t.etdCost} value={fmtMoney(etd, cur)} color="#64d2ff" />
+        <KpiCard label={t.billed} value={fmtMoney(billed, cur)} color="#30d158" />
+        <KpiCard label={t.currentMargin} value={billed > 0 ? `${currentMargin.toFixed(1)}%` : '—'}
           color={h.color} />
       </div>
 
       {/* Status + bars */}
       <div style={CARD}>
         <div className="flex items-center justify-between mb-4">
-          <p className="text-xs font-medium" style={{ color: '#6e6e73' }}>Estado financiero</p>
+          <p className="text-xs font-medium" style={{ color: '#6e6e73' }}>{t.financialStatus}</p>
           <span className="text-xs px-2.5 py-1 rounded-full font-medium"
             style={{ backgroundColor: `${h.color}18`, color: h.color }}>
             {h.label}
@@ -1307,7 +1431,7 @@ function ProfitabilitySection({ projectId }) {
           {/* Budget bar */}
           <div>
             <div className="flex justify-between text-xs mb-1.5" style={{ color: '#6e6e73' }}>
-              <span>Presupuesto</span>
+              <span>{t.budget}</span>
               <span style={{ color: '#f5f5f7' }}>{fmtMoney(contract, cur)}</span>
             </div>
             <div className="h-2 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
@@ -1318,7 +1442,7 @@ function ProfitabilitySection({ projectId }) {
           {/* ETD bar */}
           <div>
             <div className="flex justify-between text-xs mb-1.5" style={{ color: '#6e6e73' }}>
-              <span>Coste real (ETD)</span>
+              <span>{t.etdBar}</span>
               <span style={{ color: '#64d2ff' }}>{fmtMoney(etd, cur)}</span>
             </div>
             <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
@@ -1329,7 +1453,7 @@ function ProfitabilitySection({ projectId }) {
           {/* Billed bar */}
           <div>
             <div className="flex justify-between text-xs mb-1.5" style={{ color: '#6e6e73' }}>
-              <span>Facturado</span>
+              <span>{t.billed}</span>
               <span style={{ color: '#30d158' }}>{fmtMoney(billed, cur)}</span>
             </div>
             <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
@@ -1341,17 +1465,17 @@ function ProfitabilitySection({ projectId }) {
         {/* Summary row */}
         <div className="flex gap-6 mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           <div>
-            <p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>Margen objetivo</p>
+            <p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.targetMargin}</p>
             <p className="text-sm font-semibold" style={{ color: '#f5f5f7' }}>{target}%</p>
           </div>
           <div>
-            <p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>Beneficio actual</p>
+            <p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.currentProfit}</p>
             <p className="text-sm font-semibold" style={{ color: currentProfit >= 0 ? '#30d158' : '#ff453a' }}>
               {fmtMoney(currentProfit, cur)}
             </p>
           </div>
           <div>
-            <p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>Presupuesto restante</p>
+            <p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.remainingBudget}</p>
             <p className="text-sm font-semibold" style={{ color: remainingBudget >= 0 ? '#f5f5f7' : '#ff453a' }}>
               {fmtMoney(remainingBudget, cur)}
             </p>
@@ -1363,7 +1487,7 @@ function ProfitabilitySection({ projectId }) {
 }
 
 // ── Section 6: Opportunities & Challenges ────────────────────────────────────
-function OpportunitiesSection({ project, onSave }) {
+function OpportunitiesSection({ project, onSave, lang = 'es' }) {
   const [opps, setOpps] = useState(project.opportunities ?? '')
   const [chals, setChals] = useState(project.challenges ?? '')
   const [saving, setSaving] = useState(false)
@@ -1382,6 +1506,7 @@ function OpportunitiesSection({ project, onSave }) {
     toast.success('Guardado')
   }
 
+  const t = SR[lang] ?? SR.es
   const taStyle = {
     ...INPUT,
     minHeight: 100,
@@ -1397,7 +1522,7 @@ function OpportunitiesSection({ project, onSave }) {
           <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>What are the new business opportunities?</p>
           <textarea
             style={taStyle}
-            placeholder="Describe las oportunidades de negocio identificadas…"
+            placeholder={t.oppPlaceholder}
             value={opps}
             onChange={e => { setOpps(e.target.value); setDirty(true) }}
             onFocus={fi} onBlur={fo}
@@ -1407,7 +1532,7 @@ function OpportunitiesSection({ project, onSave }) {
           <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>What are the challenges?</p>
           <textarea
             style={taStyle}
-            placeholder="Describe los retos o bloqueos actuales…"
+            placeholder={t.chalPlaceholder}
             value={chals}
             onChange={e => { setChals(e.target.value); setDirty(true) }}
             onFocus={fi} onBlur={fo}
@@ -1419,7 +1544,7 @@ function OpportunitiesSection({ project, onSave }) {
           <button onClick={save} disabled={saving}
             className="px-4 py-2 rounded-xl text-sm font-semibold transition-all"
             style={{ backgroundColor: '#f5f5f7', color: '#000', border: 'none', cursor: 'pointer' }}>
-            {saving ? 'Guardando…' : 'Guardar cambios'}
+            {saving ? t.saving : t.saveChanges}
           </button>
         </div>
       )}
@@ -1428,7 +1553,9 @@ function OpportunitiesSection({ project, onSave }) {
 }
 
 // ── Snapshot read-only view ───────────────────────────────────────────────────
-function SnapshotView({ snapshot }) {
+function SnapshotView({ snapshot, lang = 'es' }) {
+  const t = SR[lang] ?? SR.es
+  const locale = t.locale
   const proj        = snapshot.project ?? {}
   const resources   = snapshot.resources ?? []
   const bugStats    = snapshot.bug_stats ?? []
@@ -1454,11 +1581,11 @@ function SnapshotView({ snapshot }) {
     const isUpcoming  = ref < start
     const isOverdue   = ref > end && !isCompleted
     let color, label
-    if (isCompleted)              { color = '#30d158'; label = 'Completada' }
-    else if (isUpcoming)          { color = '#6e6e73'; label = 'Pendiente' }
-    else if (isOverdue)           { color = '#ff453a'; label = 'Retrasada' }
-    else if (timePct - progress > 25) { color = '#ff9f0a'; label = 'En riesgo' }
-    else                          { color = '#64d2ff'; label = 'En plazo' }
+    if (isCompleted)              { color = '#30d158'; label = t.phaseCompleted }
+    else if (isUpcoming)          { color = '#6e6e73'; label = t.phasePending }
+    else if (isOverdue)           { color = '#ff453a'; label = t.phaseOverdue }
+    else if (timePct - progress > 25) { color = '#ff9f0a'; label = t.phaseAtRisk }
+    else                          { color = '#64d2ff'; label = t.phaseOnTrack }
     return { timePct, progress, color, label, isUpcoming, isCompleted }
   }
 
@@ -1469,17 +1596,18 @@ function SnapshotView({ snapshot }) {
   // Bug stats
   const bugMap     = Object.fromEntries(bugStats.map(b => [b.month_year, b]))
   const snapBugs   = bugMap[snapMonth]
-  const bugChartData = months6.map(m => ({ month: monthLabel(m), abiertos: bugMap[m]?.open_count ?? 0, en_progreso: bugMap[m]?.in_progress_count ?? 0, cerrados: bugMap[m]?.closed_count ?? 0 }))
+  const bugChartData = months6.map(m => ({ month: monthLabel(m, locale), abiertos: bugMap[m]?.open_count ?? 0, en_progreso: bugMap[m]?.in_progress_count ?? 0, cerrados: bugMap[m]?.closed_count ?? 0 }))
   const totalBugOpen       = bugStats.reduce((s, b) => s + (b.open_count        ?? 0), 0)
   const totalBugInProgress = bugStats.reduce((s, b) => s + (b.in_progress_count ?? 0), 0)
   const totalBugClosed     = bugStats.reduce((s, b) => s + (b.closed_count      ?? 0), 0)
   const bugBacklog = Math.max(0, totalBugOpen + totalBugInProgress - totalBugClosed)
   const bugDonut = [
-    { name: 'Abiertos',    value: totalBugOpen,       color: '#ff453a' },
-    { name: 'En progreso', value: totalBugInProgress, color: '#ff9f0a' },
-    { name: 'Cerrados',    value: totalBugClosed,     color: '#30d158' },
+    { name: t.open,       value: totalBugOpen,       color: '#ff453a' },
+    { name: t.inProgress, value: totalBugInProgress, color: '#ff9f0a' },
+    { name: t.closed,     value: totalBugClosed,     color: '#30d158' },
   ].filter(d => d.value > 0)
-  if (!bugDonut.length) bugDonut.push({ name: 'Sin datos', value: 1, color: '#2a2a2a' })
+  const noDataLabel = lang === 'en' ? 'No data' : 'Sin datos'
+  if (!bugDonut.length) bugDonut.push({ name: noDataLabel, value: 1, color: '#2a2a2a' })
 
   // Phases
   const phasesWithMet   = phases.map(p => ({ ...p, met: phaseMetAt(p) }))
@@ -1490,17 +1618,8 @@ function SnapshotView({ snapshot }) {
   // Team KPIs
   const kpiMap      = Object.fromEntries(teamKpis.map(k => [k.month_year, k]))
   const currentKpis = kpiMap[snapMonth] ?? { tasks_closed: 0, bugs_closed: 0, in_progress: 0 }
-  function donutFor(kpis) {
-    const data = [
-      { name: 'Tareas cerradas', value: kpis.tasks_closed ?? 0, color: '#30d158' },
-      { name: 'Bugs cerrados',   value: kpis.bugs_closed  ?? 0, color: '#ff9f0a' },
-      { name: 'En progreso',     value: kpis.in_progress  ?? 0, color: '#64d2ff' },
-    ].filter(d => d.value > 0)
-    if (!data.length) data.push({ name: 'Sin datos', value: 1, color: '#2a2a2a' })
-    return data
-  }
   const effortMap  = Object.fromEntries(effort.map(e => [e.month_year, e.hours]))
-  const effortData = months4.map(m => ({ month: monthLabel(m), horas: effortMap[m] ?? 0 }))
+  const effortData = months4.map(m => ({ month: monthLabel(m, locale), horas: effortMap[m] ?? 0 }))
 
   // Profitability
   const cur      = financial?.currency ?? '€'
@@ -1516,9 +1635,9 @@ function SnapshotView({ snapshot }) {
   const profit  = billed - etd
   const margin  = billed > 0 ? (profit / billed) * 100 : 0
   const maxVal  = Math.max(contract, etd, billed, 1)
-  const ph      = profitHealth(margin, target)
+  const ph      = profitHealth(margin, target, lang)
 
-  const TYPE_LABELS   = { implementation: 'Implementación', maintenance: 'Mantenimiento' }
+  const TYPE_LABELS   = { implementation: t.typeImpl, maintenance: t.typeMaint }
   const STATUS_LABELS = { on_track: 'On track', at_risk: 'At risk', blocked: 'Blocked' }
   const STATUS_COLORS = { on_track: '#30d158', at_risk: '#ff9f0a', blocked: '#ff453a' }
   const CSAT_STATES   = [
@@ -1530,12 +1649,12 @@ function SnapshotView({ snapshot }) {
 
   const snapSectionStatuses = proj.status_report_section_statuses ?? {}
   const sections = [
-    { number: '01', title: 'What is the status of my project?',   subtitle: 'Tipo de proyecto, satisfacción del cliente y asignación del equipo' },
-    { number: '02', title: 'Is my system stable?',                subtitle: 'Bugs registrados, estado y evolución mensual' },
-    { number: '03', title: 'Are we delivering value?',            subtitle: 'Progreso del plan, fases y estado del proyecto' },
-    { number: '04', title: 'Is my team working well?',            subtitle: 'Tareas cerradas, bugs resueltos, trabajo en progreso y esfuerzo' },
-    { number: '05', title: 'Is the project profitable?',          subtitle: 'Presupuesto, costes y facturación' },
-    { number: '06', title: 'Opportunities & Challenges',          subtitle: 'Nuevas oportunidades de negocio y retos actuales' },
+    { number: '01', title: 'What is the status of my project?',   subtitle: t.sub01 },
+    { number: '02', title: 'Is my system stable?',                subtitle: t.sub02 },
+    { number: '03', title: 'Are we delivering value?',            subtitle: t.sub03 },
+    { number: '04', title: 'Is my team working well?',            subtitle: t.sub04 },
+    { number: '05', title: 'Is the project profitable?',          subtitle: t.sub05 },
+    { number: '06', title: 'Opportunities & Challenges',          subtitle: t.sub06 },
   ]
 
   return (
@@ -1560,26 +1679,26 @@ function SnapshotView({ snapshot }) {
             <div className="flex flex-col gap-4 mb-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div style={CARD}>
-                  <p className="text-xs mb-3" style={{ color: '#6e6e73' }}>Tipo de proyecto</p>
+                  <p className="text-xs mb-3" style={{ color: '#6e6e73' }}>{t.projectType}</p>
                   <span className="text-sm font-semibold px-3 py-1 rounded-full"
                     style={{ backgroundColor: isImpl ? 'rgba(100,210,255,0.12)' : 'rgba(191,90,242,0.12)', color: isImpl ? '#64d2ff' : '#bf5af2' }}>
                     {TYPE_LABELS[proj.type] ?? proj.type}
                   </span>
-                  {!isImpl && proj.renewal_date && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>Fecha de renovación</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.renewal_date)}</p></div>}
-                  {isImpl  && proj.deadline      && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>Deadline</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.deadline)}</p></div>}
+                  {!isImpl && proj.renewal_date && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.renewalDate}</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.renewal_date, locale)}</p></div>}
+                  {isImpl  && proj.deadline      && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.deadline}</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.deadline, locale)}</p></div>}
                   <div className="mt-3">
-                    <p className="text-xs" style={{ color: '#6e6e73' }}>Estado</p>
+                    <p className="text-xs" style={{ color: '#6e6e73' }}>{t.status}</p>
                     <span className="text-sm font-medium mt-0.5 inline-block" style={{ color: STATUS_COLORS[proj.status] ?? '#f5f5f7' }}>
                       {STATUS_LABELS[proj.status] ?? proj.status}
                     </span>
                   </div>
                 </div>
                 <div style={CARD}>
-                  <p className="text-xs mb-3" style={{ color: '#6e6e73' }}>Team allocation ({resources.length} recurso{resources.length !== 1 ? 's' : ''})</p>
-                  {resources.length === 0 ? <p className="text-xs" style={{ color: '#6e6e73' }}>Sin recursos.</p> : (
+                  <p className="text-xs mb-3" style={{ color: '#6e6e73' }}>{t.teamAlloc} ({resources.length} {resources.length !== 1 ? t.resources : t.resource})</p>
+                  {resources.length === 0 ? <p className="text-xs" style={{ color: '#6e6e73' }}>{t.noResources}</p> : (
                     <div className="flex flex-col gap-3">
                       <div className="grid gap-2 text-xs" style={{ color: '#6e6e73', gridTemplateColumns: '1fr auto auto' }}>
-                        <span>Nombre / Rol</span><span style={{ textAlign: 'right' }}>€/h</span><span style={{ textAlign: 'right', minWidth: 64 }}>Dedicación</span>
+                        <span>{t.nameRole}</span><span style={{ textAlign: 'right' }}>€/h</span><span style={{ textAlign: 'right', minWidth: 64 }}>{t.dedication}</span>
                       </div>
                       {resources.map((r, ri) => (
                         <div key={ri} className="grid gap-2 items-center" style={{ gridTemplateColumns: '1fr auto auto' }}>
@@ -1608,7 +1727,7 @@ function SnapshotView({ snapshot }) {
                 </div>
                 {proj.customer_satisfaction_text
                   ? <div style={{ fontSize: 15, lineHeight: 1.7, color: '#f5f5f7' }} dangerouslySetInnerHTML={{ __html: proj.customer_satisfaction_text }} />
-                  : <p style={{ color: '#3a3a3a', fontStyle: 'italic', fontSize: 13 }}>Sin texto</p>}
+                  : <p style={{ color: '#3a3a3a', fontStyle: 'italic', fontSize: 13 }}>{lang === 'en' ? 'No text' : 'Sin texto'}</p>}
               </div>
             </div>
           )}
@@ -1617,44 +1736,44 @@ function SnapshotView({ snapshot }) {
             <div className="mb-2">
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div style={{ ...CARD, padding: '16px 20px' }}>
-                  <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Este mes</p>
+                  <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.thisMonth}</p>
                   <div className="flex gap-5">
                     <div>
-                      <p className="text-xs mb-1" style={{ color: '#ff453a' }}>Abiertos</p>
+                      <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
                       <p className="text-2xl font-bold" style={{ color: (snapBugs?.open_count ?? 0) > 0 ? '#ff453a' : '#f5f5f7' }}>{snapBugs?.open_count ?? 0}</p>
                     </div>
                     <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
                     <div>
-                      <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>En progreso</p>
+                      <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
                       <p className="text-2xl font-bold" style={{ color: (snapBugs?.in_progress_count ?? 0) > 0 ? '#ff9f0a' : '#f5f5f7' }}>{snapBugs?.in_progress_count ?? 0}</p>
                     </div>
                     <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
                     <div>
-                      <p className="text-xs mb-1" style={{ color: '#30d158' }}>Cerrados</p>
+                      <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
                       <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{snapBugs?.closed_count ?? 0}</p>
                     </div>
                   </div>
                 </div>
                 <div style={{ ...CARD, padding: '16px 20px' }}>
-                  <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Acumulado</p>
+                  <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.totalAccumulated}</p>
                   <div className="flex gap-5">
                     <div>
-                      <p className="text-xs mb-1" style={{ color: '#ff453a' }}>Abiertos</p>
+                      <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
                       <p className="text-2xl font-bold" style={{ color: totalBugOpen > 0 ? '#ff453a' : '#f5f5f7' }}>{totalBugOpen}</p>
                     </div>
                     <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
                     <div>
-                      <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>En progreso</p>
+                      <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
                       <p className="text-2xl font-bold" style={{ color: totalBugInProgress > 0 ? '#ff9f0a' : '#f5f5f7' }}>{totalBugInProgress}</p>
                     </div>
                     <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
                     <div>
-                      <p className="text-xs mb-1" style={{ color: '#30d158' }}>Cerrados</p>
+                      <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
                       <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{totalBugClosed}</p>
                     </div>
                     <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
                     <div>
-                      <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>Backlog</p>
+                      <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>{t.backlog}</p>
                       <p className="text-2xl font-bold" style={{ color: bugBacklog > 0 ? '#ff453a' : '#30d158' }}>{bugBacklog}</p>
                     </div>
                   </div>
@@ -1662,21 +1781,21 @@ function SnapshotView({ snapshot }) {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-4">
                 <div style={CARD}>
-                  <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Evolución de bugs</p>
+                  <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.bugEvolution}</p>
                   <ResponsiveContainer width="100%" height={160}>
                     <BarChart data={bugChartData} barSize={8} barGap={2}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                       <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
                       <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                      <Bar dataKey="abiertos"    fill="#ff453a" radius={[3,3,0,0]} name="Abiertos" />
-                      <Bar dataKey="en_progreso" fill="#ff9f0a" radius={[3,3,0,0]} name="En progreso" />
-                      <Bar dataKey="cerrados"    fill="#30d158" radius={[3,3,0,0]} name="Cerrados" />
+                      <Bar dataKey="abiertos"    fill="#ff453a" radius={[3,3,0,0]} name={t.open} />
+                      <Bar dataKey="en_progreso" fill="#ff9f0a" radius={[3,3,0,0]} name={t.inProgress} />
+                      <Bar dataKey="cerrados"    fill="#30d158" radius={[3,3,0,0]} name={t.closed} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
                 <div style={CARD} className="flex flex-col items-center justify-center">
-                  <p className="text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>Total acumulado</p>
+                  <p className="text-xs font-medium mb-2" style={{ color: '#6e6e73' }}>{t.totalAccumulated}</p>
                   <PieChart width={140} height={140}>
                     <Pie data={bugDonut} cx={65} cy={65} innerRadius={42} outerRadius={60} dataKey="value" paddingAngle={2}>
                       {bugDonut.map((d, i) => <Cell key={i} fill={d.color} />)}
@@ -1684,7 +1803,7 @@ function SnapshotView({ snapshot }) {
                     <Tooltip contentStyle={TOOLTIP_STYLE} />
                   </PieChart>
                   <div className="flex flex-col gap-1 mt-1">
-                    {bugDonut.filter(d => d.name !== 'Sin datos').map(d => (
+                    {bugDonut.filter(d => d.name !== noDataLabel).map(d => (
                       <div key={d.name} className="flex items-center gap-1.5">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
                         <span className="text-xs" style={{ color: '#6e6e73' }}>{d.name}: {d.value}</span>
@@ -1699,15 +1818,15 @@ function SnapshotView({ snapshot }) {
           {sec.number === '03' && (
             <div className="mb-2">
               {phases.length === 0
-                ? <div style={CARD}><p className="text-sm" style={{ color: '#6e6e73' }}>Sin plan vinculado.</p></div>
+                ? <div style={CARD}><p className="text-sm" style={{ color: '#6e6e73' }}>{t.noPlan}</p></div>
                 : <>
                     <div className="grid grid-cols-3 gap-4 mb-4">
-                      <KpiCard label="Progreso global" value={`${overallPct}%`} color={overallPct >= 75 ? '#30d158' : overallPct >= 40 ? '#64d2ff' : '#ff9f0a'} />
-                      <KpiCard label="Fases completadas" value={`${completedPhases}/${phases.length}`} color="#f5f5f7" />
-                      <KpiCard label="Horas planificadas" value={totalHoursSnap > 0 ? `${totalHoursSnap}h` : '—'} color="#64d2ff" />
+                      <KpiCard label={t.globalProgress} value={`${overallPct}%`} color={overallPct >= 75 ? '#30d158' : overallPct >= 40 ? '#64d2ff' : '#ff9f0a'} />
+                      <KpiCard label={t.phasesCompleted} value={`${completedPhases}/${phases.length}`} color="#f5f5f7" />
+                      <KpiCard label={t.plannedHours} value={totalHoursSnap > 0 ? `${totalHoursSnap}h` : '—'} color="#64d2ff" />
                     </div>
                     <div style={CARD}>
-                      <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Fases</p>
+                      <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.allPhases}</p>
                       <div className="flex flex-col gap-4">
                         {phasesWithMet.map(phase => {
                           const m = phase.met
@@ -1727,9 +1846,9 @@ function SnapshotView({ snapshot }) {
                               </div>
                               <div className="flex justify-between mt-1">
                                 <span className="text-xs" style={{ color: '#3a3a3a' }}>
-                                  {new Date(phase.start_date + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                  {new Date(phase.start_date + 'T00:00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                                   {' → '}
-                                  {new Date(phase.end_date + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                  {new Date(phase.end_date + 'T00:00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                                 </span>
                                 <span className="text-xs font-semibold" style={{ color: phase.color }}>{m.progress}%</span>
                               </div>
@@ -1746,14 +1865,14 @@ function SnapshotView({ snapshot }) {
           {sec.number === '04' && (
             <div className="mb-2">
               <div className="grid grid-cols-3 gap-4 mb-4">
-                <KpiCard label="Tareas cerradas" value={currentKpis.tasks_closed ?? 0} color="#30d158" />
-                <KpiCard label="Bugs cerrados"   value={currentKpis.bugs_closed  ?? 0} color="#ff9f0a" />
-                <KpiCard label="En progreso"     value={currentKpis.in_progress  ?? 0} color="#64d2ff" />
+                <KpiCard label={t.tasksClosedMonth} value={currentKpis.tasks_closed ?? 0} color="#30d158" />
+                <KpiCard label={t.bugsClosedMonth}  value={currentKpis.bugs_closed  ?? 0} color="#ff9f0a" />
+                <KpiCard label={t.inProgress}        value={currentKpis.in_progress  ?? 0} color="#64d2ff" />
               </div>
               <div style={CARD} className="mb-4">
-                <p className="text-xs font-medium mb-1" style={{ color: '#6e6e73' }}>Distribución del trabajo por mes</p>
+                <p className="text-xs font-medium mb-1" style={{ color: '#6e6e73' }}>{t.workDistribution}</p>
                 <div className="flex items-center gap-4 mb-4">
-                  {[{ color: '#30d158', label: 'Tareas cerradas' }, { color: '#ff9f0a', label: 'Bugs cerrados' }, { color: '#64d2ff', label: 'En progreso' }].map(l => (
+                  {[{ color: '#30d158', label: t.tasksClosed }, { color: '#ff9f0a', label: t.bugsClosed }, { color: '#64d2ff', label: t.inProgress }].map(l => (
                     <div key={l.label} className="flex items-center gap-1.5">
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
                       <span className="text-xs" style={{ color: '#6e6e73' }}>{l.label}</span>
@@ -1761,26 +1880,26 @@ function SnapshotView({ snapshot }) {
                   ))}
                 </div>
                 <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={months4.map(m => ({ month: monthLabel(m), tareas: kpiMap[m]?.tasks_closed ?? 0, bugs: kpiMap[m]?.bugs_closed ?? 0, progreso: kpiMap[m]?.in_progress ?? 0 }))} barSize={10} barGap={2}>
+                  <BarChart data={months4.map(m => ({ month: monthLabel(m, locale), tareas: kpiMap[m]?.tasks_closed ?? 0, bugs: kpiMap[m]?.bugs_closed ?? 0, progreso: kpiMap[m]?.in_progress ?? 0 }))} barSize={10} barGap={2}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                     <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
                     <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                    <Bar dataKey="tareas"   fill="#30d158" radius={[3,3,0,0]} name="Tareas cerradas" />
-                    <Bar dataKey="bugs"     fill="#ff9f0a" radius={[3,3,0,0]} name="Bugs cerrados" />
-                    <Bar dataKey="progreso" fill="#64d2ff" radius={[3,3,0,0]} name="En progreso" />
+                    <Bar dataKey="tareas"   fill="#30d158" radius={[3,3,0,0]} name={t.tasksClosed} />
+                    <Bar dataKey="bugs"     fill="#ff9f0a" radius={[3,3,0,0]} name={t.bugsClosed} />
+                    <Bar dataKey="progreso" fill="#64d2ff" radius={[3,3,0,0]} name={t.inProgress} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
               <div style={CARD}>
-                <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Evolución del esfuerzo (horas)</p>
+                <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.effortEvolution}</p>
                 <ResponsiveContainer width="100%" height={160}>
                   <BarChart data={effortData} barSize={16}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                     <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
                     <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                    <Bar dataKey="horas" fill="#64d2ff" radius={[4,4,0,0]} name="Horas" />
+                    <Bar dataKey="horas" fill="#64d2ff" radius={[4,4,0,0]} name={t.hoursBar} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1790,24 +1909,24 @@ function SnapshotView({ snapshot }) {
           {sec.number === '05' && (
             <div className="mb-2">
               {!financial && resources.length === 0
-                ? <div style={CARD}><p className="text-sm" style={{ color: '#6e6e73' }}>Sin datos financieros.</p></div>
+                ? <div style={CARD}><p className="text-sm" style={{ color: '#6e6e73' }}>{t.noFinancialData}</p></div>
                 : <>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                      <KpiCard label="Presupuesto"   value={fmtMoney(contract, cur)} color="#f5f5f7" />
-                      <KpiCard label="Coste ETD"     value={fmtMoney(etd, cur)}      color="#64d2ff" />
-                      <KpiCard label="Facturado"     value={fmtMoney(billed, cur)}   color="#30d158" />
-                      <KpiCard label="Margen actual" value={billed > 0 ? `${margin.toFixed(1)}%` : '—'} color={ph.color} />
+                      <KpiCard label={t.budget}        value={fmtMoney(contract, cur)} color="#f5f5f7" />
+                      <KpiCard label={t.etdCost}       value={fmtMoney(etd, cur)}      color="#64d2ff" />
+                      <KpiCard label={t.billed}        value={fmtMoney(billed, cur)}   color="#30d158" />
+                      <KpiCard label={t.currentMargin} value={billed > 0 ? `${margin.toFixed(1)}%` : '—'} color={ph.color} />
                     </div>
                     <div style={CARD}>
                       <div className="flex items-center justify-between mb-4">
-                        <p className="text-xs font-medium" style={{ color: '#6e6e73' }}>Estado financiero</p>
+                        <p className="text-xs font-medium" style={{ color: '#6e6e73' }}>{t.financialStatus}</p>
                         <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: `${ph.color}18`, color: ph.color }}>{ph.label}</span>
                       </div>
                       <div className="flex flex-col gap-3">
                         {[
-                          { label: 'Presupuesto',      val: contract, pct: 100,                                     color: 'rgba(255,255,255,0.12)' },
-                          { label: 'Coste real (ETD)', val: etd,      pct: Math.min(100, etd    / maxVal * 100),    color: '#64d2ff' },
-                          { label: 'Facturado',        val: billed,   pct: Math.min(100, billed / maxVal * 100),   color: '#30d158' },
+                          { label: t.budget,  val: contract, pct: 100,                                     color: 'rgba(255,255,255,0.12)' },
+                          { label: t.etdBar,  val: etd,      pct: Math.min(100, etd    / maxVal * 100),    color: '#64d2ff' },
+                          { label: t.billed,  val: billed,   pct: Math.min(100, billed / maxVal * 100),   color: '#30d158' },
                         ].map(row => (
                           <div key={row.label}>
                             <div className="flex justify-between text-xs mb-1.5" style={{ color: '#6e6e73' }}>
@@ -1821,8 +1940,8 @@ function SnapshotView({ snapshot }) {
                         ))}
                       </div>
                       <div className="flex gap-6 mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div><p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>Margen objetivo</p><p className="text-sm font-semibold" style={{ color: '#f5f5f7' }}>{target}%</p></div>
-                        <div><p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>Beneficio actual</p><p className="text-sm font-semibold" style={{ color: profit >= 0 ? '#30d158' : '#ff453a' }}>{fmtMoney(profit, cur)}</p></div>
+                        <div><p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.targetMargin}</p><p className="text-sm font-semibold" style={{ color: '#f5f5f7' }}>{target}%</p></div>
+                        <div><p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.currentProfit}</p><p className="text-sm font-semibold" style={{ color: profit >= 0 ? '#30d158' : '#ff453a' }}>{fmtMoney(profit, cur)}</p></div>
                       </div>
                     </div>
                   </>
@@ -1835,13 +1954,13 @@ function SnapshotView({ snapshot }) {
               <div style={CARD}>
                 <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>What are the new business opportunities?</p>
                 <p style={{ fontSize: 13, lineHeight: 1.6, color: proj.opportunities ? '#d1d1d6' : '#3a3a3a', fontStyle: proj.opportunities ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
-                  {proj.opportunities || 'Sin contenido'}
+                  {proj.opportunities || (lang === 'en' ? 'No content' : 'Sin contenido')}
                 </p>
               </div>
               <div style={CARD}>
                 <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>What are the challenges?</p>
                 <p style={{ fontSize: 13, lineHeight: 1.6, color: proj.challenges ? '#d1d1d6' : '#3a3a3a', fontStyle: proj.challenges ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
-                  {proj.challenges || 'Sin contenido'}
+                  {proj.challenges || (lang === 'en' ? 'No content' : 'Sin contenido')}
                 </p>
               </div>
             </div>
@@ -1874,6 +1993,8 @@ if (typeof document !== 'undefined' && !document.getElementById(CSAT_STYLE_ID)) 
 
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function StatusReport({ project: initialProject, members, tasks }) {
+  const { lang } = useLang()
+  const sr = SR[lang] ?? SR.es
   const [project, setProject] = useState(initialProject)
   useEffect(() => { setProject(initialProject) }, [initialProject])
 
@@ -1994,52 +2115,42 @@ export default function StatusReport({ project: initialProject, members, tasks }
     {
       number: '01',
       title: 'What is the status of my project?',
-      subtitle: 'Tipo de proyecto, satisfacción del cliente y asignación del equipo',
-      content: (
-        <ProjectStatusSection
-          project={project}
-          onSave={handleProjectUpdate}
-        />
-      ),
+      subtitle: sr.sub01,
+      content: <ProjectStatusSection project={project} onSave={handleProjectUpdate} lang={lang} />,
     },
     {
       number: '02',
       title: 'Is my system stable?',
-      subtitle: 'Bugs registrados, estado y evolución mensual',
-      content: <SystemStabilitySection projectId={project.id} />,
+      subtitle: sr.sub02,
+      content: <SystemStabilitySection projectId={project.id} lang={lang} />,
     },
     {
       number: '03',
       title: 'Are we delivering value?',
-      subtitle: 'Progreso del plan, fases y estado del proyecto',
-      content: <DeliveringValueSection projectId={project.id} />,
+      subtitle: sr.sub03,
+      content: <DeliveringValueSection projectId={project.id} lang={lang} />,
     },
     {
       number: '04',
       title: 'Is my team working well?',
-      subtitle: 'Tareas cerradas, bugs resueltos, trabajo en progreso y esfuerzo del equipo este mes',
-      content: <TeamPerformanceSection projectId={project.id} />,
+      subtitle: sr.sub04,
+      content: <TeamPerformanceSection projectId={project.id} lang={lang} />,
     },
     {
       number: '05',
       title: 'Is the project profitable?',
-      subtitle: 'Snapshots semanales de presupuesto, costes y facturación',
-      content: <ProfitabilitySection projectId={project.id} />,
+      subtitle: sr.sub05,
+      content: <ProfitabilitySection projectId={project.id} lang={lang} />,
     },
     {
       number: '06',
       title: 'Opportunities & Challenges',
-      subtitle: 'Nuevas oportunidades de negocio y retos actuales',
-      content: (
-        <OpportunitiesSection
-          project={project}
-          onSave={handleProjectUpdate}
-        />
-      ),
+      subtitle: sr.sub06,
+      content: <OpportunitiesSection project={project} onSave={handleProjectUpdate} lang={lang} />,
     },
   ]
 
-  const autoName = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+  const autoName = new Date().toLocaleDateString(sr.locale, { day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 24px 64px' }}>
@@ -2059,7 +2170,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
             }}
           >
             <Clock className="w-3.5 h-3.5" />
-            {selectedVersion ? selectedVersion.name : 'Versión actual'}
+            {selectedVersion ? selectedVersion.name : sr.currentVersion}
             <ChevronDown className="w-3 h-3" />
           </button>
 
@@ -2077,7 +2188,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = !selectedVersion ? 'rgba(255,255,255,0.06)' : 'transparent'}
               >
                 <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#30d158', flexShrink: 0 }} />
-                Versión actual (en vivo)
+                {sr.currentVersionLive}
               </button>
               {versions.map(v => (
                 <button key={v.id}
@@ -2089,11 +2200,11 @@ export default function StatusReport({ project: initialProject, members, tasks }
                 >
                   <span className="text-sm font-medium" style={{ color: '#f5f5f7' }}>{v.name}</span>
                   <span className="text-xs" style={{ color: '#6e6e73' }}>
-                    {new Date(v.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {new Date(v.created_at).toLocaleDateString(sr.locale, { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                 </button>
               ))}
-              {versions.length === 0 && <p className="px-4 py-3 text-xs" style={{ color: '#3a3a3a' }}>Sin versiones guardadas</p>}
+              {versions.length === 0 && <p className="px-4 py-3 text-xs" style={{ color: '#3a3a3a' }}>{sr.noVersionsSaved}</p>}
             </div>
           )}
         </div>
@@ -2114,7 +2225,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
                 <button onClick={saveVersion} disabled={savingVersion}
                   className="text-xs px-3 py-1.5 rounded-xl font-semibold"
                   style={{ backgroundColor: '#f5f5f7', color: '#000', border: 'none', cursor: 'pointer' }}>
-                  {savingVersion ? 'Guardando…' : 'Guardar'}
+                  {savingVersion ? sr.saving : sr.save}
                 </button>
                 <button onClick={() => setShowSaveForm(false)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6e6e73', fontSize: 16, lineHeight: 1 }}>×</button>
@@ -2128,7 +2239,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
                 onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#6e6e73' }}
               >
                 <Save className="w-3 h-3" />
-                Guardar versión
+                {sr.saveVersion}
               </button>
             )}
           </div>
@@ -2137,12 +2248,12 @@ export default function StatusReport({ project: initialProject, members, tasks }
         {selectedVersion && (
           <div className="flex items-center gap-3">
             <span className="text-xs" style={{ color: '#6e6e73' }}>
-              {new Date(selectedVersion.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {new Date(selectedVersion.created_at).toLocaleDateString(sr.locale, { day: 'numeric', month: 'long', year: 'numeric' })}
             </span>
             <button onClick={() => setSelectedVersion(null)}
               className="text-xs px-3 py-1.5 rounded-xl font-medium"
               style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#f5f5f7', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
-              Volver a versión actual
+              {sr.backToCurrent}
             </button>
           </div>
         )}
@@ -2150,7 +2261,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
 
       {/* ── Content ── */}
       {selectedVersion ? (
-        <SnapshotView snapshot={selectedVersion.snapshot} />
+        <SnapshotView snapshot={selectedVersion.snapshot} lang={lang} />
       ) : (
         [
           ...sections.slice(0, 1),
