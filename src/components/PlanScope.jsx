@@ -287,14 +287,17 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePlan, onUp
   function handlePrint() {
     const style = document.createElement('style')
     style.id = '__scope-portrait__'
-    style.textContent = '@page { size: A4 portrait; margin: 15mm 20mm; }'
+    style.textContent = '@page { size: A4 portrait !important; margin: 15mm 20mm !important; }'
     document.head.appendChild(style)
     if (plan) document.title = `${plan.name} — ${s.tabLabel}`
-    window.print()
+    // Small delay so the browser processes the injected @page rule before opening the print dialog
     setTimeout(() => {
-      document.title = 'OppsHub'
-      document.getElementById('__scope-portrait__')?.remove()
-    }, 1000)
+      window.print()
+      setTimeout(() => {
+        document.title = 'OppsHub'
+        document.getElementById('__scope-portrait__')?.remove()
+      }, 1000)
+    }, 80)
   }
 
   function addDeliverable() {
@@ -460,7 +463,7 @@ export default function PlanScope({ plan, phases, isEditable, onUpdatePlan, onUp
           {visiblePhases.map(phase => {
             const items = getItems(phase)
             const status = computePhaseStatus(phase)
-            const meta = status ? statusMeta[status] : null
+            const meta = (status && status !== 'on_track') ? statusMeta[status] : null
             const StatusIcon = meta?.icon
             const durationDays = daysBetween(phase.start_date, phase.end_date) + 1
             const color = phase.color || '#bf5af2'
