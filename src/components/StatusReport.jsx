@@ -7,7 +7,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, PieChart, Pie, Cell,
 } from 'recharts'
-import { Pencil, ChevronDown, ChevronUp, Save, Clock } from 'lucide-react'
+import { Pencil, ChevronDown, ChevronUp, Save, Clock, GalleryHorizontal } from 'lucide-react'
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const CARD = {
@@ -142,6 +142,7 @@ const SR = {
     oppPlaceholder: 'Describe las oportunidades de negocio identificadas…',
     chalPlaceholder: 'Describe los retos o bloqueos actuales…', saveChanges: 'Guardar cambios',
     member: 'Miembro',
+    exportPresentation: 'Exportar presentación',
   },
   en: {
     locale: 'en-US',
@@ -197,6 +198,7 @@ const SR = {
     oppPlaceholder: 'Describe the identified business opportunities…',
     chalPlaceholder: 'Describe the current challenges or blockers…', saveChanges: 'Save changes',
     member: 'Member',
+    exportPresentation: 'Export presentation',
   },
 }
 
@@ -1553,7 +1555,7 @@ function OpportunitiesSection({ project, onSave, lang = 'es' }) {
 }
 
 // ── Snapshot read-only view ───────────────────────────────────────────────────
-function SnapshotView({ snapshot, lang = 'es' }) {
+function SnapshotView({ snapshot, lang = 'es', presentationMode = false }) {
   const t = SR[lang] ?? SR.es
   const locale = t.locale
   const proj        = snapshot.project ?? {}
@@ -1658,13 +1660,13 @@ function SnapshotView({ snapshot, lang = 'es' }) {
   ]
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px 64px' }}>
+    <div className="sr-print-container" style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px 64px' }}>
       {[
         ...sections.slice(0, 1),
         { number: 'gantt', isGantt: true },
         ...sections.slice(1),
       ].map((sec, i, arr) => (
-        <div key={sec.number} style={{ marginBottom: i < arr.length - 1 ? 48 : 0 }}>
+        <div key={sec.number} className="sr-slide" style={{ marginBottom: i < arr.length - 1 ? 48 : 0 }}>
           {sec.isGantt ? (
             snapPlan && allSnapPhases.length > 0
               ? <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, backgroundColor: '#111111', overflow: 'hidden', margin: '0 -24px' }}>
@@ -1968,7 +1970,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
 
           </>
           )}
-          {i < arr.length - 1 && <div style={{ marginTop: 48, borderTop: '1px solid rgba(255,255,255,0.05)' }} />}
+          {i < arr.length - 1 && <div className="sr-no-print" style={{ marginTop: 48, borderTop: '1px solid rgba(255,255,255,0.05)' }} />}
         </div>
       ))}
     </div>
@@ -1991,12 +1993,61 @@ if (typeof document !== 'undefined' && !document.getElementById(CSAT_STYLE_ID)) 
   document.head.appendChild(s)
 }
 
+const PRES_STYLE_ID = 'sr-presentation-style'
+if (typeof document !== 'undefined' && !document.getElementById(PRES_STYLE_ID)) {
+  const s = document.createElement('style')
+  s.id = PRES_STYLE_ID
+  s.textContent = `
+    @media print {
+      @page { size: A4 landscape; margin: 0; }
+      body.presentation-print * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+      body.presentation-print .sr-no-print { display: none !important; }
+      body.presentation-print .sr-print-container { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+      body.presentation-print .sr-slide {
+        page-break-after: always;
+        break-after: page;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        min-height: 100vh;
+        background-color: #000000 !important;
+        padding: 40px 56px !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+      }
+      body.presentation-print .sr-slide:last-child { page-break-after: auto; break-after: auto; }
+      body.presentation-print .sr-slide > * { flex-shrink: 0; }
+    }
+  `
+  document.head.appendChild(s)
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function StatusReport({ project: initialProject, members, tasks }) {
   const { lang } = useLang()
   const sr = SR[lang] ?? SR.es
   const [project, setProject] = useState(initialProject)
   useEffect(() => { setProject(initialProject) }, [initialProject])
+
+  // ── Presentation export ───────────────────────────────────────
+  const [presentationMode, setPresentationMode] = useState(false)
+  useEffect(() => {
+    if (presentationMode) {
+      document.body.classList.add('presentation-print')
+      const timer = setTimeout(() => {
+        window.print()
+        window.addEventListener('afterprint', () => {
+          document.body.classList.remove('presentation-print')
+          setPresentationMode(false)
+        }, { once: true })
+      }, 150)
+      return () => clearTimeout(timer)
+    }
+  }, [presentationMode])
+
+  function exportPresentation() { setPresentationMode(true) }
 
   // ── Version management ────────────────────────────────────────
   const [versions,         setVersions]         = useState([])
@@ -2153,10 +2204,10 @@ export default function StatusReport({ project: initialProject, members, tasks }
   const autoName = new Date().toLocaleDateString(sr.locale, { day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 24px 64px' }}>
+    <div className="sr-print-container" style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 24px 64px' }}>
 
       {/* ── Version bar ── */}
-      <div className="flex items-center justify-between mb-8 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="sr-no-print flex items-center justify-between mb-8 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         {/* Selector */}
         <div ref={versionListRef} style={{ position: 'relative' }}>
           <button
@@ -2209,66 +2260,75 @@ export default function StatusReport({ project: initialProject, members, tasks }
           )}
         </div>
 
-        {/* Right side: save form or back button */}
-        {!selectedVersion && (
-          <div className="flex items-center gap-2">
-            {showSaveForm ? (
-              <>
-                <input
-                  autoFocus
-                  value={newVersionName}
-                  onChange={e => setNewVersionName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') saveVersion(); if (e.key === 'Escape') setShowSaveForm(false) }}
-                  placeholder={autoName}
-                  style={{ ...INPUT, width: 210, padding: '5px 10px', fontSize: 12 }}
-                />
-                <button onClick={saveVersion} disabled={savingVersion}
-                  className="text-xs px-3 py-1.5 rounded-xl font-semibold"
-                  style={{ backgroundColor: '#f5f5f7', color: '#000', border: 'none', cursor: 'pointer' }}>
-                  {savingVersion ? sr.saving : sr.save}
-                </button>
-                <button onClick={() => setShowSaveForm(false)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6e6e73', fontSize: 16, lineHeight: 1 }}>×</button>
-              </>
-            ) : (
-              <button
-                onClick={() => { setNewVersionName(autoName); setShowSaveForm(true) }}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
-                style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
-                onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#f5f5f7' }}
-                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#6e6e73' }}
-              >
-                <Save className="w-3 h-3" />
-                {sr.saveVersion}
-              </button>
-            )}
-          </div>
-        )}
+        {/* Right side */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportPresentation}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
+            style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#f5f5f7' }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#6e6e73' }}
+          >
+            <GalleryHorizontal className="w-3 h-3" />
+            {sr.exportPresentation}
+          </button>
 
-        {selectedVersion && (
-          <div className="flex items-center gap-3">
-            <span className="text-xs" style={{ color: '#6e6e73' }}>
-              {new Date(selectedVersion.created_at).toLocaleDateString(sr.locale, { day: 'numeric', month: 'long', year: 'numeric' })}
-            </span>
-            <button onClick={() => setSelectedVersion(null)}
-              className="text-xs px-3 py-1.5 rounded-xl font-medium"
-              style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#f5f5f7', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
-              {sr.backToCurrent}
+          {!selectedVersion && (showSaveForm ? (
+            <>
+              <input
+                autoFocus
+                value={newVersionName}
+                onChange={e => setNewVersionName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveVersion(); if (e.key === 'Escape') setShowSaveForm(false) }}
+                placeholder={autoName}
+                style={{ ...INPUT, width: 210, padding: '5px 10px', fontSize: 12 }}
+              />
+              <button onClick={saveVersion} disabled={savingVersion}
+                className="text-xs px-3 py-1.5 rounded-xl font-semibold"
+                style={{ backgroundColor: '#f5f5f7', color: '#000', border: 'none', cursor: 'pointer' }}>
+                {savingVersion ? sr.saving : sr.save}
+              </button>
+              <button onClick={() => setShowSaveForm(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6e6e73', fontSize: 16, lineHeight: 1 }}>×</button>
+            </>
+          ) : (
+            <button
+              onClick={() => { setNewVersionName(autoName); setShowSaveForm(true) }}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
+              style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#f5f5f7' }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#6e6e73' }}
+            >
+              <Save className="w-3 h-3" />
+              {sr.saveVersion}
             </button>
-          </div>
-        )}
+          ))}
+
+          {selectedVersion && (
+            <>
+              <span className="text-xs" style={{ color: '#6e6e73' }}>
+                {new Date(selectedVersion.created_at).toLocaleDateString(sr.locale, { day: 'numeric', month: 'long', year: 'numeric' })}
+              </span>
+              <button onClick={() => setSelectedVersion(null)}
+                className="text-xs px-3 py-1.5 rounded-xl font-medium"
+                style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#f5f5f7', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
+                {sr.backToCurrent}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ── Content ── */}
       {selectedVersion ? (
-        <SnapshotView snapshot={selectedVersion.snapshot} lang={lang} />
+        <SnapshotView snapshot={selectedVersion.snapshot} lang={lang} presentationMode={presentationMode} />
       ) : (
         [
           ...sections.slice(0, 1),
           { number: 'gantt', isGantt: true },
           ...sections.slice(1),
         ].map((s, i, arr) => (
-          <div key={s.number} style={{ marginBottom: i < arr.length - 1 ? 48 : 0 }}>
+          <div key={s.number} className="sr-slide" style={{ marginBottom: i < arr.length - 1 ? 48 : 0 }}>
             {s.isGantt ? (
               <PlanGanttSection projectId={project.id} />
             ) : (
@@ -2282,7 +2342,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
               </>
             )}
             {i < arr.length - 1 && (
-              <div style={{ marginTop: 48, borderTop: '1px solid rgba(255,255,255,0.05)' }} />
+              <div className="sr-no-print" style={{ marginTop: 48, borderTop: '1px solid rgba(255,255,255,0.05)' }} />
             )}
           </div>
         ))
