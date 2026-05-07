@@ -1175,37 +1175,28 @@ function TeamPerformanceSection({ projectId }) {
         ))}
       </div>
 
-      {/* Donut charts — one per month */}
+      {/* Bar chart — distribución por mes */}
       <div style={CARD}>
-        <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Distribución del trabajo por mes</p>
-        <div className="flex gap-4 overflow-x-auto">
-          {months.map(m => {
-            const kpis = allKpis[m] ?? EMPTY_KPIS
-            const data  = donutFor(kpis)
-            const isCurrent = m === thisMonth
-            return (
-              <div key={m} className="flex flex-col items-center shrink-0" style={{ minWidth: 130 }}>
-                <span className="text-xs font-medium mb-1" style={{ color: isCurrent ? '#f5f5f7' : '#6e6e73' }}>
-                  {monthLabel(m)}{isCurrent ? ' ·  actual' : ''}
-                </span>
-                <PieChart width={120} height={120}>
-                  <Pie data={data} cx={55} cy={55} innerRadius={34} outerRadius={50} dataKey="value" paddingAngle={2}>
-                    {data.map((d, i) => <Cell key={i} fill={d.color} />)}
-                  </Pie>
-                  <Tooltip contentStyle={TOOLTIP_STYLE} />
-                </PieChart>
-                <div className="flex flex-col gap-0.5 mt-1 w-full">
-                  {data.filter(d => d.name !== 'Sin datos').map(d => (
-                    <div key={d.name} className="flex items-center gap-1">
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
-                      <span className="text-xs truncate" style={{ color: '#6e6e73', fontSize: 10 }}>{d.name} ({d.value})</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
+        <p className="text-xs font-medium mb-1" style={{ color: '#6e6e73' }}>Distribución del trabajo por mes</p>
+        <div className="flex items-center gap-4 mb-4">
+          {[{ color: '#30d158', label: 'Tareas cerradas' }, { color: '#ff9f0a', label: 'Bugs cerrados' }, { color: '#64d2ff', label: 'En progreso' }].map(l => (
+            <div key={l.label} className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
+              <span className="text-xs" style={{ color: '#6e6e73' }}>{l.label}</span>
+            </div>
+          ))}
         </div>
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={months.map(m => ({ month: monthLabel(m), tareas: allKpis[m]?.tasks_closed ?? 0, bugs: allKpis[m]?.bugs_closed ?? 0, progreso: allKpis[m]?.in_progress ?? 0 }))} barSize={10} barGap={2}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+            <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+            <Bar dataKey="tareas"   fill="#30d158" radius={[3,3,0,0]} name="Tareas cerradas" />
+            <Bar dataKey="bugs"     fill="#ff9f0a" radius={[3,3,0,0]} name="Bugs cerrados" />
+            <Bar dataKey="progreso" fill="#64d2ff" radius={[3,3,0,0]} name="En progreso" />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   )
@@ -1760,32 +1751,26 @@ function SnapshotView({ snapshot }) {
                 <KpiCard label="En progreso"     value={currentKpis.in_progress  ?? 0} color="#64d2ff" />
               </div>
               <div style={CARD} className="mb-4">
-                <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Distribución del trabajo por mes</p>
-                <div className="flex gap-4 overflow-x-auto">
-                  {months4.map(m => {
-                    const kpis = kpiMap[m] ?? { tasks_closed: 0, bugs_closed: 0, in_progress: 0 }
-                    const data = donutFor(kpis)
-                    return (
-                      <div key={m} className="flex flex-col items-center shrink-0" style={{ minWidth: 130 }}>
-                        <span className="text-xs font-medium mb-1" style={{ color: m === snapMonth ? '#f5f5f7' : '#6e6e73' }}>{monthLabel(m)}</span>
-                        <PieChart width={120} height={120}>
-                          <Pie data={data} cx={55} cy={55} innerRadius={34} outerRadius={50} dataKey="value" paddingAngle={2}>
-                            {data.map((d, i) => <Cell key={i} fill={d.color} />)}
-                          </Pie>
-                          <Tooltip contentStyle={TOOLTIP_STYLE} />
-                        </PieChart>
-                        <div className="flex flex-col gap-0.5 mt-1 w-full">
-                          {data.filter(d => d.name !== 'Sin datos').map(d => (
-                            <div key={d.name} className="flex items-center gap-1">
-                              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
-                              <span style={{ color: '#6e6e73', fontSize: 10 }}>{d.name} ({d.value})</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
+                <p className="text-xs font-medium mb-1" style={{ color: '#6e6e73' }}>Distribución del trabajo por mes</p>
+                <div className="flex items-center gap-4 mb-4">
+                  {[{ color: '#30d158', label: 'Tareas cerradas' }, { color: '#ff9f0a', label: 'Bugs cerrados' }, { color: '#64d2ff', label: 'En progreso' }].map(l => (
+                    <div key={l.label} className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
+                      <span className="text-xs" style={{ color: '#6e6e73' }}>{l.label}</span>
+                    </div>
+                  ))}
                 </div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={months4.map(m => ({ month: monthLabel(m), tareas: kpiMap[m]?.tasks_closed ?? 0, bugs: kpiMap[m]?.bugs_closed ?? 0, progreso: kpiMap[m]?.in_progress ?? 0 }))} barSize={10} barGap={2}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                    <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                    <Bar dataKey="tareas"   fill="#30d158" radius={[3,3,0,0]} name="Tareas cerradas" />
+                    <Bar dataKey="bugs"     fill="#ff9f0a" radius={[3,3,0,0]} name="Bugs cerrados" />
+                    <Bar dataKey="progreso" fill="#64d2ff" radius={[3,3,0,0]} name="En progreso" />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
               <div style={CARD}>
                 <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>Evolución del esfuerzo (horas)</p>
