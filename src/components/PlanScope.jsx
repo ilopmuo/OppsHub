@@ -215,7 +215,7 @@ export function ScopePrintArea({ plan, phases }) {
           {visiblePhases.map((phase, idx) => {
             const items = getItems(phase)
             const status = computePhaseStatus(phase)
-            const meta = statusMeta[status]
+            const meta = (status && status !== 'on_track') ? statusMeta[status] : null
             const durationDays = daysBetween(phase.start_date, phase.end_date) + 1
             const color = phase.color || '#bf5af2'
             const linkedDel = deliverables.find(d => d.id === phase.scope_deliverable_id)
