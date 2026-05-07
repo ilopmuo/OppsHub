@@ -420,10 +420,11 @@ function SystemStabilitySection({ projectId }) {
   const now = new Date()
   const thisMonth = isoMonth(now)
   const thisMonthStats = statsMap[thisMonth]
-  const totalOpenThisMonth = thisMonthStats?.open_count ?? 0
+  const totalOpenThisMonth   = thisMonthStats?.open_count   ?? 0
   const totalClosedThisMonth = thisMonthStats?.closed_count ?? 0
-  const totalOpenYear = stats.filter(s => s.month_year.startsWith(String(now.getFullYear())))
-    .reduce((sum, s) => sum + (s.open_count ?? 0), 0)
+  const yearStats = stats.filter(s => s.month_year.startsWith(String(now.getFullYear())))
+  const totalOpenYear   = yearStats.reduce((sum, s) => sum + (s.open_count   ?? 0), 0)
+  const totalClosedYear = yearStats.reduce((sum, s) => sum + (s.closed_count ?? 0), 0)
 
   // Chart data
   const chartData = months.map(m => ({
@@ -477,11 +478,42 @@ function SystemStabilitySection({ projectId }) {
 
   return (
     <div className="mb-2">
-      {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        <KpiCard label="Bugs abiertos este mes"  value={totalOpenThisMonth}  color={totalOpenThisMonth  > 0 ? '#ff453a' : '#30d158'} />
-        <KpiCard label="Bugs cerrados este mes"  value={totalClosedThisMonth} color="#30d158" />
-        <KpiCard label="Total abiertos este año" value={totalOpenYear}        color="#f5f5f7" />
+      {/* KPIs — agrupados por período y por tipo */}
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        {/* Este mes */}
+        <div style={{ ...CARD, padding: '16px 20px' }}>
+          <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Este mes
+          </p>
+          <div className="flex gap-6">
+            <div>
+              <p className="text-xs mb-1" style={{ color: '#ff453a' }}>Abiertos</p>
+              <p className="text-2xl font-bold" style={{ color: totalOpenThisMonth > 0 ? '#ff453a' : '#f5f5f7' }}>{totalOpenThisMonth}</p>
+            </div>
+            <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+            <div>
+              <p className="text-xs mb-1" style={{ color: '#30d158' }}>Cerrados</p>
+              <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{totalClosedThisMonth}</p>
+            </div>
+          </div>
+        </div>
+        {/* Este año */}
+        <div style={{ ...CARD, padding: '16px 20px' }}>
+          <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Este año
+          </p>
+          <div className="flex gap-6">
+            <div>
+              <p className="text-xs mb-1" style={{ color: '#ff453a' }}>Abiertos</p>
+              <p className="text-2xl font-bold" style={{ color: totalOpenYear > 0 ? '#ff453a' : '#f5f5f7' }}>{totalOpenYear}</p>
+            </div>
+            <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+            <div>
+              <p className="text-xs mb-1" style={{ color: '#30d158' }}>Cerrados</p>
+              <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{totalClosedYear}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Monthly input table */}
@@ -1566,10 +1598,35 @@ function SnapshotView({ snapshot }) {
 
           {sec.number === '02' && (
             <div className="mb-2">
-              <div className="grid grid-cols-3 gap-4 mb-4">
-                <KpiCard label="Bugs abiertos este mes"  value={snapBugs?.open_count ?? 0}  color={(snapBugs?.open_count ?? 0) > 0 ? '#ff453a' : '#30d158'} />
-                <KpiCard label="Bugs cerrados este mes"  value={snapBugs?.closed_count ?? 0} color="#30d158" />
-                <KpiCard label="Total abiertos acumulado" value={totalBugOpen} color="#f5f5f7" />
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div style={{ ...CARD, padding: '16px 20px' }}>
+                  <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Este mes</p>
+                  <div className="flex gap-6">
+                    <div>
+                      <p className="text-xs mb-1" style={{ color: '#ff453a' }}>Abiertos</p>
+                      <p className="text-2xl font-bold" style={{ color: (snapBugs?.open_count ?? 0) > 0 ? '#ff453a' : '#f5f5f7' }}>{snapBugs?.open_count ?? 0}</p>
+                    </div>
+                    <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+                    <div>
+                      <p className="text-xs mb-1" style={{ color: '#30d158' }}>Cerrados</p>
+                      <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{snapBugs?.closed_count ?? 0}</p>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ ...CARD, padding: '16px 20px' }}>
+                  <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Acumulado</p>
+                  <div className="flex gap-6">
+                    <div>
+                      <p className="text-xs mb-1" style={{ color: '#ff453a' }}>Abiertos</p>
+                      <p className="text-2xl font-bold" style={{ color: totalBugOpen > 0 ? '#ff453a' : '#f5f5f7' }}>{totalBugOpen}</p>
+                    </div>
+                    <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+                    <div>
+                      <p className="text-xs mb-1" style={{ color: '#30d158' }}>Cerrados</p>
+                      <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{totalBugClosed}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-4">
                 <div style={CARD}>
