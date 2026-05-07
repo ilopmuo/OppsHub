@@ -87,7 +87,14 @@ function fmtDate(iso) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function SectionHeader({ number, title, subtitle }) {
+const STATUS_DOTS = [
+  { value: 'good',    color: '#30d158', shadow: 'rgba(48,209,88,0.5)' },
+  { value: 'regular', color: '#ff9f0a', shadow: 'rgba(255,159,10,0.5)' },
+  { value: 'bad',     color: '#ff453a', shadow: 'rgba(255,69,58,0.5)' },
+]
+
+function SectionHeader({ number, title, subtitle, status, onStatusChange }) {
+  const activeDot = STATUS_DOTS.find(d => d.value === status)
   return (
     <div className="mb-6">
       <div className="flex items-center gap-3 mb-1">
@@ -96,6 +103,26 @@ function SectionHeader({ number, title, subtitle }) {
           {number}
         </span>
         <h2 className="text-base font-semibold" style={{ color: '#f5f5f7' }}>{title}</h2>
+
+        {/* Status dots — clickable in edit mode, static in snapshot */}
+        {onStatusChange ? (
+          <div className="flex items-center gap-1.5">
+            {STATUS_DOTS.map(d => (
+              <button key={d.value} onClick={() => onStatusChange(status === d.value ? null : d.value)}
+                style={{
+                  width: 10, height: 10, borderRadius: '50%', backgroundColor: d.color,
+                  border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0,
+                  boxShadow: status === d.value ? `0 0 7px 2px ${d.shadow}` : 'none',
+                  opacity: status && status !== d.value ? 0.18 : 1,
+                  transition: 'box-shadow 0.2s, opacity 0.2s',
+                }}
+              />
+            ))}
+          </div>
+        ) : activeDot ? (
+          <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: activeDot.color, flexShrink: 0,
+                        boxShadow: `0 0 7px 2px ${activeDot.shadow}` }} />
+        ) : null}
       </div>
       {subtitle && <p className="text-xs ml-9" style={{ color: '#6e6e73' }}>{subtitle}</p>}
     </div>
@@ -116,8 +143,7 @@ function KpiCard({ label, value, color = '#f5f5f7', sub }) {
 function ProjectStatusSection({ project, onSave }) {
   const isImpl = project.type === 'implementation'
 
-  // Customer satisfaction — rich text + status indicator
-  const [satStatus, setSatStatus] = useState(project.customer_satisfaction_status ?? null)
+  // Customer satisfaction — rich text editor
   const [satDirty, setSatDirty] = useState(false)
   const [satSaving, setSatSaving] = useState(false)
   const [boldActive, setBoldActive] = useState(false)
@@ -131,19 +157,6 @@ function ProjectStatusSection({ project, onSave }) {
       satInitialized.current = true
     }
   }, [project.customer_satisfaction_text])
-
-  const CSAT_STATES = [
-    { value: 'good',    color: '#30d158', shadow: 'rgba(48,209,88,0.5)',    label: 'Bien' },
-    { value: 'regular', color: '#ff9f0a', shadow: 'rgba(255,159,10,0.5)',   label: 'Regular' },
-    { value: 'bad',     color: '#ff453a', shadow: 'rgba(255,69,58,0.5)',    label: 'Mal' },
-  ]
-
-  async function saveSatStatus(val) {
-    const next = satStatus === val ? null : val
-    setSatStatus(next)
-    await supabase.from('projects').update({ customer_satisfaction_status: next }).eq('id', project.id)
-    onSave({ customer_satisfaction_status: next })
-  }
 
   function toggleBold() {
     document.execCommand('bold', false, null)
@@ -300,40 +313,23 @@ function ProjectStatusSection({ project, onSave }) {
       {/* Row 2: Customer satisfaction — full width */}
       <div style={CARD} className="flex flex-col">
         {/* Toolbar */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-1">
-            <button
-              onMouseDown={e => { e.preventDefault(); toggleBold() }}
-              title="Negrita (Ctrl+B)"
-              style={{
-                width: 28, height: 28, borderRadius: 7, border: 'none', cursor: 'pointer',
-                fontWeight: 700, fontSize: 14, fontFamily: 'inherit',
-                backgroundColor: boldActive ? 'rgba(255,255,255,0.12)' : 'transparent',
-                color: boldActive ? '#f5f5f7' : '#6e6e73',
-                transition: 'background 0.15s, color 0.15s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-              onMouseEnter={e => { if (!boldActive) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
-              onMouseLeave={e => { if (!boldActive) e.currentTarget.style.backgroundColor = 'transparent' }}
-            >B</button>
-            <span style={{ width: 1, height: 16, backgroundColor: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
-            <p className="text-xs" style={{ color: '#6e6e73' }}>Customer satisfaction</p>
-          </div>
-          <div className="flex items-center gap-2.5">
-            {CSAT_STATES.map(s => (
-              <button key={s.value} onClick={() => saveSatStatus(s.value)} title={s.label}
-                style={{
-                  width: 14, height: 14, borderRadius: '50%',
-                  backgroundColor: s.color,
-                  border: 'none', cursor: 'pointer', padding: 0,
-                  boxShadow: satStatus === s.value ? `0 0 8px 3px ${s.shadow}` : 'none',
-                  opacity: satStatus && satStatus !== s.value ? 0.25 : 1,
-                  transition: 'box-shadow 0.2s, opacity 0.2s',
-                  flexShrink: 0,
-                }}
-              />
-            ))}
-          </div>
+        <div className="flex items-center gap-2 mb-3">
+          <button
+            onMouseDown={e => { e.preventDefault(); toggleBold() }}
+            title="Negrita (Ctrl+B)"
+            style={{
+              width: 28, height: 28, borderRadius: 7, border: 'none', cursor: 'pointer',
+              fontWeight: 700, fontSize: 14, fontFamily: 'inherit',
+              backgroundColor: boldActive ? 'rgba(255,255,255,0.12)' : 'transparent',
+              color: boldActive ? '#f5f5f7' : '#6e6e73',
+              transition: 'background 0.15s, color 0.15s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            onMouseEnter={e => { if (!boldActive) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+            onMouseLeave={e => { if (!boldActive) e.currentTarget.style.backgroundColor = 'transparent' }}
+          >B</button>
+          <span style={{ width: 1, height: 16, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+          <p className="text-xs" style={{ color: '#6e6e73' }}>Customer satisfaction</p>
         </div>
 
         {/* Editor */}
@@ -1459,6 +1455,7 @@ function SnapshotView({ snapshot }) {
   ]
   const isImpl = proj.type === 'implementation'
 
+  const snapSectionStatuses = proj.status_report_section_statuses ?? {}
   const sections = [
     { number: '01', title: 'What is the status of my project?',   subtitle: 'Tipo de proyecto, satisfacción del cliente y asignación del equipo' },
     { number: '02', title: 'Is my system stable?',                subtitle: 'Bugs registrados, estado y evolución mensual' },
@@ -1472,7 +1469,8 @@ function SnapshotView({ snapshot }) {
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px 64px' }}>
       {sections.map((sec, i) => (
         <div key={sec.number} style={{ marginBottom: i < sections.length - 1 ? 48 : 0 }}>
-          <SectionHeader number={sec.number} title={sec.title} subtitle={sec.subtitle} />
+          <SectionHeader number={sec.number} title={sec.title} subtitle={sec.subtitle}
+            status={snapSectionStatuses[sec.number]} />
 
           {sec.number === '01' && (
             <div className="flex flex-col gap-4 mb-4">
@@ -1825,6 +1823,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
           customer_satisfaction_status: project.customer_satisfaction_status,
           customer_satisfaction_text: project.customer_satisfaction_text,
           opportunities: project.opportunities, challenges: project.challenges,
+          status_report_section_statuses: project.status_report_section_statuses ?? {},
         },
         resources: resources ?? [], bug_stats: bugStats ?? [], phases,
         team_kpis: teamKpis ?? [], effort: effort ?? [],
@@ -1853,6 +1852,16 @@ export default function StatusReport({ project: initialProject, members, tasks }
 
   function handleProjectUpdate(updates) {
     setProject(p => ({ ...p, ...updates }))
+  }
+
+  // ── Section status dots ───────────────────────────────────────
+  const sectionStatuses = project.status_report_section_statuses ?? {}
+  async function updateSectionStatus(number, value) {
+    const updated = { ...sectionStatuses }
+    if (value === null) delete updated[number]
+    else updated[number] = value
+    handleProjectUpdate({ status_report_section_statuses: updated })
+    await supabase.from('projects').update({ status_report_section_statuses: updated }).eq('id', project.id)
   }
 
   const sections = [
@@ -2019,7 +2028,11 @@ export default function StatusReport({ project: initialProject, members, tasks }
       ) : (
         sections.map((s, i) => (
           <div key={s.number} style={{ marginBottom: i < sections.length - 1 ? 48 : 0 }}>
-            <SectionHeader number={s.number} title={s.title} subtitle={s.subtitle} />
+            <SectionHeader
+              number={s.number} title={s.title} subtitle={s.subtitle}
+              status={sectionStatuses[s.number]}
+              onStatusChange={val => updateSectionStatus(s.number, val)}
+            />
             {s.content}
             {i < sections.length - 1 && (
               <div style={{ marginTop: 48, borderTop: '1px solid rgba(255,255,255,0.05)' }} />
