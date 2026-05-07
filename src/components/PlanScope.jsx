@@ -138,130 +138,150 @@ export function ScopePrintArea({ plan, phases }) {
   const totalHours = (phases || []).reduce((s, p) => s + Number(p.hours || 0), 0)
   const lastEnd = (phases || []).reduce((acc, p) => p.end_date > acc ? p.end_date : acc, plan?.start_date || '')
 
+  const SectionHeading = ({ num, title }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, marginTop: 28 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', backgroundColor: '#1a1a1a', borderRadius: '50%', width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{num}</span>
+      <span style={{ fontSize: 13, fontWeight: 700, color: '#111', letterSpacing: '-0.01em' }}>{title}</span>
+      <div style={{ flex: 1, height: 1, backgroundColor: '#e8e8e8' }} />
+    </div>
+  )
+
   return (
-    <div style={{ fontFamily: 'Inter, system-ui, sans-serif', padding: '24px 32px', backgroundColor: '#fff', color: '#111' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingBottom: 14, borderBottom: '2px solid #e5e5e5' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+    <div style={{ fontFamily: 'Inter, system-ui, sans-serif', padding: '28px 36px', backgroundColor: '#fff', color: '#111' }}>
+
+      {/* ── Cabecera del documento ── */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, paddingBottom: 20, borderBottom: '2px solid #111' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
           {plan?.project?.icon_url && (
-            <img src={plan.project.icon_url} alt="" style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 6, flexShrink: 0, marginTop: 2 }} />
+            <img src={plan.project.icon_url} alt="" style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 8, flexShrink: 0, border: '1px solid #eee' }} />
           )}
           <div>
-            <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{plan?.name}</h1>
-            <p style={{ margin: '3px 0 0', fontSize: 12, color: '#666' }}>{s.printSubtitle}</p>
-            {plan?.client_name && <p style={{ margin: '2px 0 0', fontSize: 11, color: '#999' }}>{plan.client_name}</p>}
+            <p style={{ margin: '0 0 3px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#999' }}>{s.printSubtitle}</p>
+            <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px', letterSpacing: '-0.02em' }}>{plan?.name}</h1>
+            {plan?.client_name && <p style={{ margin: 0, fontSize: 13, color: '#555' }}>{plan.client_name}</p>}
           </div>
         </div>
         {plan?.pdf_logo_url
-          ? <img src={plan.pdf_logo_url} alt="" style={{ height: 28, maxWidth: 110, objectFit: 'contain', flexShrink: 0 }} />
+          ? <img src={plan.pdf_logo_url} alt="" style={{ height: 32, maxWidth: 120, objectFit: 'contain', flexShrink: 0 }} />
           : (plan?.pdf_logo_url === null || plan?.pdf_logo_url === undefined)
             ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                <svg width="18" height="18" viewBox="0 0 44 44" fill="none">
+                <svg width="20" height="20" viewBox="0 0 44 44" fill="none">
                   <rect width="44" height="44" rx="10" fill="#1a1a1a"/>
                   <rect x="10" y="10" width="10" height="10" rx="2" fill="white"/>
                   <rect x="24" y="10" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
                   <rect x="10" y="24" width="10" height="10" rx="2" fill="white" opacity="0.4"/>
                   <rect x="24" y="24" width="10" height="10" rx="2" fill="white"/>
                 </svg>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#333' }}>OppsHub</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>OppsHub</span>
               </div>
             )
             : null
         }
       </div>
 
-      {/* Project info */}
-      <div style={{ display: 'flex', gap: 24, marginBottom: 18, flexWrap: 'wrap' }}>
-        {plan?.start_date && (
-          <div><p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', margin: '0 0 3px' }}>{s.start}</p><p style={{ fontSize: 12, color: '#333', margin: 0 }}>{formatDate(plan.start_date, locale)}</p></div>
-        )}
-        {lastEnd && (
-          <div><p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', margin: '0 0 3px' }}>{s.end}</p><p style={{ fontSize: 12, color: '#333', margin: 0 }}>{formatDate(lastEnd, locale)}</p></div>
-        )}
-        {totalHours > 0 && (
-          <div><p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', margin: '0 0 3px' }}>{s.hours}</p><p style={{ fontSize: 12, color: '#333', margin: 0 }}>{totalHours}h</p></div>
-        )}
-        {visiblePhases.length > 0 && (
-          <div><p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', margin: '0 0 3px' }}>{s.phasesCount}</p><p style={{ fontSize: 12, color: '#333', margin: 0 }}>{visiblePhases.length}</p></div>
-        )}
+      {/* ── Datos del proyecto (pills en fila) ── */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: 4, border: '1px solid #e8e8e8', borderRadius: 8, overflow: 'hidden' }}>
+        {[
+          plan?.start_date && { label: s.start, value: formatDate(plan.start_date, locale) },
+          lastEnd          && { label: s.end,   value: formatDate(lastEnd, locale) },
+          totalHours > 0   && { label: s.hours, value: `${totalHours}h` },
+          visiblePhases.length > 0 && { label: s.phasesCount, value: visiblePhases.length },
+          plan?.client_name && { label: s.client, value: plan.client_name },
+        ].filter(Boolean).map((item, i, arr) => (
+          <div key={i} style={{ flex: 1, padding: '10px 14px', borderRight: i < arr.length - 1 ? '1px solid #e8e8e8' : 'none', backgroundColor: i % 2 === 0 ? '#fafafa' : '#fff' }}>
+            <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#aaa' }}>{item.label}</p>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#222' }}>{item.value}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Objective */}
+      {/* ── 1. Objetivo ── */}
       {plan?.scope_objective && (
-        <div style={{ marginBottom: 20, padding: '10px 14px', backgroundColor: '#f8f8f8', borderRadius: 6, borderLeft: '3px solid #bf5af2' }}>
-          <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', margin: '0 0 5px' }}>{s.objectiveLabel}</p>
-          <p style={{ fontSize: 12, lineHeight: 1.6, color: '#222', margin: 0, whiteSpace: 'pre-wrap' }}>{plan.scope_objective}</p>
-        </div>
+        <>
+          <SectionHeading num={1} title={s.objectiveLabel} />
+          <p style={{ fontSize: 13, lineHeight: 1.7, color: '#333', margin: 0, whiteSpace: 'pre-wrap', paddingLeft: 2 }}>{plan.scope_objective}</p>
+        </>
       )}
 
-      {/* Deliverables */}
+      {/* ── 2. Entregables ── */}
       {deliverables.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#555', marginBottom: 8 }}>{s.deliverablesTitle}</p>
-          {deliverables.map((d, i) => (
-            <div key={d.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 5 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#999', minWidth: 18 }}>{i + 1}.</span>
-              <span style={{ fontSize: 12, lineHeight: 1.5, color: '#222' }}>{d.title}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Phases */}
-      {visiblePhases.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#555', marginBottom: 8 }}>{s.phasesTitle}</p>
-          {visiblePhases.map((phase, idx) => {
-            const items = getItems(phase)
-            const status = computePhaseStatus(phase)
-            const meta = (status && status !== 'on_track') ? statusMeta[status] : null
-            const durationDays = daysBetween(phase.start_date, phase.end_date) + 1
-            const color = phase.color || '#bf5af2'
-            const linkedDel = deliverables.find(d => d.id === phase.scope_deliverable_id)
-
-            return (
-              <div key={phase.id} style={{ marginBottom: 14, pageBreakInside: 'avoid' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', backgroundColor: '#f8f8f8', borderLeft: `4px solid ${color}`, borderRadius: '0 6px 6px 0', marginBottom: 7 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700 }}>{phase.name}</span>
-                      {meta && <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, backgroundColor: meta.color + '20', color: meta.color, fontWeight: 600 }}>{meta.label}</span>}
-                      {linkedDel && <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, backgroundColor: '#bf5af215', color: '#bf5af2', fontWeight: 500 }}>→ {linkedDel.title}</span>}
-                    </div>
-                    <span style={{ fontSize: 11, color: '#666', marginTop: 2, display: 'block' }}>
-                      {formatDate(phase.start_date, locale)} → {formatDate(phase.end_date, locale)} · {durationDays}d{phase.hours > 0 ? ` · ${phase.hours}h` : ''}
-                    </span>
-                  </div>
-                </div>
-                {items.length > 0 && (
-                  <div style={{ paddingLeft: 12 }}>
-                    {items.map((item, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 4 }}>
-                        <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: color, flexShrink: 0, marginTop: 5, display: 'inline-block' }} />
-                        <span style={{ fontSize: 12, lineHeight: 1.5, color: '#222' }}>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {idx < visiblePhases.length - 1 && <div style={{ borderBottom: '1px solid #eee', marginTop: 12 }} />}
+        <>
+          <SectionHeading num={plan?.scope_objective ? 2 : 1} title={s.deliverablesTitle} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {deliverables.map((d, i) => (
+              <div key={d.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 12px', backgroundColor: '#fafafa', borderRadius: 6, border: '1px solid #efefef' }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#bbb', minWidth: 16, paddingTop: 1 }}>{i + 1}</span>
+                <span style={{ fontSize: 13, lineHeight: 1.5, color: '#111', fontWeight: 500 }}>{d.title}</span>
               </div>
-            )
-          })}
-        </div>
+            ))}
+          </div>
+        </>
       )}
 
-      {/* Out of scope */}
+      {/* ── 3. Fases ── */}
+      {visiblePhases.length > 0 && (
+        <>
+          <SectionHeading num={[plan?.scope_objective, deliverables.length > 0].filter(Boolean).length + 1} title={s.phasesTitle} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {visiblePhases.map((phase) => {
+              const items = getItems(phase)
+              const status = computePhaseStatus(phase)
+              const meta = (status && status !== 'on_track') ? statusMeta[status] : null
+              const durationDays = daysBetween(phase.start_date, phase.end_date) + 1
+              const color = phase.color || '#bf5af2'
+              const linkedDel = deliverables.find(d => d.id === phase.scope_deliverable_id)
+
+              return (
+                <div key={phase.id} style={{ pageBreakInside: 'avoid', border: '1px solid #e8e8e8', borderRadius: 8, overflow: 'hidden' }}>
+                  {/* Phase header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', backgroundColor: '#f5f5f5', borderLeft: `4px solid ${color}` }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{phase.name}</span>
+                        {meta && (
+                          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, backgroundColor: meta.color + '20', color: meta.color, fontWeight: 700 }}>{meta.label}</span>
+                        )}
+                        {linkedDel && (
+                          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, backgroundColor: '#f0e8ff', color: '#7c3aed', fontWeight: 500 }}>→ {linkedDel.title}</span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 11, color: '#888', marginTop: 2, display: 'block' }}>
+                        {formatDate(phase.start_date, locale)} → {formatDate(phase.end_date, locale)} · {durationDays}d{phase.hours > 0 ? ` · ${phase.hours}h` : ''}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Bullets */}
+                  {items.length > 0 && (
+                    <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      {items.map((item, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: color, flexShrink: 0, marginTop: 6, display: 'inline-block' }} />
+                          <span style={{ fontSize: 12, lineHeight: 1.6, color: '#333' }}>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      {/* ── 4. Fuera de alcance ── */}
       {outOfScope.length > 0 && (
-        <div style={{ marginTop: 20, padding: '10px 14px', backgroundColor: '#fff8f8', borderRadius: 6, border: '1px solid #fde8e8' }}>
-          <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999', marginBottom: 8 }}>{s.outOfScopeTitle}</p>
-          {outOfScope.map((item, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 4 }}>
-              <span style={{ fontSize: 13, color: '#ff453a', flexShrink: 0, marginTop: -1 }}>×</span>
-              <span style={{ fontSize: 12, lineHeight: 1.5, color: '#444' }}>{item}</span>
-            </div>
-          ))}
-        </div>
+        <>
+          <SectionHeading num={[plan?.scope_objective, deliverables.length > 0, visiblePhases.length > 0].filter(Boolean).length + 1} title={s.outOfScopeTitle} />
+          <div style={{ border: '1px solid #fdd', borderRadius: 8, overflow: 'hidden' }}>
+            {outOfScope.map((item, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 14px', borderBottom: i < outOfScope.length - 1 ? '1px solid #fdd' : 'none', backgroundColor: i % 2 === 0 ? '#fff8f8' : '#fff' }}>
+                <span style={{ fontSize: 14, color: '#ef4444', flexShrink: 0, lineHeight: 1.4, fontWeight: 700 }}>×</span>
+                <span style={{ fontSize: 12, lineHeight: 1.6, color: '#444' }}>{item}</span>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )
