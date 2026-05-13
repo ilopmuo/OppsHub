@@ -7,7 +7,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, PieChart, Pie, Cell,
 } from 'recharts'
-import { Pencil, ChevronDown, ChevronUp, Save, Clock, GalleryHorizontal } from 'lucide-react'
+import { Pencil, ChevronDown, ChevronUp, Save, Clock, GalleryHorizontal, MessageSquare } from 'lucide-react'
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const CARD = {
@@ -143,6 +143,8 @@ const SR = {
     chalPlaceholder: 'Describe los retos o bloqueos actuales…', saveChanges: 'Guardar cambios',
     member: 'Miembro',
     exportPresentation: 'Exportar presentación',
+    commentPlaceholder: 'Añade un comentario a esta sección…',
+    commentSave: 'Guardar comentario', commentSaved: 'Comentario guardado',
   },
   en: {
     locale: 'en-US',
@@ -199,6 +201,8 @@ const SR = {
     chalPlaceholder: 'Describe the current challenges or blockers…', saveChanges: 'Save changes',
     member: 'Member',
     exportPresentation: 'Export presentation',
+    commentPlaceholder: 'Add a comment to this section…',
+    commentSave: 'Save comment', commentSaved: 'Comment saved',
   },
 }
 
@@ -210,7 +214,7 @@ const STATUS_DOTS = [
   { value: 'bad',     color: '#ff453a', shadow: 'rgba(255,69,58,0.5)' },
 ]
 
-function SectionHeader({ number, title, subtitle, status, onStatusChange }) {
+function SectionHeader({ number, title, subtitle, status, onStatusChange, hasComment, commentExpanded, onCommentToggle }) {
   const activeDot = STATUS_DOTS.find(d => d.value === status)
   return (
     <div className="mb-6">
@@ -240,8 +244,160 @@ function SectionHeader({ number, title, subtitle, status, onStatusChange }) {
           <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: activeDot.color, flexShrink: 0,
                         boxShadow: `0 0 7px 2px ${activeDot.shadow}` }} />
         ) : null}
+
+        {/* Comment toggle — only in edit mode */}
+        {onCommentToggle && (
+          <button
+            onClick={onCommentToggle}
+            title="Comentario de sección"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 26, height: 26, borderRadius: 8, border: 'none', cursor: 'pointer',
+              backgroundColor: commentExpanded ? 'rgba(100,210,255,0.12)' : 'rgba(255,255,255,0.04)',
+              color: commentExpanded ? '#64d2ff' : hasComment ? '#64d2ff' : '#3a3a3a',
+              transition: 'background 0.15s, color 0.15s',
+              position: 'relative',
+            }}
+            onMouseEnter={e => { if (!commentExpanded) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#6e6e73' } }}
+            onMouseLeave={e => { if (!commentExpanded) { e.currentTarget.style.backgroundColor = hasComment ? 'rgba(100,210,255,0.06)' : 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = hasComment ? '#64d2ff' : '#3a3a3a' } }}
+          >
+            <MessageSquare size={13} />
+            {hasComment && !commentExpanded && (
+              <span style={{
+                position: 'absolute', top: 4, right: 4, width: 5, height: 5,
+                borderRadius: '50%', backgroundColor: '#64d2ff',
+              }} />
+            )}
+          </button>
+        )}
       </div>
       {subtitle && <p className="text-xs ml-9" style={{ color: '#6e6e73' }}>{subtitle}</p>}
+    </div>
+  )
+}
+
+const COMMENT_COLORS = [
+  { color: '#f5f5f7', label: 'Blanco' },
+  { color: '#ff453a', label: 'Rojo' },
+  { color: '#ff9f0a', label: 'Naranja' },
+  { color: '#30d158', label: 'Verde' },
+  { color: '#64d2ff', label: 'Azul' },
+  { color: '#bf5af2', label: 'Púrpura' },
+]
+
+function SectionCommentEditor({ sectionNumber, initialHtml, projectId, onSave, lang }) {
+  const t = SR[lang] ?? SR.es
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [boldActive, setBoldActive] = useState(false)
+  const [italicActive, setItalicActive] = useState(false)
+  const editorRef = useRef(null)
+  const initialized = useRef(false)
+
+  useEffect(() => {
+    if (editorRef.current && !initialized.current) {
+      editorRef.current.innerHTML = initialHtml ?? ''
+      initialized.current = true
+    }
+  }, [initialHtml])
+
+  function updateStates() {
+    setBoldActive(document.queryCommandState('bold'))
+    setItalicActive(document.queryCommandState('italic'))
+  }
+
+  function exec(cmd, val = null) {
+    document.execCommand(cmd, false, val)
+    editorRef.current?.focus()
+    updateStates()
+  }
+
+  async function save() {
+    setSaving(true)
+    const newHtml = editorRef.current?.innerHTML ?? ''
+    const { data: cur } = await supabase.from('projects').select('section_comments').eq('id', projectId).single()
+    const updated = { ...(cur?.section_comments ?? {}), [sectionNumber]: newHtml }
+    const { error } = await supabase.from('projects').update({ section_comments: updated }).eq('id', projectId)
+    setSaving(false)
+    if (error) { toast.error('Error al guardar'); return }
+    setDirty(false)
+    onSave({ section_comments: updated })
+    toast.success(t.commentSaved)
+  }
+
+  const btnBase = (active) => ({
+    width: 26, height: 26, borderRadius: 7, border: 'none', cursor: 'pointer',
+    fontFamily: 'inherit', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: active ? 'rgba(255,255,255,0.12)' : 'transparent',
+    color: active ? '#f5f5f7' : '#6e6e73',
+    transition: 'background 0.15s, color 0.15s',
+  })
+
+  return (
+    <div className="sr-no-print" style={{
+      marginBottom: 24, borderRadius: 12,
+      border: '1px solid rgba(100,210,255,0.12)',
+      backgroundColor: 'rgba(100,210,255,0.03)',
+      overflow: 'hidden',
+    }}>
+      {/* Toolbar */}
+      <div className="flex items-center gap-1 px-3 py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <button onMouseDown={e => { e.preventDefault(); exec('bold') }} style={btnBase(boldActive)}
+          onMouseEnter={e => { if (!boldActive) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+          onMouseLeave={e => { if (!boldActive) e.currentTarget.style.backgroundColor = 'transparent' }}>
+          <strong>B</strong>
+        </button>
+        <button onMouseDown={e => { e.preventDefault(); exec('italic') }} style={{ ...btnBase(italicActive), fontStyle: 'italic' }}
+          onMouseEnter={e => { if (!italicActive) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+          onMouseLeave={e => { if (!italicActive) e.currentTarget.style.backgroundColor = 'transparent' }}>
+          I
+        </button>
+        <button onMouseDown={e => { e.preventDefault(); exec('insertUnorderedList') }} style={btnBase(false)}
+          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'}
+          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+          title="Lista">
+          ≡
+        </button>
+        <span style={{ width: 1, height: 14, backgroundColor: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
+        {COMMENT_COLORS.map(({ color, label }) => (
+          <button key={color} title={label}
+            onMouseDown={e => { e.preventDefault(); exec('foreColor', color) }}
+            style={{
+              width: 13, height: 13, borderRadius: '50%', backgroundColor: color,
+              border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', padding: 0, flexShrink: 0,
+            }}
+          />
+        ))}
+        {dirty && (
+          <>
+            <span style={{ flex: 1 }} />
+            <button onClick={save} disabled={saving}
+              className="text-xs px-3 py-1 rounded-lg font-semibold"
+              style={{ backgroundColor: '#f5f5f7', color: '#000', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              {saving ? t.saving : t.commentSave}
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Editor */}
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        spellCheck={false}
+        onInput={() => { setDirty(true); updateStates() }}
+        onKeyUp={updateStates}
+        onMouseUp={updateStates}
+        data-placeholder={t.commentPlaceholder}
+        style={{
+          minHeight: 72, outline: 'none',
+          color: '#f5f5f7', fontSize: 13, fontFamily: 'inherit',
+          lineHeight: 1.65, caretColor: '#f5f5f7',
+          padding: '10px 14px',
+        }}
+        className="section-comment-editor"
+      />
     </div>
   )
 }
@@ -1568,8 +1724,9 @@ function SnapshotView({ snapshot, lang = 'es', presentationMode = false }) {
   const effort      = snapshot.effort ?? []
   const financial   = snapshot.financial ?? null
   const invoices    = snapshot.invoices ?? []
-  const allocations = snapshot.allocations ?? []
-  const snapDate    = snapshot.date ?? new Date().toISOString().slice(0, 10)
+  const allocations    = snapshot.allocations ?? []
+  const snapComments   = proj.section_comments ?? {}
+  const snapDate       = snapshot.date ?? new Date().toISOString().slice(0, 10)
 
   function phaseMetAt(phase) {
     const ref   = new Date(snapDate + 'T00:00:00')
@@ -1676,6 +1833,17 @@ function SnapshotView({ snapshot, lang = 'es', presentationMode = false }) {
           ) : (
           <><SectionHeader number={sec.number} title={sec.title} subtitle={sec.subtitle}
             status={snapSectionStatuses[sec.number]} />
+
+          {snapComments[sec.number] && snapComments[sec.number].replace(/<[^>]*>/g, '').trim() && (
+            <div style={{
+              marginBottom: 24, borderRadius: 12, padding: '10px 14px',
+              border: '1px solid rgba(100,210,255,0.12)',
+              backgroundColor: 'rgba(100,210,255,0.03)',
+              fontSize: 13, lineHeight: 1.65, color: '#d1d1d6',
+            }}
+              dangerouslySetInnerHTML={{ __html: snapComments[sec.number] }}
+            />
+          )}
 
           {sec.number === '01' && (
             <div className="flex flex-col gap-4 mb-4">
@@ -1989,6 +2157,13 @@ if (typeof document !== 'undefined' && !document.getElementById(CSAT_STYLE_ID)) 
       pointer-events: none;
     }
     .csat-editor b, .csat-editor strong { color: #ffffff; }
+    .section-comment-editor:empty:before {
+      content: attr(data-placeholder);
+      color: #3a3a3a;
+      pointer-events: none;
+    }
+    .section-comment-editor ul { list-style: disc; padding-left: 1.25em; }
+    .section-comment-editor li { margin-bottom: 2px; }
   `
   document.head.appendChild(s)
 }
@@ -2122,6 +2297,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
           customer_satisfaction_text: project.customer_satisfaction_text,
           opportunities: project.opportunities, challenges: project.challenges,
           status_report_section_statuses: project.status_report_section_statuses ?? {},
+          section_comments: project.section_comments ?? {},
         },
         resources: resources ?? [], bug_stats: bugStats ?? [], plan: snapPlan, phases,
         team_kpis: teamKpis ?? [], effort: effort ?? [],
@@ -2160,6 +2336,13 @@ export default function StatusReport({ project: initialProject, members, tasks }
     else updated[number] = value
     handleProjectUpdate({ status_report_section_statuses: updated })
     await supabase.from('projects').update({ status_report_section_statuses: updated }).eq('id', project.id)
+  }
+
+  // ── Section comments ──────────────────────────────────────────
+  const sectionComments = project.section_comments ?? {}
+  const [commentsExpanded, setCommentsExpanded] = useState({})
+  function toggleComment(number) {
+    setCommentsExpanded(prev => ({ ...prev, [number]: !prev[number] }))
   }
 
   const sections = [
@@ -2337,7 +2520,20 @@ export default function StatusReport({ project: initialProject, members, tasks }
                   number={s.number} title={s.title} subtitle={s.subtitle}
                   status={sectionStatuses[s.number]}
                   onStatusChange={val => updateSectionStatus(s.number, val)}
+                  hasComment={!!(sectionComments[s.number] && sectionComments[s.number].replace(/<[^>]*>/g, '').trim())}
+                  commentExpanded={!!commentsExpanded[s.number]}
+                  onCommentToggle={() => toggleComment(s.number)}
                 />
+                {commentsExpanded[s.number] && (
+                  <SectionCommentEditor
+                    key={`comment-${s.number}`}
+                    sectionNumber={s.number}
+                    initialHtml={sectionComments[s.number] ?? ''}
+                    projectId={project.id}
+                    onSave={handleProjectUpdate}
+                    lang={lang}
+                  />
+                )}
                 {s.content}
               </>
             )}
