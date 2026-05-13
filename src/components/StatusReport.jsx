@@ -7,7 +7,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, PieChart, Pie, Cell,
 } from 'recharts'
-import { Pencil, ChevronDown, ChevronUp, Save, Clock, GalleryHorizontal, MessageSquare } from 'lucide-react'
+import { Pencil, ChevronDown, ChevronUp, Save, Clock, GalleryHorizontal, MessageSquare, Zap } from 'lucide-react'
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const CARD = {
@@ -143,6 +143,8 @@ const SR = {
     chalPlaceholder: 'Describe los retos o bloqueos actuales…', saveChanges: 'Guardar cambios',
     member: 'Miembro',
     exportPresentation: 'Exportar presentación',
+    autoDetect: 'Auto-detectar estado', autoDetecting: 'Analizando…',
+    autoDetectDone: n => `${n} sección${n !== 1 ? 'es' : ''} actualizadas`,
     commentPlaceholder: 'Añade un comentario a esta sección…',
     commentSave: 'Guardar comentario', commentSaved: 'Comentario guardado',
   },
@@ -201,6 +203,8 @@ const SR = {
     chalPlaceholder: 'Describe the current challenges or blockers…', saveChanges: 'Save changes',
     member: 'Member',
     exportPresentation: 'Export presentation',
+    autoDetect: 'Auto-detect status', autoDetecting: 'Analyzing…',
+    autoDetectDone: n => `${n} section${n !== 1 ? 's' : ''} updated`,
     commentPlaceholder: 'Add a comment to this section…',
     commentSave: 'Save comment', commentSaved: 'Comment saved',
   },
@@ -2392,6 +2396,102 @@ export default function StatusReport({ project: initialProject, members, tasks }
     setCommentsExpanded(prev => ({ ...prev, [number]: !prev[number] }))
   }
 
+  // ── Auto-detect section statuses ──────────────────────────────
+  const [analyzing, setAnalyzing] = useState(false)
+
+  async function analyzeStatuses() {
+    setAnalyzing(true)
+    try {
+      const suggestions = {}
+      const months3 = lastNMonths(3)
+      const months2 = lastNMonths(2)
+
+      const [
+        { data: bugData },
+        { data: plans },
+        { data: kpiData },
+        { data: fin },
+        { data: invoices },
+      ] = await Promise.all([
+        supabase.from('project_bug_stats').select('*').eq('project_id', project.id).in('month_year', months3),
+        supabase.from('project_plans').select('id').eq('project_id', project.id).limit(1),
+        supabase.from('project_team_kpis').select('*').eq('project_id', project.id).in('month_year', months2),
+        supabase.from('project_financials').select('*').eq('project_id', project.id).maybeSingle(),
+        supabase.from('project_invoices').select('amount').eq('project_id', project.id),
+      ])
+
+      // 01 — project status field
+      if (project.status === 'blocked') suggestions['01'] = 'bad'
+      else if (project.status === 'at_risk') suggestions['01'] = 'regular'
+      else if (project.status === 'on_track') suggestions['01'] = 'good'
+
+      // 02 — bug backlog trend over last 3 months
+      if (bugData?.length) {
+        const backlog = months3.map(m => {
+          const b = bugData.find(x => x.month_year === m) ?? {}
+          return Math.max(0, (b.open_count ?? 0) + (b.in_progress_count ?? 0) - (b.closed_count ?? 0))
+        })
+        const growing = backlog[2] > backlog[1] && backlog[1] > backlog[0]
+        const shrinking = backlog[2] < backlog[1] || backlog[2] === 0
+        suggestions['02'] = growing ? 'bad' : shrinking ? 'good' : 'regular'
+      }
+
+      // 03 — plan phases: overdue count + overall progress vs time
+      if (plans?.length) {
+        const { data: phases } = await supabase
+          .from('plan_phases')
+          .select('start_date, end_date, progress, is_milestone')
+          .eq('plan_id', plans[0].id)
+        const real = (phases ?? []).filter(p => !p.is_milestone && p.start_date && p.end_date)
+        if (real.length) {
+          const now = new Date()
+          const overdue = real.filter(p => new Date(p.end_date) < now && (p.progress ?? 0) < 100).length
+          const avgProgress = real.reduce((s, p) => s + (p.progress ?? 0), 0) / real.length
+          if (overdue > 0) suggestions['03'] = overdue >= real.length / 2 ? 'bad' : 'regular'
+          else suggestions['03'] = avgProgress >= 70 ? 'good' : 'regular'
+        }
+      }
+
+      // 04 — team KPIs: tasks + bugs closed trend (last 2 months)
+      if (kpiData?.length === 2) {
+        const [prev, curr] = months2.map(m => kpiData.find(k => k.month_year === m) ?? {})
+        const tasksDelta = (curr.tasks_closed ?? 0) - (prev.tasks_closed ?? 0)
+        const bugsDelta  = (curr.bugs_closed  ?? 0) - (prev.bugs_closed  ?? 0)
+        const score = tasksDelta + bugsDelta
+        suggestions['04'] = score > 0 ? 'good' : score < -2 ? 'bad' : 'regular'
+      }
+
+      // 05 — profitability: actual margin vs target
+      if (fin) {
+        const target  = fin.target_margin ?? 20
+        const etd     = fin.effort_to_date ?? 0
+        const billed  = invoices?.length
+          ? invoices.reduce((s, i) => s + i.amount, 0)
+          : (fin.invoiced_to_date ?? 0)
+        const margin  = billed > 0 ? ((billed - etd) / billed) * 100 : null
+        if (margin !== null) {
+          suggestions['05'] = margin < 0 ? 'bad' : margin < target * 0.85 ? 'regular' : 'good'
+        }
+      }
+
+      // 06 — has active blockers in challenges text
+      const hasChallenge = project.challenges && project.challenges.replace(/<[^>]*>/g, '').trim()
+      const hasOpps      = project.opportunities && project.opportunities.replace(/<[^>]*>/g, '').trim()
+      if (hasChallenge) suggestions['06'] = 'regular'
+      else if (hasOpps) suggestions['06'] = 'good'
+
+      const count = Object.keys(suggestions).length
+      if (!count) { toast(lang === 'en' ? 'No data to analyze' : 'Sin datos suficientes para analizar'); return }
+
+      const updated = { ...sectionStatuses, ...suggestions }
+      handleProjectUpdate({ status_report_section_statuses: updated })
+      await supabase.from('projects').update({ status_report_section_statuses: updated }).eq('id', project.id)
+      toast.success(sr.autoDetectDone(count))
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
   const sections = [
     {
       number: '01',
@@ -2492,6 +2592,19 @@ export default function StatusReport({ project: initialProject, members, tasks }
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          {!selectedVersion && (
+            <button
+              onClick={analyzeStatuses}
+              disabled={analyzing}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
+              style={{ backgroundColor: analyzing ? 'rgba(255,159,10,0.1)' : 'rgba(255,255,255,0.06)', color: analyzing ? '#ff9f0a' : '#6e6e73', border: `1px solid ${analyzing ? 'rgba(255,159,10,0.2)' : 'rgba(255,255,255,0.08)'}`, cursor: analyzing ? 'default' : 'pointer', transition: 'all 0.15s' }}
+              onMouseEnter={e => { if (!analyzing) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#f5f5f7' } }}
+              onMouseLeave={e => { if (!analyzing) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#6e6e73' } }}
+            >
+              <Zap className="w-3 h-3" />
+              {analyzing ? sr.autoDetecting : sr.autoDetect}
+            </button>
+          )}
           <button
             onClick={exportPresentation}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
