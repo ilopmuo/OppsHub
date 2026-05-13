@@ -1711,7 +1711,7 @@ function OpportunitiesSection({ project, onSave, lang = 'es' }) {
 }
 
 // ── Snapshot read-only view ───────────────────────────────────────────────────
-function SnapshotView({ snapshot, lang = 'es', presentationMode = false }) {
+function SnapshotView({ snapshot, lang = 'es' }) {
   const t = SR[lang] ?? SR.es
   const locale = t.locale
   const proj        = snapshot.project ?? {}
@@ -1820,10 +1820,10 @@ function SnapshotView({ snapshot, lang = 'es', presentationMode = false }) {
     <div className="sr-print-container" style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px 64px' }}>
       {[
         ...sections.slice(0, 1),
-        ...(presentationMode ? [] : [{ number: 'gantt', isGantt: true }]),
+        { number: 'gantt', isGantt: true },
         ...sections.slice(1),
       ].map((sec, i, arr) => (
-        <div key={sec.number} className="sr-slide" style={{ marginBottom: i < arr.length - 1 ? 48 : 0 }}>
+        <div key={sec.number} className={`sr-slide${sec.isGantt ? ' sr-gantt-slide' : ''}`} style={{ marginBottom: i < arr.length - 1 ? 48 : 0 }}>
           {sec.isGantt ? (
             snapPlan && allSnapPhases.length > 0
               ? <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, backgroundColor: '#111111', overflow: 'hidden', margin: '0 -24px' }}>
@@ -2168,35 +2168,52 @@ if (typeof document !== 'undefined' && !document.getElementById(CSAT_STYLE_ID)) 
   document.head.appendChild(s)
 }
 
-const PRES_STYLE_ID = 'sr-presentation-style'
-if (typeof document !== 'undefined' && !document.getElementById(PRES_STYLE_ID)) {
-  const s = document.createElement('style')
-  s.id = PRES_STYLE_ID
-  s.textContent = `
-    @media print {
-      @page { size: A4 landscape; margin: 0; }
-      body.presentation-print * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
-      body.presentation-print .sr-no-print { display: none !important; }
-      body.presentation-print .sr-print-container { max-width: none !important; padding: 0 !important; margin: 0 !important; }
-      body.presentation-print .sr-slide {
-        page-break-after: always;
-        break-after: page;
-        page-break-inside: avoid;
-        break-inside: avoid;
-        min-height: 100vh;
-        background-color: #000000 !important;
-        padding: 40px 56px !important;
-        box-sizing: border-box !important;
-        margin: 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        overflow: hidden !important;
-      }
-      body.presentation-print .sr-slide:last-child { page-break-after: auto; break-after: auto; }
-      body.presentation-print .sr-slide > * { flex-shrink: 0; }
-    }
-  `
-  document.head.appendChild(s)
+function buildPresentationWindow(slides) {
+  const styleLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+    .map(l => `<link rel="stylesheet" href="${l.href}">`)
+    .join('\n')
+  const inlineStyles = Array.from(document.querySelectorAll('style'))
+    .map(s => `<style>${s.textContent}</style>`)
+    .join('\n')
+  const slidesHTML = slides.map(el =>
+    `<div class="pres-slide">${el.innerHTML}</div>`
+  ).join('\n')
+
+  const win = window.open('', '_blank', 'width=1280,height=800')
+  if (!win) return null
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+${styleLinks}
+${inlineStyles}
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  *, *::before, *::after {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    box-sizing: border-box;
+  }
+  html, body { margin: 0; padding: 0; background: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; }
+  .sr-no-print, [contenteditable] + button { display: none !important; }
+  .pres-slide {
+    width: 297mm;
+    height: 210mm;
+    background-color: #111111;
+    padding: 36px 56px;
+    overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+    display: flex;
+    flex-direction: column;
+  }
+  .pres-slide:last-child { page-break-after: auto; break-after: auto; }
+</style>
+</head>
+<body>${slidesHTML}</body>
+</html>`)
+  win.document.close()
+  return win
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -2208,21 +2225,14 @@ export default function StatusReport({ project: initialProject, members, tasks }
 
   // ── Presentation export ───────────────────────────────────────
   const [presentationMode, setPresentationMode] = useState(false)
-  useEffect(() => {
-    if (presentationMode) {
-      document.body.classList.add('presentation-print')
-      const timer = setTimeout(() => {
-        window.print()
-        window.addEventListener('afterprint', () => {
-          document.body.classList.remove('presentation-print')
-          setPresentationMode(false)
-        }, { once: true })
-      }, 150)
-      return () => clearTimeout(timer)
-    }
-  }, [presentationMode])
 
-  function exportPresentation() { setPresentationMode(true) }
+  function exportPresentation() {
+    const slides = Array.from(document.querySelectorAll('.sr-slide:not(.sr-gantt-slide)'))
+    if (!slides.length) { toast.error('Sin secciones para exportar'); return }
+    const win = buildPresentationWindow(slides)
+    if (!win) { toast.error('Permite ventanas emergentes para exportar'); return }
+    setTimeout(() => { try { win.print() } catch (_) {} }, 700)
+  }
 
   // ── Version management ────────────────────────────────────────
   const [versions,         setVersions]         = useState([])
@@ -2504,14 +2514,14 @@ export default function StatusReport({ project: initialProject, members, tasks }
 
       {/* ── Content ── */}
       {selectedVersion ? (
-        <SnapshotView snapshot={selectedVersion.snapshot} lang={lang} presentationMode={presentationMode} />
+        <SnapshotView snapshot={selectedVersion.snapshot} lang={lang} />
       ) : (
         [
           ...sections.slice(0, 1),
-          ...(presentationMode ? [] : [{ number: 'gantt', isGantt: true }]),
+          { number: 'gantt', isGantt: true },
           ...sections.slice(1),
         ].map((s, i, arr) => (
-          <div key={s.number} className="sr-slide" style={{ marginBottom: i < arr.length - 1 ? 48 : 0 }}>
+          <div key={s.number} className={`sr-slide${s.isGantt ? ' sr-gantt-slide' : ''}`} style={{ marginBottom: i < arr.length - 1 ? 48 : 0 }}>
             {s.isGantt ? (
               <PlanGanttSection projectId={project.id} />
             ) : (
