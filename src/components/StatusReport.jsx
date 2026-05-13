@@ -2191,18 +2191,16 @@ ${inlineStyles}
     -webkit-print-color-adjust: exact !important;
     box-sizing: border-box;
   }
-  html, body { margin: 0; padding: 0; background: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; }
+  html, body { margin: 0; padding: 0; background: #111111; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; }
   .sr-no-print { display: none !important; }
   .pres-slide {
     width: 297mm;
-    height: 210mm;
+    min-height: 210mm;
     background-color: #111111;
     padding: 36px 56px;
-    overflow: hidden;
+    box-sizing: border-box;
     page-break-after: always;
     break-after: page;
-    display: flex;
-    flex-direction: column;
   }
   .pres-slide:last-child { page-break-after: auto; break-after: auto; }
 </style>
