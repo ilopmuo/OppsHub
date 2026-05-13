@@ -94,6 +94,19 @@ function CardContent({ task, isOverlay = false, onDelete, onClickTask, wasDraggi
             {formatDate(task.due_date)}
           </span>
         )}
+        {task.jira_issue_key && (
+          <a
+            href={task.jira_issue_url || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            onPointerDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
+            className="text-xs px-1.5 py-0.5 rounded font-mono"
+            style={{ backgroundColor: 'rgba(100,130,255,0.12)', color: '#6496ff', border: '1px solid rgba(100,130,255,0.2)', textDecoration: 'none' }}
+          >
+            {task.jira_issue_key}
+          </a>
+        )}
       </div>
     </div>
   )

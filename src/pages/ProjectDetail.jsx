@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
-import { Save, Trash2, Plus, Loader2, List, LayoutGrid, AlertTriangle, Download, ChevronDown, ChevronUp } from 'lucide-react'
+import { Save, Trash2, Plus, Loader2, List, LayoutGrid, AlertTriangle, Download, ChevronDown, ChevronUp, RefreshCw, Link2 } from 'lucide-react'
 import TaskList from '../components/TaskList'
 import KanbanBoard from '../components/KanbanBoard'
 import NewTaskModal from '../components/NewTaskModal'
@@ -81,6 +81,10 @@ export default function ProjectDetail() {
   const [taskView, setTaskView] = useState(getTaskView)
   const [editingDetails, setEditingDetails] = useState(false)
   const [activeTab, setActiveTab] = useState('tasks') // 'tasks' | 'finances'
+  const [showJiraConfig, setShowJiraConfig] = useState(false)
+  const [jiraForm, setJiraForm] = useState({ base_url: '', email: '', api_token: '', project_key: '' })
+  const [jiraSaving, setJiraSaving] = useState(false)
+  const [jiraSyncing, setJiraSyncing] = useState(false)
 
   // Form fields
   const [name, setName] = useState('')
@@ -99,6 +103,8 @@ export default function ProjectDetail() {
     const { data, error } = await supabase.from('projects').select('*').eq('id', id).single()
     if (error || !data) { toast.error('Proyecto no encontrado'); navigate('/'); return }
     setProject(data)
+    const cfg = data.jira_config ?? {}
+    setJiraForm({ base_url: cfg.base_url ?? '', email: cfg.email ?? '', api_token: cfg.api_token ?? '', project_key: cfg.project_key ?? '' })
     setName(data.name); setStatus(data.status); setStartDate(data.start_date || '')
     setDescription(data.description || ''); setDeadline(data.deadline || '')
     setRenewalDate(data.renewal_date || ''); setSlaStatus(data.sla_status || 'ok')
@@ -176,6 +182,73 @@ export default function ProjectDetail() {
         const notifyId = assigneeId || user.id
         await notify({ userId: notifyId, type: 'task_completed', projectId: id, taskId, message: `Tarea completada: "${task?.title}"` })
       }
+      if (task?.jira_issue_key && project?.jira_config?.base_url) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/jira-proxy`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+            body: JSON.stringify({ project_id: id, action: 'push_transition', issue_key: task.jira_issue_key, target_status: newStatus }),
+          }).catch(() => {})
+        })
+      }
+    }
+  }
+
+  async function saveJiraConfig() {
+    setJiraSaving(true)
+    const { error } = await supabase.from('projects').update({ jira_config: jiraForm }).eq('id', id)
+    if (error) { toast.error('Error al guardar') } else {
+      setProject(p => ({ ...p, jira_config: jiraForm }))
+      toast.success('Jira conectado')
+    }
+    setJiraSaving(false)
+  }
+
+  async function syncFromJira() {
+    setJiraSyncing(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/jira-proxy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ project_id: id, action: 'fetch_issues' }),
+      })
+      const data = await resp.json()
+      if (!resp.ok) throw new Error(data.error || 'Error Jira')
+      const issues = data.issues || []
+
+      const { data: existingTasks } = await supabase.from('tasks').select('id, jira_issue_key, status').eq('project_id', id)
+      const byKey = Object.fromEntries((existingTasks || []).filter(t => t.jira_issue_key).map(t => [t.jira_issue_key, t]))
+
+      let created = 0, updated = 0
+      for (const issue of issues) {
+        const key = issue.key
+        const cat = issue.fields.status?.statusCategory?.name
+        const status = cat === 'Done' ? 'done' : cat === 'In Progress' ? 'in_progress' : 'todo'
+        const pName = (issue.fields.priority?.name ?? 'medium').toLowerCase()
+        const priority = pName.includes('high') ? 'high' : pName.includes('low') ? 'low' : 'medium'
+        const jira_issue_url = `${project.jira_config?.base_url}/browse/${key}`
+
+        if (byKey[key]) {
+          if (byKey[key].status !== status) {
+            await supabase.from('tasks').update({ status, jira_issue_url }).eq('id', byKey[key].id)
+            updated++
+          }
+        } else {
+          await supabase.from('tasks').insert({
+            project_id: id, user_id: user.id,
+            title: issue.fields.summary, status, priority,
+            jira_issue_key: key, jira_issue_url,
+          })
+          created++
+        }
+      }
+      await fetchTasks()
+      toast.success(`${created} importadas · ${updated} actualizadas`)
+    } catch (err) {
+      toast.error(err.message || 'Error al sincronizar con Jira')
+    } finally {
+      setJiraSyncing(false)
     }
   }
 
@@ -471,6 +544,20 @@ export default function ProjectDetail() {
                     <LayoutGrid className="w-3.5 h-3.5" />
                   </button>
                 </div>
+                {project?.jira_config?.base_url && (
+                  <button
+                    onClick={syncFromJira}
+                    disabled={jiraSyncing}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm transition-all"
+                    style={{ backgroundColor: '#1a1a1a', color: jiraSyncing ? '#ff9f0a' : '#6e6e73', border: '1px solid rgba(255,255,255,0.08)', cursor: jiraSyncing ? 'default' : 'pointer' }}
+                    onMouseEnter={e => { if (!jiraSyncing) { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' } }}
+                    onMouseLeave={e => { if (!jiraSyncing) { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' } }}
+                    title="Sincronizar con Jira"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${jiraSyncing ? 'animate-spin' : ''}`} />
+                    {jiraSyncing ? 'Sync…' : 'Sync Jira'}
+                  </button>
+                )}
                 <button onClick={() => openAddTask('todo')}
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all"
                   style={{ backgroundColor: '#f5f5f7', color: '#000000' }}
@@ -681,6 +768,64 @@ export default function ProjectDetail() {
                       </button>
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Jira */}
+            <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <button
+                onClick={() => setShowJiraConfig(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 transition-all"
+                style={{ borderBottom: showJiraConfig ? '1px solid rgba(255,255,255,0.06)' : 'none' }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <span className="flex items-center gap-2">
+                  <Link2 className="w-3.5 h-3.5" style={{ color: '#6e6e73' }} />
+                  <span className="text-xs font-semibold" style={{ color: '#6e6e73' }}>Jira</span>
+                  {project?.jira_config?.base_url && (
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#30d158' }} />
+                  )}
+                </span>
+                {showJiraConfig
+                  ? <ChevronUp className="w-3.5 h-3.5" style={{ color: '#6e6e73' }} />
+                  : <ChevronDown className="w-3.5 h-3.5" style={{ color: '#6e6e73' }} />
+                }
+              </button>
+              {showJiraConfig && (
+                <div className="px-4 pb-4 pt-3 space-y-2.5">
+                  {[
+                    { key: 'base_url', label: 'URL de Jira', placeholder: 'https://empresa.atlassian.net' },
+                    { key: 'email', label: 'Email', placeholder: 'tu@empresa.com' },
+                    { key: 'api_token', label: 'API Token', placeholder: 'Token de Jira', type: 'password' },
+                    { key: 'project_key', label: 'Clave del proyecto', placeholder: 'PROJ' },
+                  ].map(({ key, label, placeholder, type }) => (
+                    <div key={key}>
+                      <label className="block text-xs font-medium mb-1" style={{ color: '#6e6e73' }}>{label}</label>
+                      <input
+                        type={type || 'text'}
+                        value={jiraForm[key]}
+                        onChange={e => setJiraForm(f => ({ ...f, [key]: e.target.value }))}
+                        placeholder={placeholder}
+                        style={inputStyle}
+                        onFocus={fi} onBlur={fo}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    onClick={saveJiraConfig}
+                    disabled={jiraSaving || !jiraForm.base_url || !jiraForm.email || !jiraForm.api_token || !jiraForm.project_key}
+                    className="w-full flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-xl font-semibold transition-all mt-1"
+                    style={{
+                      backgroundColor: jiraSaving ? 'rgba(245,245,247,0.1)' : '#f5f5f7',
+                      color: jiraSaving ? '#6e6e73' : '#000',
+                      cursor: jiraSaving ? 'default' : 'pointer',
+                    }}
+                  >
+                    {jiraSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                    Guardar conexión
+                  </button>
                 </div>
               )}
             </div>
