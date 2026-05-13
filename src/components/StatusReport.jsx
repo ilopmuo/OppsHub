@@ -2175,8 +2175,9 @@ function buildPresentationHtml(slides) {
   const inlineStyles = Array.from(document.querySelectorAll('style'))
     .map(s => `<style>${s.textContent}</style>`)
     .join('\n')
+  // Wrap each slide content in .pres-inner so we can scale just the content
   const slidesHTML = slides.map(el =>
-    `<div class="pres-slide">${el.innerHTML}</div>`
+    `<div class="pres-slide"><div class="pres-inner">${el.innerHTML}</div></div>`
   ).join('\n')
   return `<!DOCTYPE html>
 <html>
@@ -2195,14 +2196,19 @@ ${inlineStyles}
   .sr-no-print { display: none !important; }
   .pres-slide {
     width: 297mm;
-    min-height: 210mm;
+    height: 210mm;
     background-color: #111111;
-    padding: 36px 56px;
-    box-sizing: border-box;
+    overflow: hidden;
     page-break-after: always;
     break-after: page;
+    position: relative;
   }
   .pres-slide:last-child { page-break-after: auto; break-after: auto; }
+  .pres-inner {
+    padding: 36px 56px;
+    box-sizing: border-box;
+    transform-origin: top left;
+  }
 </style>
 </head>
 <body>${slidesHTML}</body>
@@ -2223,13 +2229,13 @@ export default function StatusReport({ project: initialProject, members, tasks }
 
     const html = buildPresentationHtml(slides)
 
-    // Use a hidden iframe — no popup permission needed
     const existing = document.getElementById('sr-print-frame')
     if (existing) existing.remove()
 
     const frame = document.createElement('iframe')
     frame.id = 'sr-print-frame'
-    frame.style.cssText = 'position:fixed;inset:0;width:1px;height:1px;border:none;opacity:0;pointer-events:none;'
+    // Full-size but invisible — needed for accurate scrollHeight measurements
+    frame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:none;visibility:hidden;pointer-events:none;z-index:-1;'
     document.body.appendChild(frame)
 
     frame.contentDocument.write(html)
@@ -2238,10 +2244,26 @@ export default function StatusReport({ project: initialProject, members, tasks }
     const cleanup = () => { if (document.body.contains(frame)) document.body.removeChild(frame) }
 
     setTimeout(() => {
+      const fDoc = frame.contentDocument
+
+      // Scale down slides whose content exceeds the page height
+      fDoc.querySelectorAll('.pres-slide').forEach(slide => {
+        const inner = slide.querySelector('.pres-inner')
+        if (!inner) return
+        const slideH = slide.offsetHeight   // 210mm in px
+        const innerH = inner.scrollHeight   // actual content height
+        if (innerH > slideH) {
+          const scale = slideH / innerH
+          inner.style.transform = `scale(${scale})`
+          // Compensate width so content fills slide horizontally after scale
+          inner.style.width = `${(100 / scale).toFixed(3)}%`
+        }
+      })
+
       frame.contentWindow.focus()
       frame.contentWindow.print()
       frame.contentWindow.addEventListener('afterprint', cleanup, { once: true })
-      setTimeout(cleanup, 60000) // fallback cleanup
+      setTimeout(cleanup, 60000)
     }, 700)
   }
 
