@@ -2168,7 +2168,7 @@ if (typeof document !== 'undefined' && !document.getElementById(CSAT_STYLE_ID)) 
   document.head.appendChild(s)
 }
 
-function buildPresentationWindow(slides) {
+function buildPresentationHtml(slides) {
   const styleLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
     .map(l => `<link rel="stylesheet" href="${l.href}">`)
     .join('\n')
@@ -2178,10 +2178,7 @@ function buildPresentationWindow(slides) {
   const slidesHTML = slides.map(el =>
     `<div class="pres-slide">${el.innerHTML}</div>`
   ).join('\n')
-
-  const win = window.open('', '_blank', 'width=1280,height=800')
-  if (!win) return null
-  win.document.write(`<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -2195,7 +2192,7 @@ ${inlineStyles}
     box-sizing: border-box;
   }
   html, body { margin: 0; padding: 0; background: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; }
-  .sr-no-print, [contenteditable] + button { display: none !important; }
+  .sr-no-print { display: none !important; }
   .pres-slide {
     width: 297mm;
     height: 210mm;
@@ -2211,9 +2208,7 @@ ${inlineStyles}
 </style>
 </head>
 <body>${slidesHTML}</body>
-</html>`)
-  win.document.close()
-  return win
+</html>`
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -2224,14 +2219,32 @@ export default function StatusReport({ project: initialProject, members, tasks }
   useEffect(() => { setProject(initialProject) }, [initialProject])
 
   // ── Presentation export ───────────────────────────────────────
-  const [presentationMode, setPresentationMode] = useState(false)
-
   function exportPresentation() {
     const slides = Array.from(document.querySelectorAll('.sr-slide:not(.sr-gantt-slide)'))
     if (!slides.length) { toast.error('Sin secciones para exportar'); return }
-    const win = buildPresentationWindow(slides)
-    if (!win) { toast.error('Permite ventanas emergentes para exportar'); return }
-    setTimeout(() => { try { win.print() } catch (_) {} }, 700)
+
+    const html = buildPresentationHtml(slides)
+
+    // Use a hidden iframe — no popup permission needed
+    const existing = document.getElementById('sr-print-frame')
+    if (existing) existing.remove()
+
+    const frame = document.createElement('iframe')
+    frame.id = 'sr-print-frame'
+    frame.style.cssText = 'position:fixed;inset:0;width:1px;height:1px;border:none;opacity:0;pointer-events:none;'
+    document.body.appendChild(frame)
+
+    frame.contentDocument.write(html)
+    frame.contentDocument.close()
+
+    const cleanup = () => { if (document.body.contains(frame)) document.body.removeChild(frame) }
+
+    setTimeout(() => {
+      frame.contentWindow.focus()
+      frame.contentWindow.print()
+      frame.contentWindow.addEventListener('afterprint', cleanup, { once: true })
+      setTimeout(cleanup, 60000) // fallback cleanup
+    }, 700)
   }
 
   // ── Version management ────────────────────────────────────────
