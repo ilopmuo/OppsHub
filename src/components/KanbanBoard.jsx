@@ -43,12 +43,14 @@ function CardContent({ task, isOverlay = false, onDelete, onClickTask, wasDraggi
       {...dragAttributes}
       {...dragListeners}
       onClick={() => { if (!isOverlay && !wasDraggingRef?.current) onClickTask?.(task) }}
-      className="group rounded-xl p-3.5 select-none"
+      className="group rounded-xl p-3.5 pl-3 select-none"
       style={{
         opacity: isDragging ? 0.35 : 1,
         cursor: isOverlay ? 'grabbing' : 'grab',
         backgroundColor: isOverlay ? '#222' : '#1a1a1a',
         border: `1px solid ${isOverlay ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.07)'}`,
+        borderLeftWidth: 3,
+        borderLeftColor: p.color,
         boxShadow: isOverlay ? '0 12px 40px rgba(0,0,0,0.6)' : 'none',
         touchAction: 'none',
       }}
@@ -148,8 +150,10 @@ function KanbanColumn({ column, tasks, onDelete, onAddTask, onClickTask, wasDrag
       {/* Column header */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: column.color }} />
-          <span className="text-sm font-medium" style={{ color: '#f5f5f7' }}>{column.label}</span>
+          <span className="text-xs font-semibold px-2 py-0.5 rounded-md"
+            style={{ backgroundColor: `${column.color}22`, color: column.color, border: `1px solid ${column.color}44` }}>
+            {column.label}
+          </span>
           <span className="text-xs px-1.5 py-0.5 rounded-full"
             style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73' }}>
             {tasks.length}
@@ -186,10 +190,16 @@ function KanbanColumn({ column, tasks, onDelete, onAddTask, onClickTask, wasDrag
         </SortableContext>
 
         {isEmpty && (
-          <div className="h-full flex items-center justify-center py-8">
-            <p className="text-xs transition-colors" style={{ color: isDraggingAny ? (isOver ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)') : '#3a3a3a' }}>
-              {isDraggingAny ? 'Soltar aquí' : 'Sin tareas'}
-            </p>
+          <div className="h-full flex flex-col items-center justify-center py-8 gap-2">
+            {isDraggingAny
+              ? <p className="text-xs" style={{ color: isOver ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)' }}>Soltar aquí</p>
+              : <>
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${column.color}18`, border: `1px dashed ${column.color}44` }}>
+                    <Plus className="w-3 h-3" style={{ color: column.color, opacity: 0.5 }} />
+                  </div>
+                  <p className="text-xs" style={{ color: '#2a2a2a' }}>Sin tareas</p>
+                </>
+            }
           </div>
         )}
       </div>

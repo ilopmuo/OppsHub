@@ -177,10 +177,11 @@ export default function Dashboard() {
 
         <div className="flex items-end justify-between mb-10">
           <div>
-            <p className="text-xs font-medium uppercase tracking-widest mb-2" style={{ color: '#3a3a3a' }}>
-              Dashboard
+            <p className="text-xs font-medium uppercase tracking-widest mb-2" style={{ color: '#3a3a3a', letterSpacing: '0.12em' }}>
+              OppsHub
             </p>
-            <h1 className="text-4xl font-bold tracking-tight mb-3" style={{ color: '#f5f5f7', letterSpacing: '-0.02em' }}>
+            <h1 className="text-4xl font-bold mb-3"
+              style={{ letterSpacing: '-0.03em', background: 'linear-gradient(135deg, #f5f5f7 30%, #6e6e73 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
               Proyectos
             </h1>
             {projects.length > 0 && (

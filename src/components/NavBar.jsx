@@ -139,10 +139,12 @@ export default function NavBar({ breadcrumb }) {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all"
                 style={{
                   color: active ? '#f5f5f7' : '#6e6e73',
-                  backgroundColor: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  backgroundColor: active ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  fontWeight: active ? 600 : 400,
+                  boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,0.1)' : 'none',
                 }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.color = '#f5f5f7' }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.color = '#6e6e73' }}
+                onMouseEnter={e => { if (!active) { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)' } }}
+                onMouseLeave={e => { if (!active) { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'transparent' } }}
               >
                 {icon}
                 {t(`nav.${key}`)}
