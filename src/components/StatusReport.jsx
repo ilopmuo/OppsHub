@@ -2169,46 +2169,52 @@ if (typeof document !== 'undefined' && !document.getElementById(CSAT_STYLE_ID)) 
 }
 
 function buildPresentationHtml(slides) {
-  const styleLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
-    .map(l => `<link rel="stylesheet" href="${l.href}">`)
-    .join('\n')
-  const inlineStyles = Array.from(document.querySelectorAll('style'))
-    .map(s => `<style>${s.textContent}</style>`)
-    .join('\n')
-  // Wrap each slide content in .pres-inner so we can scale just the content
+  // Inline all CSS rules — eliminates async stylesheet loading race
+  let allCSS = ''
+  Array.from(document.styleSheets).forEach(sheet => {
+    try { Array.from(sheet.cssRules).forEach(r => { allCSS += r.cssText + '\n' }) } catch (_) {}
+  })
+
   const slidesHTML = slides.map(el =>
     `<div class="pres-slide"><div class="pres-inner">${el.innerHTML}</div></div>`
   ).join('\n')
+
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-${styleLinks}
-${inlineStyles}
 <style>
-  @page { size: A4 landscape; margin: 0; }
-  *, *::before, *::after {
-    print-color-adjust: exact !important;
-    -webkit-print-color-adjust: exact !important;
-    box-sizing: border-box;
-  }
-  html, body { margin: 0; padding: 0; background: #111111; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; }
-  .sr-no-print { display: none !important; }
-  .pres-slide {
-    width: 297mm;
-    height: 210mm;
-    background-color: #111111;
-    overflow: hidden;
-    page-break-after: always;
-    break-after: page;
-    position: relative;
-  }
-  .pres-slide:last-child { page-break-after: auto; break-after: auto; }
-  .pres-inner {
-    padding: 36px 56px;
-    box-sizing: border-box;
-    transform-origin: top left;
-  }
+${allCSS}
+@page { size: A4 landscape; margin: 0; }
+*, *::before, *::after {
+  print-color-adjust: exact !important;
+  -webkit-print-color-adjust: exact !important;
+  box-sizing: border-box;
+}
+html, body { margin: 0; padding: 0; background: #111111;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; }
+.sr-no-print { display: none !important; }
+/* pres-slide: fixed page dimensions, clips anything that overflows */
+.pres-slide {
+  position: relative !important;
+  width: 297mm !important;
+  height: 210mm !important;
+  background-color: #111111 !important;
+  overflow: hidden !important;
+  page-break-after: always !important;
+  break-after: page !important;
+}
+.pres-slide:last-child { page-break-after: auto !important; break-after: auto !important; }
+/* pres-inner: absolute so its offsetHeight = true content height,
+   unaffected by the parent's 210mm constraint.
+   transform: scale() is applied in JS before printing. */
+.pres-inner {
+  position: absolute !important;
+  top: 0 !important; left: 0 !important; right: 0 !important;
+  padding: 36px 56px !important;
+  box-sizing: border-box !important;
+  transform-origin: top center !important;
+}
 </style>
 </head>
 <body>${slidesHTML}</body>
@@ -2246,17 +2252,15 @@ export default function StatusReport({ project: initialProject, members, tasks }
     setTimeout(() => {
       const fDoc = frame.contentDocument
 
-      // Scale down slides whose content exceeds the page height
       fDoc.querySelectorAll('.pres-slide').forEach(slide => {
         const inner = slide.querySelector('.pres-inner')
         if (!inner) return
-        const slideH = slide.offsetHeight   // 210mm in px
-        const innerH = inner.scrollHeight   // actual content height
-        if (innerH > slideH) {
-          const scale = slideH / innerH
-          inner.style.transform = `scale(${scale})`
-          // Compensate width so content fills slide horizontally after scale
-          inner.style.width = `${(100 / scale).toFixed(3)}%`
+        // offsetHeight on absolute-positioned element = true content height,
+        // independent of parent's 210mm. No reflow when we apply transform.
+        const slideH = slide.offsetHeight
+        const innerH = inner.offsetHeight
+        if (innerH > slideH && innerH > 0) {
+          inner.style.transform = `scale(${(slideH / innerH).toFixed(4)})`
         }
       })
 
