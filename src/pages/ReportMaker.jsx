@@ -341,12 +341,18 @@ function VelocityViz({ data }) {
 }
 
 function ProjectStatusViz({ data }) {
-  const { status = 'En marcha', milestones = [] } = data
+  const { status = 'En marcha', milestones = [], has_migration } = data
   const sColor = status === 'En marcha' ? '#30d158' : status === 'En riesgo' ? '#ff9f0a' : '#ff453a'
   const total  = milestones.length > 0
     ? Math.round(milestones.reduce((a, m) => a + (m.pct || 0), 0) / milestones.length)
     : 0
   const msColor = s => s === 'Completado' ? '#30d158' : s === 'En marcha' ? '#64d2ff' : s === 'En riesgo' ? '#ff9f0a' : s === 'Retrasado' ? '#ff453a' : '#3a3a3a'
+
+  const migTotal = data.migr_total || 0
+  const migDone  = Math.min(data.migr_done || 0, migTotal)
+  const migProg  = Math.min(data.migr_in_progress || 0, migTotal - migDone)
+  const migBlock = Math.min(data.migr_blocked || 0, migTotal - migDone - migProg)
+  const migPct   = migTotal > 0 ? Math.round(migDone / migTotal * 100) : 0
 
   return (
     <div>
@@ -383,6 +389,43 @@ function ProjectStatusViz({ data }) {
           </div>
         </div>
       ))}
+
+      {has_migration && (
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', marginTop: 12, paddingTop: 12 }}>
+          <p style={SEC}>Migración</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10 }}>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <svg width="60" height="60">
+                <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="7" />
+                {migTotal > 0 && (
+                  <circle cx="30" cy="30" r="24" fill="none"
+                    stroke="#5e5ce6" strokeWidth="7"
+                    strokeDasharray={`${migPct / 100 * 2 * Math.PI * 24} ${2 * Math.PI * 24}`}
+                    strokeDashoffset={2 * Math.PI * 24 * 0.25}
+                    strokeLinecap="round"
+                  />
+                )}
+                <text x="30" y="33" textAnchor="middle" fontSize="12" fontWeight="800" fill="#f5f5f7">{migPct}%</text>
+              </svg>
+            </div>
+            <div style={{ flex: 1 }}>
+              {[
+                { label: 'Migrados',     val: migDone,  color: '#30d158' },
+                { label: 'En progreso',  val: migProg,  color: '#ff9f0a' },
+                { label: 'Bloqueados',   val: migBlock, color: '#ff453a' },
+              ].map(({ label, val, color }) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <div style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: '#6e6e73' }}>{label}</span>
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#f5f5f7' }}>{val}<span style={{ fontSize: 9, color: '#3a3a3a', fontWeight: 400, marginLeft: 2 }}>/ {migTotal}</span></span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -578,6 +621,36 @@ function ProjectStatusForm({ data, onChange }) {
           </button>
         </div>
       ))}
+
+      {/* Migration toggle */}
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 16, marginBottom: data.has_migration ? 12 : 0 }}>
+        <input
+          type="checkbox"
+          checked={!!data.has_migration}
+          onChange={e => set('has_migration', e.target.checked)}
+          style={{ accentColor: '#5e5ce6', width: 14, height: 14, cursor: 'pointer' }}
+        />
+        <span style={{ fontSize: 12, color: '#6e6e73', fontWeight: 500 }}>Incluir sección de migración</span>
+      </label>
+
+      {data.has_migration && (
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 14 }}>
+          <p style={SEC}>Migración</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+            {[
+              ['migr_total',       'Total ítems'],
+              ['migr_done',        'Migrados'],
+              ['migr_in_progress', 'En progreso'],
+              ['migr_blocked',     'Bloqueados'],
+            ].map(([k, l]) => (
+              <div key={k}>
+                <label style={LABEL}>{l}</label>
+                <input style={INPUT} type="number" min="0" value={data[k] || ''} onChange={e => set(k, +e.target.value)} placeholder="0" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
