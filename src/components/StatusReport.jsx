@@ -7,7 +7,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, PieChart, Pie, Cell,
 } from 'recharts'
-import { Pencil, ChevronDown, ChevronUp, Save, Clock, GalleryHorizontal, MessageSquare, Zap } from 'lucide-react'
+import { Pencil, ChevronDown, ChevronUp, Save, Clock, GalleryHorizontal, MessageSquare, Zap, Plus, Trash2 } from 'lucide-react'
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const CARD = {
@@ -133,6 +133,8 @@ const SR = {
     tasksClosedMonth: 'Tareas cerradas este mes', bugsClosedMonth: 'Bugs cerrados este mes',
     workDistribution: 'Distribución del trabajo por mes', tasksClosed: 'Tareas cerradas', bugsClosed: 'Bugs cerrados',
     spCommitted: 'SP comprometidos', spCompleted: 'SP completados', spRate: 'Tasa de completado',
+    otherDeliverables: 'Otras entregas', addDeliverable: 'Añadir entrega', deliverablePlaceholder: 'Nombre de la entrega…',
+    statusPending: 'Pendiente', statusInProgress: 'En progreso', statusDone: 'Hecho',
     // section 05
     noFinancialData: 'Sin datos financieros. Configúralos en la pestaña Recursos & Finanzas.',
     budget: 'Presupuesto', etdCost: 'Coste ETD', billed: 'Facturado', currentMargin: 'Margen actual',
@@ -194,6 +196,8 @@ const SR = {
     tasksClosedMonth: 'Tasks closed this month', bugsClosedMonth: 'Bugs closed this month',
     workDistribution: 'Monthly work distribution', tasksClosed: 'Tasks closed', bugsClosed: 'Bugs closed',
     spCommitted: 'SP committed', spCompleted: 'SP completed', spRate: 'Completion rate',
+    otherDeliverables: 'Other deliverables', addDeliverable: 'Add deliverable', deliverablePlaceholder: 'Deliverable name…',
+    statusPending: 'Pending', statusInProgress: 'In progress', statusDone: 'Done',
     // section 05
     noFinancialData: 'No financial data. Configure it in the Resources & Finances tab.',
     budget: 'Budget', etdCost: 'ETD Cost', billed: 'Billed', currentMargin: 'Current margin',
@@ -963,6 +967,10 @@ function DeliveringValueSection({ projectId, lang = 'es' }) {
   const [showAllPhases, setShowAllPhases] = useState(false)
   const PHASES_VISIBLE = 4
 
+  const [deliverables, setDeliverables] = useState([])
+  const [addingDeliverable, setAddingDeliverable] = useState(false)
+  const [newDelivName, setNewDelivName] = useState('')
+
   useEffect(() => {
     async function load() {
       const { data: plans } = await supabase
@@ -979,9 +987,45 @@ function DeliveringValueSection({ projectId, lang = 'es' }) {
       }
     }
     load()
+    supabase.from('project_deliverables').select('*')
+      .eq('project_id', projectId).order('created_at')
+      .then(({ data }) => setDeliverables(data ?? []))
   }, [projectId])
 
+  async function addDeliverable() {
+    const name = newDelivName.trim()
+    if (!name) return
+    const { data, error } = await supabase.from('project_deliverables')
+      .insert({ project_id: projectId, name, status: 'pending' })
+      .select().single()
+    if (error) { toast.error('Error al guardar'); return }
+    setDeliverables(prev => [...prev, data])
+    setNewDelivName('')
+    setAddingDeliverable(false)
+  }
+
+  async function cycleStatus(deliv) {
+    const next = deliv.status === 'pending' ? 'in_progress' : deliv.status === 'in_progress' ? 'done' : 'pending'
+    const { error } = await supabase.from('project_deliverables')
+      .update({ status: next }).eq('id', deliv.id)
+    if (error) { toast.error('Error al guardar'); return }
+    setDeliverables(prev => prev.map(d => d.id === deliv.id ? { ...d, status: next } : d))
+  }
+
+  async function deleteDeliverable(id) {
+    const { error } = await supabase.from('project_deliverables').delete().eq('id', id)
+    if (error) { toast.error('Error al eliminar'); return }
+    setDeliverables(prev => prev.filter(d => d.id !== id))
+  }
+
   const t = SR[lang] ?? SR.es
+
+  function delivStatusMeta(status) {
+    if (status === 'done')        return { color: '#30d158', label: t.statusDone }
+    if (status === 'in_progress') return { color: '#64d2ff', label: t.statusInProgress }
+    return                               { color: '#3a3a3a', label: t.statusPending }
+  }
+
   // Derived plan stats
   const phasesWithMetrics = phases.map(p => ({ ...p, metrics: phaseMetrics(p, lang) }))
   const activePhase     = phasesWithMetrics.find(p => p.metrics.isActive)
@@ -1130,6 +1174,68 @@ function DeliveringValueSection({ projectId, lang = 'es' }) {
           )}
         </div>
       </>)}
+
+      {/* Other deliverables */}
+      <div style={{ ...CARD, marginBottom: 16 }}>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-medium" style={{ color: '#6e6e73' }}>{t.otherDeliverables}</p>
+          <button
+            onClick={() => setAddingDeliverable(true)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6e6e73', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: 0, fontFamily: 'inherit' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#f5f5f7'}
+            onMouseLeave={e => e.currentTarget.style.color = '#6e6e73'}
+          >
+            <Plus size={12} /> {t.addDeliverable}
+          </button>
+        </div>
+
+        {deliverables.length === 0 && !addingDeliverable && (
+          <p className="text-xs" style={{ color: '#3a3a3a' }}>—</p>
+        )}
+
+        <div className="flex flex-col gap-2">
+          {deliverables.map(d => {
+            const meta = delivStatusMeta(d.status)
+            return (
+              <div key={d.id} className="flex items-center justify-between gap-3 group">
+                <span className="text-sm flex-1" style={{ color: '#f5f5f7' }}>{d.name}</span>
+                <button
+                  onClick={() => cycleStatus(d)}
+                  style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, border: `1px solid ${meta.color}30`, backgroundColor: `${meta.color}14`, color: meta.color, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+                >{meta.label}</button>
+                <button
+                  onClick={() => deleteDeliverable(d.id)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3a3a3a', display: 'flex', opacity: 0, transition: 'opacity 0.15s', padding: 0 }}
+                  className="group-hover:!opacity-100"
+                  onMouseEnter={e => e.currentTarget.style.color = '#ff453a'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#3a3a3a'}
+                ><Trash2 size={12} /></button>
+              </div>
+            )
+          })}
+        </div>
+
+        {addingDeliverable && (
+          <div className="flex gap-2 mt-3">
+            <input
+              autoFocus
+              value={newDelivName}
+              onChange={e => setNewDelivName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addDeliverable(); if (e.key === 'Escape') { setAddingDeliverable(false); setNewDelivName('') } }}
+              placeholder={t.deliverablePlaceholder}
+              style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '6px 10px', fontSize: 12, color: '#f5f5f7', outline: 'none', fontFamily: 'inherit' }}
+            />
+            <button
+              onClick={addDeliverable}
+              style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#f5f5f7', color: '#000', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+            >OK</button>
+            <button
+              onClick={() => { setAddingDeliverable(false); setNewDelivName('') }}
+              style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#6e6e73', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+            >✕</button>
+          </div>
+        )}
+      </div>
 
       {/* Effort table + chart (global view) */}
       <EffortOverview projectId={projectId} lang={lang} />
@@ -1772,6 +1878,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
   const financial   = snapshot.financial ?? null
   const invoices    = snapshot.invoices ?? []
   const allocations    = snapshot.allocations ?? []
+  const snapDeliverables = snapshot.deliverables ?? []
   const snapComments   = proj.section_comments ?? {}
   const snapDate       = snapshot.date ?? new Date().toISOString().slice(0, 10)
 
@@ -2042,7 +2149,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                       <KpiCard label={t.phasesCompleted} value={`${completedPhases}/${phases.length}`} color="#f5f5f7" />
                       <KpiCard label={t.plannedHours} value={totalHoursSnap > 0 ? `${totalHoursSnap}h` : '—'} color="#64d2ff" />
                     </div>
-                    <div style={CARD}>
+                    <div style={{ ...CARD, marginBottom: 16 }}>
                       <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.allPhases}</p>
                       <div className="flex flex-col gap-4">
                         {phasesWithMet.map(phase => {
@@ -2074,6 +2181,26 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                         })}
                       </div>
                     </div>
+                    {snapDeliverables.length > 0 && (
+                      <div style={CARD}>
+                        <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.otherDeliverables}</p>
+                        <div className="flex flex-col gap-2">
+                          {snapDeliverables.map(d => {
+                            const meta = d.status === 'done'
+                              ? { color: '#30d158', label: t.statusDone }
+                              : d.status === 'in_progress'
+                              ? { color: '#64d2ff', label: t.statusInProgress }
+                              : { color: '#3a3a3a', label: t.statusPending }
+                            return (
+                              <div key={d.id} className="flex items-center justify-between gap-3">
+                                <span className="text-sm" style={{ color: '#f5f5f7' }}>{d.name}</span>
+                                <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, border: `1px solid ${meta.color}30`, backgroundColor: `${meta.color}14`, color: meta.color, whiteSpace: 'nowrap' }}>{meta.label}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </>
               }
             </div>
@@ -2373,6 +2500,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
         { data: effort },
         { data: financial },
         { data: invoices },
+        { data: deliverables },
       ] = await Promise.all([
         supabase.from('project_resources').select('*').eq('project_id', project.id),
         supabase.from('project_bug_stats').select('*').eq('project_id', project.id),
@@ -2381,6 +2509,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
         supabase.from('project_effort').select('*').eq('project_id', project.id),
         supabase.from('project_financials').select('*').eq('project_id', project.id).maybeSingle(),
         supabase.from('project_invoices').select('amount').eq('project_id', project.id),
+        supabase.from('project_deliverables').select('id, name, status').eq('project_id', project.id).order('created_at'),
       ])
       let snapPlan = null
       let phases = []
@@ -2415,6 +2544,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
         resources: resources ?? [], bug_stats: bugStats ?? [], plan: snapPlan, phases,
         team_kpis: teamKpis ?? [], effort: effort ?? [],
         financial: financial ?? null, invoices: invoices ?? [], allocations,
+        deliverables: deliverables ?? [],
       }
       const { data: saved, error } = await supabase.from('status_report_versions')
         .insert({ project_id: project.id, name: newVersionName.trim(), snapshot })
