@@ -775,22 +775,22 @@ function SystemStabilitySection({ projectId, lang = 'es' }) {
   return (
     <div className="mb-2">
       {/* Este mes — principal */}
-      <div style={{ ...CARD, padding: '20px 24px', marginBottom: 12 }}>
-        <p className="text-xs font-semibold mb-4" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.thisMonth}</p>
-        <div className="flex gap-8">
+      <div style={{ ...CARD, padding: '28px 32px', marginBottom: 12, background: 'rgba(255,255,255,0.04)' }}>
+        <p className="text-xs font-semibold mb-6" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t.thisMonth}</p>
+        <div className="flex gap-12">
           <div>
-            <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
-            <p style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: totalOpenThisMonth > 0 ? '#ff453a' : '#f5f5f7', letterSpacing: '-0.02em' }}>{totalOpenThisMonth}</p>
+            <p className="text-sm font-medium mb-2" style={{ color: '#ff453a' }}>{t.open}</p>
+            <p style={{ fontSize: 64, fontWeight: 800, lineHeight: 1, color: totalOpenThisMonth > 0 ? '#ff453a' : '#f5f5f7', letterSpacing: '-0.04em' }}>{totalOpenThisMonth}</p>
           </div>
           {SEP}
           <div>
-            <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
-            <p style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: totalInProgressThisMonth > 0 ? '#ff9f0a' : '#f5f5f7', letterSpacing: '-0.02em' }}>{totalInProgressThisMonth}</p>
+            <p className="text-sm font-medium mb-2" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
+            <p style={{ fontSize: 64, fontWeight: 800, lineHeight: 1, color: totalInProgressThisMonth > 0 ? '#ff9f0a' : '#f5f5f7', letterSpacing: '-0.04em' }}>{totalInProgressThisMonth}</p>
           </div>
           {SEP}
           <div>
-            <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
-            <p style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: '#30d158', letterSpacing: '-0.02em' }}>{totalClosedThisMonth}</p>
+            <p className="text-sm font-medium mb-2" style={{ color: '#30d158' }}>{t.closed}</p>
+            <p style={{ fontSize: 64, fontWeight: 800, lineHeight: 1, color: '#30d158', letterSpacing: '-0.04em' }}>{totalClosedThisMonth}</p>
           </div>
         </div>
       </div>
@@ -2059,22 +2059,22 @@ function SnapshotView({ snapshot, lang = 'es' }) {
           {sec.number === '02' && (
             <div className="mb-2">
               {/* Este mes — principal */}
-              <div style={{ ...CARD, padding: '20px 24px', marginBottom: 12 }}>
-                <p className="text-xs font-semibold mb-4" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.thisMonth}</p>
-                <div className="flex gap-8">
+              <div style={{ ...CARD, padding: '28px 32px', marginBottom: 12, background: 'rgba(255,255,255,0.04)' }}>
+                <p className="text-xs font-semibold mb-6" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t.thisMonth}</p>
+                <div className="flex gap-12">
                   <div>
-                    <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
-                    <p style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: (snapBugs?.open_count ?? 0) > 0 ? '#ff453a' : '#f5f5f7', letterSpacing: '-0.02em' }}>{snapBugs?.open_count ?? 0}</p>
+                    <p className="text-sm font-medium mb-2" style={{ color: '#ff453a' }}>{t.open}</p>
+                    <p style={{ fontSize: 64, fontWeight: 800, lineHeight: 1, color: (snapBugs?.open_count ?? 0) > 0 ? '#ff453a' : '#f5f5f7', letterSpacing: '-0.04em' }}>{snapBugs?.open_count ?? 0}</p>
                   </div>
                   <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
                   <div>
-                    <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
-                    <p style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: (snapBugs?.in_progress_count ?? 0) > 0 ? '#ff9f0a' : '#f5f5f7', letterSpacing: '-0.02em' }}>{snapBugs?.in_progress_count ?? 0}</p>
+                    <p className="text-sm font-medium mb-2" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
+                    <p style={{ fontSize: 64, fontWeight: 800, lineHeight: 1, color: (snapBugs?.in_progress_count ?? 0) > 0 ? '#ff9f0a' : '#f5f5f7', letterSpacing: '-0.04em' }}>{snapBugs?.in_progress_count ?? 0}</p>
                   </div>
                   <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
                   <div>
-                    <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
-                    <p style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: '#30d158', letterSpacing: '-0.02em' }}>{snapBugs?.closed_count ?? 0}</p>
+                    <p className="text-sm font-medium mb-2" style={{ color: '#30d158' }}>{t.closed}</p>
+                    <p style={{ fontSize: 64, fontWeight: 800, lineHeight: 1, color: '#30d158', letterSpacing: '-0.04em' }}>{snapBugs?.closed_count ?? 0}</p>
                   </div>
                 </div>
               </div>
