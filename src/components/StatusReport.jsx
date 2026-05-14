@@ -774,49 +774,49 @@ function SystemStabilitySection({ projectId, lang = 'es' }) {
 
   return (
     <div className="mb-2">
-      {/* KPIs — agrupados por período */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div style={{ ...CARD, padding: '16px 20px' }}>
-          <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.thisMonth}</p>
-          <div className="flex gap-5">
-            <div>
-              <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
-              <p className="text-2xl font-bold" style={{ color: totalOpenThisMonth > 0 ? '#ff453a' : '#f5f5f7' }}>{totalOpenThisMonth}</p>
-            </div>
-            {SEP}
-            <div>
-              <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
-              <p className="text-2xl font-bold" style={{ color: totalInProgressThisMonth > 0 ? '#ff9f0a' : '#f5f5f7' }}>{totalInProgressThisMonth}</p>
-            </div>
-            {SEP}
-            <div>
-              <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
-              <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{totalClosedThisMonth}</p>
-            </div>
+      {/* Este mes — principal */}
+      <div style={{ ...CARD, padding: '20px 24px', marginBottom: 12 }}>
+        <p className="text-xs font-semibold mb-4" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.thisMonth}</p>
+        <div className="flex gap-8">
+          <div>
+            <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
+            <p style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: totalOpenThisMonth > 0 ? '#ff453a' : '#f5f5f7', letterSpacing: '-0.02em' }}>{totalOpenThisMonth}</p>
+          </div>
+          {SEP}
+          <div>
+            <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
+            <p style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: totalInProgressThisMonth > 0 ? '#ff9f0a' : '#f5f5f7', letterSpacing: '-0.02em' }}>{totalInProgressThisMonth}</p>
+          </div>
+          {SEP}
+          <div>
+            <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
+            <p style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: '#30d158', letterSpacing: '-0.02em' }}>{totalClosedThisMonth}</p>
           </div>
         </div>
-        <div style={{ ...CARD, padding: '16px 20px' }}>
-          <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.thisYear}</p>
-          <div className="flex gap-5">
-            <div>
-              <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
-              <p className="text-2xl font-bold" style={{ color: totalOpenYear > 0 ? '#ff453a' : '#f5f5f7' }}>{totalOpenYear}</p>
-            </div>
-            {SEP}
-            <div>
-              <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
-              <p className="text-2xl font-bold" style={{ color: totalInProgressYear > 0 ? '#ff9f0a' : '#f5f5f7' }}>{totalInProgressYear}</p>
-            </div>
-            {SEP}
-            <div>
-              <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
-              <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{totalClosedYear}</p>
-            </div>
-            {SEP}
-            <div>
-              <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>{t.backlog}</p>
-              <p className="text-2xl font-bold" style={{ color: backlog > 0 ? '#ff453a' : '#30d158' }}>{Math.max(0, backlog)}</p>
-            </div>
+      </div>
+
+      {/* Este año — secundario */}
+      <div style={{ ...CARD, padding: '14px 20px', marginBottom: 16 }}>
+        <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.thisYear}</p>
+        <div className="flex gap-5">
+          <div>
+            <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
+            <p className="text-xl font-bold" style={{ color: totalOpenYear > 0 ? '#ff453a' : '#f5f5f7' }}>{totalOpenYear}</p>
+          </div>
+          {SEP}
+          <div>
+            <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
+            <p className="text-xl font-bold" style={{ color: totalInProgressYear > 0 ? '#ff9f0a' : '#f5f5f7' }}>{totalInProgressYear}</p>
+          </div>
+          {SEP}
+          <div>
+            <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
+            <p className="text-xl font-bold" style={{ color: '#30d158' }}>{totalClosedYear}</p>
+          </div>
+          {SEP}
+          <div>
+            <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>{t.backlog}</p>
+            <p className="text-xl font-bold" style={{ color: backlog > 0 ? '#ff453a' : '#30d158' }}>{Math.max(0, backlog)}</p>
           </div>
         </div>
       </div>
@@ -2058,48 +2058,48 @@ function SnapshotView({ snapshot, lang = 'es' }) {
 
           {sec.number === '02' && (
             <div className="mb-2">
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div style={{ ...CARD, padding: '16px 20px' }}>
-                  <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.thisMonth}</p>
-                  <div className="flex gap-5">
-                    <div>
-                      <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
-                      <p className="text-2xl font-bold" style={{ color: (snapBugs?.open_count ?? 0) > 0 ? '#ff453a' : '#f5f5f7' }}>{snapBugs?.open_count ?? 0}</p>
-                    </div>
-                    <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
-                    <div>
-                      <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
-                      <p className="text-2xl font-bold" style={{ color: (snapBugs?.in_progress_count ?? 0) > 0 ? '#ff9f0a' : '#f5f5f7' }}>{snapBugs?.in_progress_count ?? 0}</p>
-                    </div>
-                    <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
-                    <div>
-                      <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
-                      <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{snapBugs?.closed_count ?? 0}</p>
-                    </div>
+              {/* Este mes — principal */}
+              <div style={{ ...CARD, padding: '20px 24px', marginBottom: 12 }}>
+                <p className="text-xs font-semibold mb-4" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.thisMonth}</p>
+                <div className="flex gap-8">
+                  <div>
+                    <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
+                    <p style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: (snapBugs?.open_count ?? 0) > 0 ? '#ff453a' : '#f5f5f7', letterSpacing: '-0.02em' }}>{snapBugs?.open_count ?? 0}</p>
+                  </div>
+                  <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+                  <div>
+                    <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
+                    <p style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: (snapBugs?.in_progress_count ?? 0) > 0 ? '#ff9f0a' : '#f5f5f7', letterSpacing: '-0.02em' }}>{snapBugs?.in_progress_count ?? 0}</p>
+                  </div>
+                  <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+                  <div>
+                    <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
+                    <p style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: '#30d158', letterSpacing: '-0.02em' }}>{snapBugs?.closed_count ?? 0}</p>
                   </div>
                 </div>
-                <div style={{ ...CARD, padding: '16px 20px' }}>
-                  <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.totalAccumulated}</p>
-                  <div className="flex gap-5">
-                    <div>
-                      <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
-                      <p className="text-2xl font-bold" style={{ color: totalBugOpen > 0 ? '#ff453a' : '#f5f5f7' }}>{totalBugOpen}</p>
-                    </div>
-                    <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
-                    <div>
-                      <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
-                      <p className="text-2xl font-bold" style={{ color: totalBugInProgress > 0 ? '#ff9f0a' : '#f5f5f7' }}>{totalBugInProgress}</p>
-                    </div>
-                    <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
-                    <div>
-                      <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
-                      <p className="text-2xl font-bold" style={{ color: '#30d158' }}>{totalBugClosed}</p>
-                    </div>
-                    <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
-                    <div>
-                      <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>{t.backlog}</p>
-                      <p className="text-2xl font-bold" style={{ color: bugBacklog > 0 ? '#ff453a' : '#30d158' }}>{bugBacklog}</p>
-                    </div>
+              </div>
+              {/* Este año — secundario */}
+              <div style={{ ...CARD, padding: '14px 20px', marginBottom: 16 }}>
+                <p className="text-xs font-semibold mb-3" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.totalAccumulated}</p>
+                <div className="flex gap-5">
+                  <div>
+                    <p className="text-xs mb-1" style={{ color: '#ff453a' }}>{t.open}</p>
+                    <p className="text-xl font-bold" style={{ color: totalBugOpen > 0 ? '#ff453a' : '#f5f5f7' }}>{totalBugOpen}</p>
+                  </div>
+                  <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+                  <div>
+                    <p className="text-xs mb-1" style={{ color: '#ff9f0a' }}>{t.inProgress}</p>
+                    <p className="text-xl font-bold" style={{ color: totalBugInProgress > 0 ? '#ff9f0a' : '#f5f5f7' }}>{totalBugInProgress}</p>
+                  </div>
+                  <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+                  <div>
+                    <p className="text-xs mb-1" style={{ color: '#30d158' }}>{t.closed}</p>
+                    <p className="text-xl font-bold" style={{ color: '#30d158' }}>{totalBugClosed}</p>
+                  </div>
+                  <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+                  <div>
+                    <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>{t.backlog}</p>
+                    <p className="text-xl font-bold" style={{ color: bugBacklog > 0 ? '#ff453a' : '#30d158' }}>{bugBacklog}</p>
                   </div>
                 </div>
               </div>
