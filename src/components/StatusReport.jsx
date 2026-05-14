@@ -132,6 +132,7 @@ const SR = {
     // section 04
     tasksClosedMonth: 'Tareas cerradas este mes', bugsClosedMonth: 'Bugs cerrados este mes',
     workDistribution: 'Distribución del trabajo por mes', tasksClosed: 'Tareas cerradas', bugsClosed: 'Bugs cerrados',
+    spCommitted: 'SP comprometidos', spCompleted: 'SP completados', spRate: 'Tasa de completado',
     // section 05
     noFinancialData: 'Sin datos financieros. Configúralos en la pestaña Recursos & Finanzas.',
     budget: 'Presupuesto', etdCost: 'Coste ETD', billed: 'Facturado', currentMargin: 'Margen actual',
@@ -192,6 +193,7 @@ const SR = {
     // section 04
     tasksClosedMonth: 'Tasks closed this month', bugsClosedMonth: 'Bugs closed this month',
     workDistribution: 'Monthly work distribution', tasksClosed: 'Tasks closed', bugsClosed: 'Bugs closed',
+    spCommitted: 'SP committed', spCompleted: 'SP completed', spRate: 'Completion rate',
     // section 05
     noFinancialData: 'No financial data. Configure it in the Resources & Finances tab.',
     budget: 'Budget', etdCost: 'ETD Cost', billed: 'Billed', currentMargin: 'Current margin',
@@ -1376,13 +1378,15 @@ function TeamEffortMonth({ projectId, lang = 'es' }) {
 function getTeamKpiFields(lang) {
   const t = SR[lang] ?? SR.es
   return [
-    { key: 'tasks_closed', label: t.tasksClosedMonth, color: '#30d158' },
-    { key: 'bugs_closed',  label: t.bugsClosedMonth,  color: '#ff9f0a' },
-    { key: 'in_progress',  label: t.inProgress,       color: '#64d2ff' },
+    { key: 'tasks_closed',      label: t.tasksClosedMonth, color: '#30d158' },
+    { key: 'bugs_closed',       label: t.bugsClosedMonth,  color: '#ff9f0a' },
+    { key: 'in_progress',       label: t.inProgress,       color: '#64d2ff' },
+    { key: 'points_committed',  label: t.spCommitted,      color: '#bf5af2' },
+    { key: 'points_completed',  label: t.spCompleted,      color: '#5e5ce6' },
   ]
 }
 
-const EMPTY_KPIS = { tasks_closed: 0, bugs_closed: 0, in_progress: 0 }
+const EMPTY_KPIS = { tasks_closed: 0, bugs_closed: 0, in_progress: 0, points_committed: 0, points_completed: 0 }
 
 function TeamPerformanceSection({ projectId, lang = 'es' }) {
   const months    = lastNMonths(4)  // [3 months ago … this month]
@@ -1431,11 +1435,16 @@ function TeamPerformanceSection({ projectId, lang = 'es' }) {
     return data
   }
 
+  const spCommitted = currentKpis.points_committed ?? 0
+  const spCompleted = currentKpis.points_completed ?? 0
+  const spRate      = spCommitted > 0 ? Math.round(spCompleted / spCommitted * 100) : 0
+  const spColor     = spRate >= 80 ? '#30d158' : spRate >= 50 ? '#ff9f0a' : '#ff453a'
+
   return (
     <div className="mb-2">
       {/* Editable KPI cards — current month */}
       <div className="grid grid-cols-3 gap-4 mb-4">
-        {TEAM_KPI_FIELDS.map(f => (
+        {TEAM_KPI_FIELDS.slice(0, 3).map(f => (
           <div key={f.key} style={{ ...CARD, cursor: 'pointer' }}
             onClick={() => { setEditing(f.key); setDraft(String(currentKpis[f.key] ?? 0)) }}>
             <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>{f.label}</p>
@@ -1457,6 +1466,40 @@ function TeamPerformanceSection({ projectId, lang = 'es' }) {
             )}
           </div>
         ))}
+      </div>
+
+      {/* Story Points */}
+      <div style={{ ...CARD, marginBottom: 16 }}>
+        <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.spRate}</p>
+        <div className="grid grid-cols-3 gap-4 mb-3">
+          {TEAM_KPI_FIELDS.slice(3).map(f => (
+            <div key={f.key} style={{ cursor: 'pointer' }}
+              onClick={() => { setEditing(f.key); setDraft(String(currentKpis[f.key] ?? 0)) }}>
+              <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>{f.label}</p>
+              {editing === f.key ? (
+                <input
+                  autoFocus type="number" min="0"
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  onBlur={() => save(f.key, draft)}
+                  onKeyDown={e => { if (e.key === 'Enter') save(f.key, draft); if (e.key === 'Escape') setEditing(null) }}
+                  style={{ ...INPUT, fontSize: 22, fontWeight: 700, padding: '2px 0', backgroundColor: 'transparent',
+                           border: 'none', borderBottom: `1px solid ${f.color}`, borderRadius: 0, width: '100%', color: f.color }}
+                  onClick={e => e.stopPropagation()}
+                />
+              ) : (
+                <p className="text-2xl font-bold mt-1" style={{ color: f.color }}>{currentKpis[f.key] ?? 0}</p>
+              )}
+            </div>
+          ))}
+          <div>
+            <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>{t.spRate}</p>
+            <p className="text-2xl font-bold mt-1" style={{ color: spColor }}>{spCommitted > 0 ? `${spRate}%` : '—'}</p>
+          </div>
+        </div>
+        <div style={{ height: 4, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${Math.min(spRate, 100)}%`, borderRadius: 4, backgroundColor: spColor, opacity: 0.8, transition: 'width 0.5s' }} />
+        </div>
       </div>
 
       {/* Bar chart — distribución por mes */}
@@ -2043,6 +2086,25 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                 <KpiCard label={t.bugsClosedMonth}  value={currentKpis.bugs_closed  ?? 0} color="#ff9f0a" />
                 <KpiCard label={t.inProgress}        value={currentKpis.in_progress  ?? 0} color="#64d2ff" />
               </div>
+              {(() => {
+                const sc = currentKpis.points_committed ?? 0
+                const sd = currentKpis.points_completed ?? 0
+                const sr = sc > 0 ? Math.round(sd / sc * 100) : 0
+                const srColor = sr >= 80 ? '#30d158' : sr >= 50 ? '#ff9f0a' : '#ff453a'
+                return (
+                  <div style={{ ...CARD, marginBottom: 16 }}>
+                    <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.spRate}</p>
+                    <div className="grid grid-cols-3 gap-4 mb-3">
+                      <KpiCard label={t.spCommitted} value={sc} color="#bf5af2" />
+                      <KpiCard label={t.spCompleted} value={sd} color="#5e5ce6" />
+                      <KpiCard label={t.spRate} value={sc > 0 ? `${sr}%` : '—'} color={srColor} />
+                    </div>
+                    <div style={{ height: 4, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.min(sr, 100)}%`, borderRadius: 4, backgroundColor: srColor, opacity: 0.8 }} />
+                    </div>
+                  </div>
+                )
+              })()}
               <div style={CARD} className="mb-4">
                 <p className="text-xs font-medium mb-1" style={{ color: '#6e6e73' }}>{t.workDistribution}</p>
                 <div className="flex items-center gap-4 mb-4">
