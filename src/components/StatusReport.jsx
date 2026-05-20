@@ -2331,10 +2331,11 @@ function OpportunitiesSection({ project, onSave, lang = 'es' }) {
   const t = SR[lang] ?? SR.es
   const taStyle = {
     ...INPUT,
-    minHeight: 100,
+    minHeight: 160,
     resize: 'vertical',
     fontFamily: 'inherit',
-    lineHeight: 1.5,
+    fontSize: 14,
+    lineHeight: 1.6,
   }
 
   return (
@@ -3025,13 +3026,13 @@ function SnapshotView({ snapshot, lang = 'es' }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div style={CARD}>
                 <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>What are the new business opportunities?</p>
-                <p style={{ fontSize: 13, lineHeight: 1.6, color: proj.opportunities ? '#d1d1d6' : '#3a3a3a', fontStyle: proj.opportunities ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
+                <p style={{ fontSize: 14, lineHeight: 1.65, color: proj.opportunities ? '#d1d1d6' : '#3a3a3a', fontStyle: proj.opportunities ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
                   {proj.opportunities || (lang === 'en' ? 'No content' : 'Sin contenido')}
                 </p>
               </div>
               <div style={CARD}>
                 <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>What are the challenges?</p>
-                <p style={{ fontSize: 13, lineHeight: 1.6, color: proj.challenges ? '#d1d1d6' : '#3a3a3a', fontStyle: proj.challenges ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
+                <p style={{ fontSize: 14, lineHeight: 1.65, color: proj.challenges ? '#d1d1d6' : '#3a3a3a', fontStyle: proj.challenges ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
                   {proj.challenges || (lang === 'en' ? 'No content' : 'Sin contenido')}
                 </p>
               </div>
