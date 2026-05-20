@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { useLang } from '../contexts/LanguageContext'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip, PieChart, Pie, Cell,
+  CartesianGrid, Tooltip, PieChart, Pie, Cell, ReferenceLine,
 } from 'recharts'
 import { Pencil, ChevronDown, ChevronUp, Save, Clock, GalleryHorizontal, MessageSquare, Zap, Plus, Trash2 } from 'lucide-react'
 
@@ -135,7 +135,7 @@ const SR = {
     allPhases: 'Todas las fases', activeLabel: 'activa', showLess: 'Ver menos',
     showMorePhases: n => `Ver ${n} fase${n > 1 ? 's' : ''} más`,
     effortHoursLabel: 'Horas de esfuerzo del equipo por mes', clickToEdit: 'Haz click en una celda para editar',
-    effortEvolution: 'Evolución del esfuerzo (horas)', hoursBar: 'Horas',
+    effortEvolution: 'Evolución del esfuerzo (horas)', hoursBar: 'Horas', effortTarget: 'Objetivo mensual (h)',
     // section 04
     tasksClosedMonth: 'Tareas cerradas este mes', bugsClosedMonth: 'Bugs cerrados este mes',
     workDistribution: 'Distribución del trabajo por mes', tasksClosed: 'Tareas cerradas', bugsClosed: 'Bugs cerrados',
@@ -208,7 +208,7 @@ const SR = {
     allPhases: 'All phases', activeLabel: 'active', showLess: 'Show less',
     showMorePhases: n => `Show ${n} more phase${n > 1 ? 's' : ''}`,
     effortHoursLabel: 'Team effort hours per month', clickToEdit: 'Click a cell to edit',
-    effortEvolution: 'Effort evolution (hours)', hoursBar: 'Hours',
+    effortEvolution: 'Effort evolution (hours)', hoursBar: 'Hours', effortTarget: 'Monthly target (h)',
     // section 04
     tasksClosedMonth: 'Tasks closed this month', bugsClosedMonth: 'Bugs closed this month',
     workDistribution: 'Monthly work distribution', tasksClosed: 'Tasks closed', bugsClosed: 'Bugs closed',
@@ -1106,7 +1106,7 @@ function PlanGanttSection({ projectId }) {
   )
 }
 
-function DeliveringValueSection({ projectId, lang = 'es' }) {
+function DeliveringValueSection({ projectId, project, onSave, lang = 'es' }) {
   const [phases, setPhases] = useState([])
   const [hasPlan, setHasPlan] = useState(null)
   const [showAllPhases, setShowAllPhases] = useState(false)
@@ -1383,15 +1383,18 @@ function DeliveringValueSection({ projectId, lang = 'es' }) {
       </div>
 
       {/* Effort table + chart (global view) */}
-      <EffortOverview projectId={projectId} lang={lang} />
+      <EffortOverview projectId={projectId} project={project} onSave={onSave} lang={lang} />
     </div>
   )
 }
 
 // ── Effort Overview (monthly table + chart) — used in Global ─────────────────
-function EffortOverview({ projectId, lang = 'es' }) {
+function EffortOverview({ projectId, project, onSave, lang = 'es' }) {
   const [effort, setEffort] = useState([])
   const [editingEffort, setEditingEffort] = useState({})
+  const [target, setTarget] = useState(project?.effort_target_hours ?? null)
+  const [editingTarget, setEditingTarget] = useState(false)
+  const [targetBuf, setTargetBuf] = useState('')
   const months = lastNMonths(4)
   const thisMonth = isoMonth()
 
@@ -1399,6 +1402,15 @@ function EffortOverview({ projectId, lang = 'es' }) {
     supabase.from('project_effort').select('*').eq('project_id', projectId)
       .then(({ data }) => setEffort(data ?? []))
   }, [projectId])
+
+  async function saveTarget() {
+    const val = targetBuf === '' ? null : parseFloat(targetBuf)
+    if (targetBuf !== '' && (isNaN(val) || val < 0)) { toast.error('Valor inválido'); return }
+    setTarget(val)
+    setEditingTarget(false)
+    await supabase.from('projects').update({ effort_target_hours: val }).eq('id', projectId)
+    onSave?.({ effort_target_hours: val })
+  }
 
   async function saveEffort(monthYear, hours) {
     const val = parseFloat(hours)
@@ -1471,7 +1483,45 @@ function EffortOverview({ projectId, lang = 'es' }) {
       </div>
     </div>
     <div style={CARD}>
-      <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.effortEvolution}</p>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs font-medium" style={{ color: '#6e6e73' }}>{t.effortEvolution}</p>
+        <div className="flex items-center gap-2">
+          {target != null && !editingTarget && (
+            <span className="text-xs" style={{ color: '#ff9f0a' }}>
+              — {t.effortTarget}: {target}h
+            </span>
+          )}
+          {editingTarget ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                autoFocus type="number" min="0" placeholder="0"
+                style={{ ...INPUT, width: 72, padding: '3px 8px', fontSize: 12, textAlign: 'center' }}
+                value={targetBuf}
+                onChange={e => setTargetBuf(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveTarget(); if (e.key === 'Escape') setEditingTarget(false) }}
+                onFocus={fi}
+              />
+              <button onClick={saveTarget}
+                style={{ fontSize: 11, color: '#30d158', background: 'none', border: 'none', cursor: 'pointer', padding: '3px 6px' }}>
+                ✓
+              </button>
+              <button onClick={() => setEditingTarget(false)}
+                style={{ fontSize: 11, color: '#6e6e73', background: 'none', border: 'none', cursor: 'pointer', padding: '3px 6px' }}>
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => { setTargetBuf(target != null ? String(target) : ''); setEditingTarget(true) }}
+              style={{ fontSize: 11, color: '#6e6e73', background: 'none', border: '1px solid rgba(255,255,255,0.08)',
+                       borderRadius: 6, cursor: 'pointer', padding: '3px 8px',
+                       transition: 'color 0.15s, border-color 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}>
+              {target != null ? t.effortTarget : `+ ${t.effortTarget}`}
+            </button>
+          )}
+        </div>
+      </div>
       <ResponsiveContainer width="100%" height={160}>
         <BarChart data={chartData} barSize={16}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -1479,6 +1529,10 @@ function EffortOverview({ projectId, lang = 'es' }) {
           <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
           <Bar dataKey="horas" fill="#64d2ff" radius={[4,4,0,0]} name={t.hoursBar} />
+          {target != null && (
+            <ReferenceLine y={target} stroke="#ff9f0a" strokeDasharray="5 4" strokeWidth={1.5}
+              label={{ value: `${target}h`, position: 'insideTopRight', fill: '#ff9f0a', fontSize: 10, dy: -4 }} />
+          )}
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -2540,7 +2594,12 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                 </ResponsiveContainer>
               </div>
               <div style={CARD}>
-                <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.effortEvolution}</p>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-xs font-medium" style={{ color: '#6e6e73' }}>{t.effortEvolution}</p>
+                  {proj.effort_target_hours != null && (
+                    <span className="text-xs" style={{ color: '#ff9f0a' }}>— {t.effortTarget}: {proj.effort_target_hours}h</span>
+                  )}
+                </div>
                 <ResponsiveContainer width="100%" height={160}>
                   <BarChart data={effortData} barSize={16}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -2548,6 +2607,10 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                     <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
                     <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
                     <Bar dataKey="horas" fill="#64d2ff" radius={[4,4,0,0]} name={t.hoursBar} />
+                    {proj.effort_target_hours != null && (
+                      <ReferenceLine y={proj.effort_target_hours} stroke="#ff9f0a" strokeDasharray="5 4" strokeWidth={1.5}
+                        label={{ value: `${proj.effort_target_hours}h`, position: 'insideTopRight', fill: '#ff9f0a', fontSize: 10, dy: -4 }} />
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -2942,6 +3005,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
           customer_satisfaction_text: project.customer_satisfaction_text,
           opportunities: project.opportunities, challenges: project.challenges,
           stability_verdict: project.stability_verdict ?? null,
+          effort_target_hours: project.effort_target_hours ?? null,
           status_report_section_statuses: project.status_report_section_statuses ?? {},
           section_comments: project.section_comments ?? {},
         },
@@ -3105,7 +3169,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
       number: '03',
       title: 'Are we delivering value?',
       subtitle: sr.sub03,
-      content: <DeliveringValueSection projectId={project.id} lang={lang} />,
+      content: <DeliveringValueSection projectId={project.id} project={project} onSave={handleProjectUpdate} lang={lang} />,
     },
     {
       number: '04',
