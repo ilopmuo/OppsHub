@@ -151,7 +151,8 @@ const SR = {
     estimatedCostLabel: 'Coste estimado total', budgetConsumed: 'del presupuesto consumido',
     estimatedMarginLabel: 'Margen estimado', healthGood: 'Bajo control', healthWarning: 'Atención',
     healthRisk: 'En riesgo', budgetHealth: 'Salud presupuestaria',
-    resourceBreakdown: 'Desglose por recurso', resName: 'Nombre', resRole: 'Rol', resHours: 'Horas', resRate: 'Tarifa/h', resCost: 'Coste', resTotal: 'Total',
+    resourceBreakdown: 'Desglose por recurso', resName: 'Nombre', resRole: 'Rol', resHours: 'H. reales', resRate: 'Tarifa/h', resCost: 'Coste real', resTotal: 'Total',
+    resPlannedH: 'H. planificadas', resRemH: 'H. restantes', resRemCost: 'Coste restante',
     invoiceList: 'Facturas', invDate: 'Fecha', invDesc: 'Descripción', invAmount: 'Importe', invNoDesc: '—',
     costEvolution: 'Evolución mensual', evoCost: 'Coste', evoBilled: 'Facturado',
     licensesTitle: 'Licencias del producto', licName: 'Licencia', licCount: 'Unidades', licPrice: 'Precio/u', licTotal: 'Total', licGrandTotal: 'Valor total', licAddRow: '+ Añadir licencia', licNamePlaceholder: 'Nombre…',
@@ -228,7 +229,8 @@ const SR = {
     estimatedCostLabel: 'Estimated total cost', budgetConsumed: 'of budget consumed',
     estimatedMarginLabel: 'Estimated margin', healthGood: 'Under control', healthWarning: 'Warning',
     healthRisk: 'At risk', budgetHealth: 'Budget health',
-    resourceBreakdown: 'Resource breakdown', resName: 'Name', resRole: 'Role', resHours: 'Hours', resRate: 'Rate/h', resCost: 'Cost', resTotal: 'Total',
+    resourceBreakdown: 'Resource breakdown', resName: 'Name', resRole: 'Role', resHours: 'Actual h.', resRate: 'Rate/h', resCost: 'Actual cost', resTotal: 'Total',
+    resPlannedH: 'Planned h.', resRemH: 'Remaining h.', resRemCost: 'Remaining cost',
     invoiceList: 'Invoices', invDate: 'Date', invDesc: 'Description', invAmount: 'Amount', invNoDesc: '—',
     costEvolution: 'Monthly evolution', evoCost: 'Cost', evoBilled: 'Billed',
     licensesTitle: 'Product licenses', licName: 'License', licCount: 'Units', licPrice: 'Price/u', licTotal: 'Total', licGrandTotal: 'Total value', licAddRow: '+ Add license', licNamePlaceholder: 'Name…',
@@ -2029,22 +2031,38 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
       {/* Resource breakdown */}
       {resources.length > 0 && (() => {
         const rows = resources.map(r => {
-          const hours = Object.keys(actual)
+          const actualHours = Object.keys(actual)
             .filter(k => k.startsWith(r.id + '_'))
             .reduce((s, k) => s + (actual[k] || 0), 0) + (r.hours_to_date || 0)
-          const cost = hours * (r.hourly_rate || 0)
-          return { ...r, totalHours: hours, cost }
-        }).filter(r => r.totalHours > 0 || r.hourly_rate > 0)
+          const plannedHours = Object.keys(planned)
+            .filter(k => k.startsWith(r.id + '_'))
+            .reduce((s, k) => s + (planned[k] || 0), 0) + (r.hours_to_date || 0)
+          const remHours = plannedHours - actualHours
+          return {
+            ...r,
+            totalHours: actualHours,
+            cost: actualHours * (r.hourly_rate || 0),
+            plannedHours,
+            remHours,
+            remCost: remHours * (r.hourly_rate || 0),
+          }
+        }).filter(r => r.totalHours > 0 || r.plannedHours > 0 || r.hourly_rate > 0)
         if (!rows.length) return null
-        const totalCost = rows.reduce((s, r) => s + r.cost, 0)
-        const totalHours = rows.reduce((s, r) => s + r.totalHours, 0)
+        const totalCost    = rows.reduce((s, r) => s + r.cost, 0)
+        const totalHours   = rows.reduce((s, r) => s + r.totalHours, 0)
+        const totalRemH    = rows.reduce((s, r) => s + r.remHours, 0)
+        const totalRemCost = rows.reduce((s, r) => s + r.remCost, 0)
+        const remColor = n => n < 0 ? '#ff453a' : n > 0 ? '#ff9f0a' : '#6e6e73'
+        const headers = hasPlanned
+          ? [t.resName, t.resRole, t.resHours, t.resRate, t.resCost, t.resRemH, t.resRemCost]
+          : [t.resName, t.resRole, t.resHours, t.resRate, t.resCost]
         return (
           <div style={{ ...CARD, marginTop: 12, overflowX: 'auto' }}>
             <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.resourceBreakdown}</p>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  {[t.resName, t.resRole, t.resHours, t.resRate, t.resCost].map(h => (
+                  {headers.map(h => (
                     <th key={h} style={{ textAlign: 'left', paddingBottom: 8, paddingRight: 16, color: '#6e6e73', fontWeight: 500, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -2056,7 +2074,15 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
                     <td style={{ padding: '8px 16px 8px 0', color: '#6e6e73' }}>{r.role || '—'}</td>
                     <td style={{ padding: '8px 16px 8px 0', color: '#f5f5f7' }}>{r.totalHours.toFixed(1)}h</td>
                     <td style={{ padding: '8px 16px 8px 0', color: '#6e6e73' }}>{r.hourly_rate ? `${cur}${r.hourly_rate}/h` : '—'}</td>
-                    <td style={{ padding: '8px 0 8px 0', color: '#64d2ff', fontWeight: 500 }}>{fmtMoney(r.cost, cur)}</td>
+                    <td style={{ padding: '8px 16px 8px 0', color: '#64d2ff', fontWeight: 500 }}>{fmtMoney(r.cost, cur)}</td>
+                    {hasPlanned && <>
+                      <td style={{ padding: '8px 16px 8px 0', color: remColor(r.remHours), fontWeight: 500 }}>
+                        {r.remHours >= 0 ? '' : '−'}{Math.abs(r.remHours).toFixed(1)}h
+                      </td>
+                      <td style={{ padding: '8px 0 8px 0', color: remColor(r.remCost), fontWeight: 500 }}>
+                        {r.remCost < 0 ? '−' : ''}{fmtMoney(Math.abs(r.remCost), cur)}
+                      </td>
+                    </>}
                   </tr>
                 ))}
               </tbody>
@@ -2066,6 +2092,14 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
                   <td style={{ paddingTop: 8, color: '#f5f5f7', fontWeight: 600 }}>{totalHours.toFixed(1)}h</td>
                   <td />
                   <td style={{ paddingTop: 8, color: '#64d2ff', fontWeight: 600 }}>{fmtMoney(totalCost, cur)}</td>
+                  {hasPlanned && <>
+                    <td style={{ paddingTop: 8, fontWeight: 600, color: remColor(totalRemH) }}>
+                      {totalRemH >= 0 ? '' : '−'}{Math.abs(totalRemH).toFixed(1)}h
+                    </td>
+                    <td style={{ paddingTop: 8, fontWeight: 600, color: remColor(totalRemCost) }}>
+                      {totalRemCost < 0 ? '−' : ''}{fmtMoney(Math.abs(totalRemCost), cur)}
+                    </td>
+                  </>}
                 </tr>
               </tfoot>
             </table>
@@ -2897,22 +2931,34 @@ function SnapshotView({ snapshot, lang = 'es' }) {
 
                     {/* Resource breakdown (snapshot) */}
                     {resources.length > 0 && (() => {
-                      const allocMap = {}
-                      allocations.forEach(a => { if (a.actual_hours) allocMap[`${a.resource_id}_${a.week_start}`] = a.actual_hours })
+                      const allocActMap = {}, allocPlanMap = {}
+                      allocations.forEach(a => {
+                        if (a.actual_hours) allocActMap[`${a.resource_id}_${a.week_start}`] = a.actual_hours
+                        if (a.hours)        allocPlanMap[`${a.resource_id}_${a.week_start}`] = a.hours
+                      })
                       const rows = resources.map(r => {
-                        const hours = Object.keys(allocMap).filter(k => k.startsWith(r.id + '_')).reduce((s, k) => s + (allocMap[k] || 0), 0) + (r.hours_to_date || 0)
-                        return { ...r, totalHours: hours, cost: hours * (r.hourly_rate || 0) }
-                      }).filter(r => r.totalHours > 0 || r.hourly_rate > 0)
+                        const actualHours  = Object.keys(allocActMap).filter(k => k.startsWith(r.id + '_')).reduce((s, k) => s + (allocActMap[k] || 0), 0) + (r.hours_to_date || 0)
+                        const plannedHours = Object.keys(allocPlanMap).filter(k => k.startsWith(r.id + '_')).reduce((s, k) => s + (allocPlanMap[k] || 0), 0) + (r.hours_to_date || 0)
+                        const remHours = plannedHours - actualHours
+                        return { ...r, totalHours: actualHours, cost: actualHours * (r.hourly_rate || 0),
+                          plannedHours, remHours, remCost: remHours * (r.hourly_rate || 0) }
+                      }).filter(r => r.totalHours > 0 || r.plannedHours > 0 || r.hourly_rate > 0)
                       if (!rows.length) return null
-                      const totalCost = rows.reduce((s, r) => s + r.cost, 0)
-                      const totalHours = rows.reduce((s, r) => s + r.totalHours, 0)
+                      const totalCost    = rows.reduce((s, r) => s + r.cost, 0)
+                      const totalHours   = rows.reduce((s, r) => s + r.totalHours, 0)
+                      const totalRemH    = rows.reduce((s, r) => s + r.remHours, 0)
+                      const totalRemCost = rows.reduce((s, r) => s + r.remCost, 0)
+                      const remColor = n => n < 0 ? '#ff453a' : n > 0 ? '#ff9f0a' : '#6e6e73'
+                      const headers = snapHasPlanned
+                        ? [t.resName, t.resRole, t.resHours, t.resRate, t.resCost, t.resRemH, t.resRemCost]
+                        : [t.resName, t.resRole, t.resHours, t.resRate, t.resCost]
                       return (
                         <div style={{ ...CARD, marginTop: 12, overflowX: 'auto' }}>
                           <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.resourceBreakdown}</p>
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                             <thead><tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                              {[t.resName, t.resRole, t.resHours, t.resRate, t.resCost].map(h => (
-                                <th key={h} style={{ textAlign: 'left', paddingBottom: 8, paddingRight: 16, color: '#6e6e73', fontWeight: 500 }}>{h}</th>
+                              {headers.map(h => (
+                                <th key={h} style={{ textAlign: 'left', paddingBottom: 8, paddingRight: 16, color: '#6e6e73', fontWeight: 500, whiteSpace: 'nowrap' }}>{h}</th>
                               ))}
                             </tr></thead>
                             <tbody>
@@ -2922,7 +2968,15 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                                   <td style={{ padding: '8px 16px 8px 0', color: '#6e6e73' }}>{r.role || '—'}</td>
                                   <td style={{ padding: '8px 16px 8px 0', color: '#f5f5f7' }}>{r.totalHours.toFixed(1)}h</td>
                                   <td style={{ padding: '8px 16px 8px 0', color: '#6e6e73' }}>{r.hourly_rate ? `${cur}${r.hourly_rate}/h` : '—'}</td>
-                                  <td style={{ padding: '8px 0 8px 0', color: '#64d2ff', fontWeight: 500 }}>{fmtMoney(r.cost, cur)}</td>
+                                  <td style={{ padding: '8px 16px 8px 0', color: '#64d2ff', fontWeight: 500 }}>{fmtMoney(r.cost, cur)}</td>
+                                  {snapHasPlanned && <>
+                                    <td style={{ padding: '8px 16px 8px 0', color: remColor(r.remHours), fontWeight: 500 }}>
+                                      {r.remHours >= 0 ? '' : '−'}{Math.abs(r.remHours).toFixed(1)}h
+                                    </td>
+                                    <td style={{ padding: '8px 0 8px 0', color: remColor(r.remCost), fontWeight: 500 }}>
+                                      {r.remCost < 0 ? '−' : ''}{fmtMoney(Math.abs(r.remCost), cur)}
+                                    </td>
+                                  </>}
                                 </tr>
                               ))}
                             </tbody>
@@ -2931,6 +2985,14 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                               <td style={{ paddingTop: 8, color: '#f5f5f7', fontWeight: 600 }}>{totalHours.toFixed(1)}h</td>
                               <td />
                               <td style={{ paddingTop: 8, color: '#64d2ff', fontWeight: 600 }}>{fmtMoney(totalCost, cur)}</td>
+                              {snapHasPlanned && <>
+                                <td style={{ paddingTop: 8, fontWeight: 600, color: remColor(totalRemH) }}>
+                                  {totalRemH >= 0 ? '' : '−'}{Math.abs(totalRemH).toFixed(1)}h
+                                </td>
+                                <td style={{ paddingTop: 8, fontWeight: 600, color: remColor(totalRemCost) }}>
+                                  {totalRemCost < 0 ? '−' : ''}{fmtMoney(Math.abs(totalRemCost), cur)}
+                                </td>
+                              </>}
                             </tr></tfoot>
                           </table>
                         </div>
