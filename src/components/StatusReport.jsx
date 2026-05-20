@@ -109,6 +109,13 @@ const SR = {
     nameRole: 'Nombre / Rol', dedication: 'Dedicación',
     satPlaceholder: 'Describe la satisfacción del cliente…',
     // section 02
+    stabilityVerdicts: [
+      { key: 'stable',   label: 'El sistema funciona con estabilidad',                         color: '#30d158' },
+      { key: 'minor',    label: 'Hay bugs menores abiertos bajo seguimiento',                  color: '#ff9f0a' },
+      { key: 'critical', label: 'Hay incidencias críticas abiertas que requieren atención',    color: '#ff453a' },
+      { key: 'unknown',  label: 'Sin datos suficientes para determinar la estabilidad',        color: '#6e6e73' },
+    ],
+    selectVerdict: 'Selecciona el estado del sistema',
     thisMonth: 'Este mes', thisYear: 'Este año',
     open: 'Abiertos', inProgress: 'En progreso', closed: 'Cerrados', backlog: 'Backlog',
     bugsPerMonth: 'Bugs por mes — haz click en cualquier celda para editar',
@@ -141,6 +148,9 @@ const SR = {
     financialStatus: 'Estado financiero', onTarget: 'En objetivo', critical: 'Crítico',
     etdBar: 'Coste real (ETD)', targetMargin: 'Margen objetivo', currentProfit: 'Beneficio actual',
     remainingBudget: 'Presupuesto restante',
+    resourceBreakdown: 'Desglose por recurso', resName: 'Nombre', resRole: 'Rol', resHours: 'Horas', resRate: 'Tarifa/h', resCost: 'Coste', resTotal: 'Total',
+    invoiceList: 'Facturas', invDate: 'Fecha', invDesc: 'Descripción', invAmount: 'Importe', invNoDesc: '—',
+    costEvolution: 'Evolución mensual', evoCost: 'Coste', evoBilled: 'Facturado',
     // section 06
     oppPlaceholder: 'Describe las oportunidades de negocio identificadas…',
     chalPlaceholder: 'Describe los retos o bloqueos actuales…', saveChanges: 'Guardar cambios',
@@ -172,6 +182,13 @@ const SR = {
     nameRole: 'Name / Role', dedication: 'Dedication',
     satPlaceholder: 'Describe customer satisfaction…',
     // section 02
+    stabilityVerdicts: [
+      { key: 'stable',   label: 'The system is running stably',                           color: '#30d158' },
+      { key: 'minor',    label: 'There are minor open bugs under monitoring',              color: '#ff9f0a' },
+      { key: 'critical', label: 'There are critical open incidents requiring attention',   color: '#ff453a' },
+      { key: 'unknown',  label: 'Insufficient data to assess system stability',            color: '#6e6e73' },
+    ],
+    selectVerdict: 'Select the system status',
     thisMonth: 'This month', thisYear: 'This year',
     open: 'Open', inProgress: 'In progress', closed: 'Closed', backlog: 'Backlog',
     bugsPerMonth: 'Bugs per month — click any cell to edit',
@@ -204,6 +221,9 @@ const SR = {
     financialStatus: 'Financial status', onTarget: 'On target', critical: 'Critical',
     etdBar: 'Actual cost (ETD)', targetMargin: 'Target margin', currentProfit: 'Current profit',
     remainingBudget: 'Remaining budget',
+    resourceBreakdown: 'Resource breakdown', resName: 'Name', resRole: 'Role', resHours: 'Hours', resRate: 'Rate/h', resCost: 'Cost', resTotal: 'Total',
+    invoiceList: 'Invoices', invDate: 'Date', invDesc: 'Description', invAmount: 'Amount', invNoDesc: '—',
+    costEvolution: 'Monthly evolution', evoCost: 'Cost', evoBilled: 'Billed',
     // section 06
     oppPlaceholder: 'Describe the identified business opportunities…',
     chalPlaceholder: 'Describe the current challenges or blockers…', saveChanges: 'Save changes',
@@ -645,9 +665,11 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
 }
 
 // ── Section 2: System Stability ───────────────────────────────────────────────
-function SystemStabilitySection({ projectId, lang = 'es' }) {
+function SystemStabilitySection({ projectId, project, onSave, lang = 'es' }) {
   const [stats, setStats] = useState([])   // [{month_year, open_count, closed_count}]
   const [editing, setEditing] = useState({}) // { 'YYYY-MM_open' | 'YYYY-MM_closed' → string }
+  const [verdict, setVerdict] = useState(project?.stability_verdict ?? null)
+  const [showPicker, setShowPicker] = useState(false)
 
   const months = lastNMonths(6)
 
@@ -732,6 +754,15 @@ function SystemStabilitySection({ projectId, lang = 'es' }) {
   ].filter(d => d.value > 0)
   if (donutData.length === 0) donutData.push({ name: '—', value: 1, color: '#2a2a2a' })
 
+  async function saveVerdict(key) {
+    setVerdict(key)
+    setShowPicker(false)
+    await supabase.from('projects').update({ stability_verdict: key }).eq('id', projectId)
+    onSave?.({ stability_verdict: key })
+  }
+
+  const activeVerdict = t.stabilityVerdicts.find(v => v.key === verdict)
+
   const FIELD_COLORS = { open: '#ff453a', in_progress: '#ff9f0a', closed: '#30d158' }
   const FIELD_BG     = { open: 'rgba(255,69,58,0.06)', in_progress: 'rgba(255,159,10,0.06)', closed: 'rgba(48,209,88,0.06)' }
 
@@ -774,6 +805,71 @@ function SystemStabilitySection({ projectId, lang = 'es' }) {
 
   return (
     <div className="mb-2">
+      {/* Verdict banner */}
+      <div style={{ position: 'relative', marginBottom: 16 }}>
+        {activeVerdict ? (
+          <button onClick={() => setShowPicker(v => !v)} style={{
+            width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+          }}>
+            <div style={{
+              borderRadius: 14, padding: '20px 28px',
+              backgroundColor: `${activeVerdict.color}10`,
+              border: `1px solid ${activeVerdict.color}30`,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+            }}>
+              <p style={{ fontSize: 22, fontWeight: 700, color: activeVerdict.color, lineHeight: 1.2, letterSpacing: '-0.01em', margin: 0 }}>
+                {activeVerdict.label}
+              </p>
+              <span style={{ fontSize: 11, color: activeVerdict.color, opacity: 0.6, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                {showPicker ? '▲' : '▼'}
+              </span>
+            </div>
+          </button>
+        ) : (
+          <button onClick={() => setShowPicker(v => !v)} style={{
+            width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+          }}>
+            <div style={{
+              borderRadius: 14, padding: '16px 24px',
+              border: '1px dashed rgba(255,255,255,0.12)',
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              <span style={{ fontSize: 18, color: '#3a3a3a' }}>+</span>
+              <p style={{ fontSize: 14, color: '#3a3a3a', margin: 0 }}>{t.selectVerdict}</p>
+            </div>
+          </button>
+        )}
+
+        {showPicker && (
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, zIndex: 50,
+            borderRadius: 14, overflow: 'hidden',
+            border: '1px solid rgba(255,255,255,0.1)',
+            backgroundColor: '#1c1c1e',
+            boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
+          }}>
+            {t.stabilityVerdicts.map(v => (
+              <button key={v.key} onClick={() => saveVerdict(v.key)} style={{
+                width: '100%', textAlign: 'left', background: 'none', cursor: 'pointer',
+                padding: '14px 20px', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                display: 'flex', alignItems: 'center', gap: 12,
+                backgroundColor: verdict === v.key ? `${v.color}10` : 'transparent',
+                transition: 'background 0.1s',
+              }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = `${v.color}10`}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = verdict === v.key ? `${v.color}10` : 'transparent'}
+              >
+                <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: v.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 14, color: verdict === v.key ? v.color : '#d1d1d6', fontWeight: verdict === v.key ? 600 : 400 }}>
+                  {v.label}
+                </span>
+                {verdict === v.key && <span style={{ marginLeft: 'auto', color: v.color, fontSize: 12 }}>✓</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Este mes — principal */}
       <div style={{ ...CARD, padding: '28px 32px', marginBottom: 12, background: 'rgba(255,255,255,0.04)' }}>
         <p className="text-xs font-semibold mb-6" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t.thisMonth}</p>
@@ -1668,7 +1764,7 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
         ids.length > 0
           ? supabase.from('resource_allocations').select('resource_id,week_start,actual_hours').in('resource_id', ids)
           : { data: [] },
-        supabase.from('project_invoices').select('amount').eq('project_id', projectId),
+        supabase.from('project_invoices').select('amount,invoice_date,description').eq('project_id', projectId).order('invoice_date'),
       ])
 
       setFin(finData)
@@ -1793,6 +1889,131 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
           </div>
         </div>
       </div>
+
+      {/* Resource breakdown */}
+      {resources.length > 0 && (() => {
+        const rows = resources.map(r => {
+          const hours = Object.keys(actual)
+            .filter(k => k.startsWith(r.id + '_'))
+            .reduce((s, k) => s + (actual[k] || 0), 0) + (r.hours_to_date || 0)
+          const cost = hours * (r.hourly_rate || 0)
+          return { ...r, totalHours: hours, cost }
+        }).filter(r => r.totalHours > 0 || r.hourly_rate > 0)
+        if (!rows.length) return null
+        const totalCost = rows.reduce((s, r) => s + r.cost, 0)
+        const totalHours = rows.reduce((s, r) => s + r.totalHours, 0)
+        return (
+          <div style={{ ...CARD, marginTop: 12, overflowX: 'auto' }}>
+            <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.resourceBreakdown}</p>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  {[t.resName, t.resRole, t.resHours, t.resRate, t.resCost].map(h => (
+                    <th key={h} style={{ textAlign: 'left', paddingBottom: 8, paddingRight: 16, color: '#6e6e73', fontWeight: 500, whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => (
+                  <tr key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <td style={{ padding: '8px 16px 8px 0', color: '#f5f5f7', fontWeight: 500 }}>{r.name}</td>
+                    <td style={{ padding: '8px 16px 8px 0', color: '#6e6e73' }}>{r.role || '—'}</td>
+                    <td style={{ padding: '8px 16px 8px 0', color: '#f5f5f7' }}>{r.totalHours.toFixed(1)}h</td>
+                    <td style={{ padding: '8px 16px 8px 0', color: '#6e6e73' }}>{r.hourly_rate ? `${cur}${r.hourly_rate}/h` : '—'}</td>
+                    <td style={{ padding: '8px 0 8px 0', color: '#64d2ff', fontWeight: 500 }}>{fmtMoney(r.cost, cur)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                  <td colSpan={2} style={{ paddingTop: 8, color: '#6e6e73', fontWeight: 600 }}>{t.resTotal}</td>
+                  <td style={{ paddingTop: 8, color: '#f5f5f7', fontWeight: 600 }}>{totalHours.toFixed(1)}h</td>
+                  <td />
+                  <td style={{ paddingTop: 8, color: '#64d2ff', fontWeight: 600 }}>{fmtMoney(totalCost, cur)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )
+      })()}
+
+      {/* Monthly cost evolution */}
+      {(() => {
+        const monthMap = {}
+        resources.forEach(r => {
+          Object.keys(actual).filter(k => k.startsWith(r.id + '_')).forEach(k => {
+            const month = k.slice(r.id.length + 1, r.id.length + 8) // YYYY-MM
+            monthMap[month] = (monthMap[month] || 0) + (actual[k] || 0) * (r.hourly_rate || 0)
+          })
+        })
+        const invByMonth = {}
+        invoices.forEach(inv => {
+          if (!inv.invoice_date) return
+          const month = inv.invoice_date.slice(0, 7)
+          invByMonth[month] = (invByMonth[month] || 0) + inv.amount
+        })
+        const allMonths = [...new Set([...Object.keys(monthMap), ...Object.keys(invByMonth)])].sort()
+        if (!allMonths.length) return null
+        const chartData = allMonths.map(m => ({
+          month: m.slice(0, 7),
+          [t.evoCost]: Math.round(monthMap[m] || 0),
+          [t.evoBilled]: Math.round(invByMonth[m] || 0),
+        }))
+        return (
+          <div style={{ ...CARD, marginTop: 12 }}>
+            <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.costEvolution}</p>
+            <div className="flex items-center gap-4 mb-3">
+              {[{ color: '#64d2ff', label: t.evoCost }, { color: '#30d158', label: t.evoBilled }].map(l => (
+                <div key={l.label} className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
+                  <span className="text-xs" style={{ color: '#6e6e73' }}>{l.label}</span>
+                </div>
+              ))}
+            </div>
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={chartData} barSize={14} barGap={3}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => fmtMoney(v, cur)} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} formatter={v => fmtMoney(v, cur)} />
+                <Bar dataKey={t.evoCost}   fill="#64d2ff" radius={[3,3,0,0]} />
+                <Bar dataKey={t.evoBilled} fill="#30d158" radius={[3,3,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )
+      })()}
+
+      {/* Invoice list */}
+      {invoices.length > 0 && (
+        <div style={{ ...CARD, marginTop: 12, overflowX: 'auto' }}>
+          <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.invoiceList}</p>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                {[t.invDate, t.invDesc, t.invAmount].map(h => (
+                  <th key={h} style={{ textAlign: 'left', paddingBottom: 8, paddingRight: 16, color: '#6e6e73', fontWeight: 500 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((inv, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <td style={{ padding: '8px 16px 8px 0', color: '#6e6e73', whiteSpace: 'nowrap' }}>{inv.invoice_date ? fmtDate(inv.invoice_date, lang === 'en' ? 'en-GB' : 'es-ES') : '—'}</td>
+                  <td style={{ padding: '8px 16px 8px 0', color: '#d1d1d6' }}>{inv.description || t.invNoDesc}</td>
+                  <td style={{ padding: '8px 0 8px 0', color: '#30d158', fontWeight: 500 }}>{fmtMoney(inv.amount, cur)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <td colSpan={2} style={{ paddingTop: 8, color: '#6e6e73', fontWeight: 600 }}>{t.resTotal}</td>
+                <td style={{ paddingTop: 8, color: '#30d158', fontWeight: 600 }}>{fmtMoney(invoices.reduce((s, i) => s + i.amount, 0), cur)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
@@ -2058,6 +2279,21 @@ function SnapshotView({ snapshot, lang = 'es' }) {
 
           {sec.number === '02' && (
             <div className="mb-2">
+              {/* Verdict banner (snapshot read-only) */}
+              {proj.stability_verdict && (() => {
+                const sv = t.stabilityVerdicts.find(v => v.key === proj.stability_verdict)
+                if (!sv) return null
+                return (
+                  <div style={{
+                    borderRadius: 14, padding: '20px 28px', marginBottom: 16,
+                    backgroundColor: `${sv.color}10`, border: `1px solid ${sv.color}30`,
+                  }}>
+                    <p style={{ fontSize: 22, fontWeight: 700, color: sv.color, lineHeight: 1.2, letterSpacing: '-0.01em', margin: 0 }}>
+                      {sv.label}
+                    </p>
+                  </div>
+                )
+              })()}
               {/* Este mes — principal */}
               <div style={{ ...CARD, padding: '28px 32px', marginBottom: 12, background: 'rgba(255,255,255,0.04)' }}>
                 <p className="text-xs font-semibold mb-6" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t.thisMonth}</p>
@@ -2307,6 +2543,124 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                         <div><p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.currentProfit}</p><p className="text-sm font-semibold" style={{ color: profit >= 0 ? '#30d158' : '#ff453a' }}>{fmtMoney(profit, cur)}</p></div>
                       </div>
                     </div>
+
+                    {/* Resource breakdown (snapshot) */}
+                    {resources.length > 0 && (() => {
+                      const allocMap = {}
+                      allocations.forEach(a => { if (a.actual_hours) allocMap[`${a.resource_id}_${a.week_start}`] = a.actual_hours })
+                      const rows = resources.map(r => {
+                        const hours = Object.keys(allocMap).filter(k => k.startsWith(r.id + '_')).reduce((s, k) => s + (allocMap[k] || 0), 0) + (r.hours_to_date || 0)
+                        return { ...r, totalHours: hours, cost: hours * (r.hourly_rate || 0) }
+                      }).filter(r => r.totalHours > 0 || r.hourly_rate > 0)
+                      if (!rows.length) return null
+                      const totalCost = rows.reduce((s, r) => s + r.cost, 0)
+                      const totalHours = rows.reduce((s, r) => s + r.totalHours, 0)
+                      return (
+                        <div style={{ ...CARD, marginTop: 12, overflowX: 'auto' }}>
+                          <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.resourceBreakdown}</p>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                            <thead><tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                              {[t.resName, t.resRole, t.resHours, t.resRate, t.resCost].map(h => (
+                                <th key={h} style={{ textAlign: 'left', paddingBottom: 8, paddingRight: 16, color: '#6e6e73', fontWeight: 500 }}>{h}</th>
+                              ))}
+                            </tr></thead>
+                            <tbody>
+                              {rows.map(r => (
+                                <tr key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                  <td style={{ padding: '8px 16px 8px 0', color: '#f5f5f7', fontWeight: 500 }}>{r.name}</td>
+                                  <td style={{ padding: '8px 16px 8px 0', color: '#6e6e73' }}>{r.role || '—'}</td>
+                                  <td style={{ padding: '8px 16px 8px 0', color: '#f5f5f7' }}>{r.totalHours.toFixed(1)}h</td>
+                                  <td style={{ padding: '8px 16px 8px 0', color: '#6e6e73' }}>{r.hourly_rate ? `${cur}${r.hourly_rate}/h` : '—'}</td>
+                                  <td style={{ padding: '8px 0 8px 0', color: '#64d2ff', fontWeight: 500 }}>{fmtMoney(r.cost, cur)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot><tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                              <td colSpan={2} style={{ paddingTop: 8, color: '#6e6e73', fontWeight: 600 }}>{t.resTotal}</td>
+                              <td style={{ paddingTop: 8, color: '#f5f5f7', fontWeight: 600 }}>{totalHours.toFixed(1)}h</td>
+                              <td />
+                              <td style={{ paddingTop: 8, color: '#64d2ff', fontWeight: 600 }}>{fmtMoney(totalCost, cur)}</td>
+                            </tr></tfoot>
+                          </table>
+                        </div>
+                      )
+                    })()}
+
+                    {/* Monthly evolution (snapshot) */}
+                    {(() => {
+                      const allocMap = {}
+                      allocations.forEach(a => { if (a.actual_hours) allocMap[`${a.resource_id}_${a.week_start}`] = a.actual_hours })
+                      const monthMap = {}
+                      resources.forEach(r => {
+                        Object.keys(allocMap).filter(k => k.startsWith(r.id + '_')).forEach(k => {
+                          const month = k.slice(r.id.length + 1, r.id.length + 8)
+                          monthMap[month] = (monthMap[month] || 0) + (allocMap[k] || 0) * (r.hourly_rate || 0)
+                        })
+                      })
+                      const invByMonth = {}
+                      invoices.forEach(inv => {
+                        if (!inv.invoice_date) return
+                        const month = inv.invoice_date.slice(0, 7)
+                        invByMonth[month] = (invByMonth[month] || 0) + inv.amount
+                      })
+                      const allMonths = [...new Set([...Object.keys(monthMap), ...Object.keys(invByMonth)])].sort()
+                      if (!allMonths.length) return null
+                      const chartData = allMonths.map(m => ({
+                        month: m,
+                        [t.evoCost]: Math.round(monthMap[m] || 0),
+                        [t.evoBilled]: Math.round(invByMonth[m] || 0),
+                      }))
+                      return (
+                        <div style={{ ...CARD, marginTop: 12 }}>
+                          <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.costEvolution}</p>
+                          <div className="flex items-center gap-4 mb-3">
+                            {[{ color: '#64d2ff', label: t.evoCost }, { color: '#30d158', label: t.evoBilled }].map(l => (
+                              <div key={l.label} className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
+                                <span className="text-xs" style={{ color: '#6e6e73' }}>{l.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <ResponsiveContainer width="100%" height={160}>
+                            <BarChart data={chartData} barSize={14} barGap={3}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                              <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
+                              <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => fmtMoney(v, cur)} />
+                              <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} formatter={v => fmtMoney(v, cur)} />
+                              <Bar dataKey={t.evoCost}   fill="#64d2ff" radius={[3,3,0,0]} />
+                              <Bar dataKey={t.evoBilled} fill="#30d158" radius={[3,3,0,0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )
+                    })()}
+
+                    {/* Invoice list (snapshot) */}
+                    {invoices.length > 0 && (
+                      <div style={{ ...CARD, marginTop: 12, overflowX: 'auto' }}>
+                        <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.invoiceList}</p>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                          <thead><tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                            {[t.invDate, t.invDesc, t.invAmount].map(h => (
+                              <th key={h} style={{ textAlign: 'left', paddingBottom: 8, paddingRight: 16, color: '#6e6e73', fontWeight: 500 }}>{h}</th>
+                            ))}
+                          </tr></thead>
+                          <tbody>
+                            {invoices.map((inv, i) => (
+                              <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                <td style={{ padding: '8px 16px 8px 0', color: '#6e6e73', whiteSpace: 'nowrap' }}>{inv.invoice_date ? fmtDate(inv.invoice_date, locale) : '—'}</td>
+                                <td style={{ padding: '8px 16px 8px 0', color: '#d1d1d6' }}>{inv.description || t.invNoDesc}</td>
+                                <td style={{ padding: '8px 0 8px 0', color: '#30d158', fontWeight: 500 }}>{fmtMoney(inv.amount, cur)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot><tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                            <td colSpan={2} style={{ paddingTop: 8, color: '#6e6e73', fontWeight: 600 }}>{t.resTotal}</td>
+                            <td style={{ paddingTop: 8, color: '#30d158', fontWeight: 600 }}>{fmtMoney(invoices.reduce((s, i) => s + i.amount, 0), cur)}</td>
+                          </tr></tfoot>
+                        </table>
+                      </div>
+                    )}
                   </>
               }
             </div>
@@ -2508,7 +2862,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
         supabase.from('project_team_kpis').select('*').eq('project_id', project.id),
         supabase.from('project_effort').select('*').eq('project_id', project.id),
         supabase.from('project_financials').select('*').eq('project_id', project.id).maybeSingle(),
-        supabase.from('project_invoices').select('amount').eq('project_id', project.id),
+        supabase.from('project_invoices').select('amount,invoice_date,description').eq('project_id', project.id).order('invoice_date'),
         supabase.from('project_deliverables').select('id, name, status').eq('project_id', project.id).order('created_at'),
       ])
       let snapPlan = null
@@ -2538,6 +2892,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
           customer_satisfaction_status: project.customer_satisfaction_status,
           customer_satisfaction_text: project.customer_satisfaction_text,
           opportunities: project.opportunities, challenges: project.challenges,
+          stability_verdict: project.stability_verdict ?? null,
           status_report_section_statuses: project.status_report_section_statuses ?? {},
           section_comments: project.section_comments ?? {},
         },
@@ -2609,7 +2964,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
         supabase.from('project_plans').select('id').eq('project_id', project.id).limit(1),
         supabase.from('project_team_kpis').select('*').eq('project_id', project.id).in('month_year', months2),
         supabase.from('project_financials').select('*').eq('project_id', project.id).maybeSingle(),
-        supabase.from('project_invoices').select('amount').eq('project_id', project.id),
+        supabase.from('project_invoices').select('amount,invoice_date,description').eq('project_id', project.id).order('invoice_date'),
       ])
 
       // 01 — project status field
@@ -2695,7 +3050,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
       number: '02',
       title: 'Is my system stable?',
       subtitle: sr.sub02,
-      content: <SystemStabilitySection projectId={project.id} lang={lang} />,
+      content: <SystemStabilitySection projectId={project.id} project={project} onSave={handleProjectUpdate} lang={lang} />,
     },
     {
       number: '03',
