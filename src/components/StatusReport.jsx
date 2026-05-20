@@ -151,6 +151,7 @@ const SR = {
     resourceBreakdown: 'Desglose por recurso', resName: 'Nombre', resRole: 'Rol', resHours: 'Horas', resRate: 'Tarifa/h', resCost: 'Coste', resTotal: 'Total',
     invoiceList: 'Facturas', invDate: 'Fecha', invDesc: 'Descripción', invAmount: 'Importe', invNoDesc: '—',
     costEvolution: 'Evolución mensual', evoCost: 'Coste', evoBilled: 'Facturado',
+    licensesTitle: 'Licencias del producto', licName: 'Licencia', licCount: 'Unidades', licPrice: 'Precio/u', licTotal: 'Total', licGrandTotal: 'Valor total', licAddRow: '+ Añadir licencia', licNamePlaceholder: 'Nombre…',
     // section 06
     oppPlaceholder: 'Describe las oportunidades de negocio identificadas…',
     chalPlaceholder: 'Describe los retos o bloqueos actuales…', saveChanges: 'Guardar cambios',
@@ -224,6 +225,7 @@ const SR = {
     resourceBreakdown: 'Resource breakdown', resName: 'Name', resRole: 'Role', resHours: 'Hours', resRate: 'Rate/h', resCost: 'Cost', resTotal: 'Total',
     invoiceList: 'Invoices', invDate: 'Date', invDesc: 'Description', invAmount: 'Amount', invNoDesc: '—',
     costEvolution: 'Monthly evolution', evoCost: 'Cost', evoBilled: 'Billed',
+    licensesTitle: 'Product licenses', licName: 'License', licCount: 'Units', licPrice: 'Price/u', licTotal: 'Total', licGrandTotal: 'Total value', licAddRow: '+ Add license', licNamePlaceholder: 'Name…',
     // section 06
     oppPlaceholder: 'Describe the identified business opportunities…',
     chalPlaceholder: 'Describe the current challenges or blockers…', saveChanges: 'Save changes',
@@ -2117,6 +2119,160 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
           </table>
         </div>
       )}
+
+      <LicensesCard projectId={projectId} lang={lang} />
+    </div>
+  )
+}
+
+// ── Licenses Card (independent of project finances) ──────────────────────────
+function LicensesCard({ projectId, lang = 'es', readOnly = false, initialRows = null }) {
+  const [rows, setRows] = useState(initialRows ?? [])
+  const [editing, setEditing] = useState({}) // { id: { name, count, unit_price, currency } }
+  const t = SR[lang] ?? SR.es
+
+  useEffect(() => {
+    if (initialRows !== null) return
+    supabase.from('project_licenses').select('*').eq('project_id', projectId).order('created_at')
+      .then(({ data }) => setRows(data ?? []))
+  }, [projectId])
+
+  async function addRow() {
+    const { data, error } = await supabase.from('project_licenses')
+      .insert({ project_id: projectId, name: '', count: 0, unit_price: 0, currency: '€' })
+      .select().single()
+    if (error) { toast.error('Error al guardar'); return }
+    setRows(prev => [...prev, data])
+    setEditing(prev => ({ ...prev, [data.id]: { name: '', count: '0', unit_price: '0', currency: '€' } }))
+  }
+
+  async function saveRow(id) {
+    const e = editing[id]
+    if (!e) return
+    const count = parseInt(e.count, 10) || 0
+    const unit_price = parseFloat(e.unit_price) || 0
+    const { error } = await supabase.from('project_licenses')
+      .update({ name: e.name, count, unit_price, currency: e.currency || '€' }).eq('id', id)
+    if (error) { toast.error('Error al guardar'); return }
+    setRows(prev => prev.map(r => r.id === id ? { ...r, name: e.name, count, unit_price, currency: e.currency || '€' } : r))
+    setEditing(prev => { const n = { ...prev }; delete n[id]; return n })
+  }
+
+  async function deleteRow(id) {
+    await supabase.from('project_licenses').delete().eq('id', id)
+    setRows(prev => prev.filter(r => r.id !== id))
+    setEditing(prev => { const n = { ...prev }; delete n[id]; return n })
+  }
+
+  function startEdit(row) {
+    setEditing(prev => ({ ...prev, [row.id]: { name: row.name, count: String(row.count), unit_price: String(row.unit_price), currency: row.currency } }))
+  }
+
+  const grandTotal = rows.reduce((s, r) => s + (r.count || 0) * (r.unit_price || 0), 0)
+  const currency = rows[0]?.currency ?? '€'
+
+  if (rows.length === 0 && readOnly) return null
+
+  return (
+    <div style={{ ...CARD, marginTop: 12 }}>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs font-semibold" style={{ color: '#6e6e73', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t.licensesTitle}</p>
+        {grandTotal > 0 && (
+          <span className="text-sm font-bold" style={{ color: '#bf5af2' }}>{fmtMoney(grandTotal, currency)}</span>
+        )}
+      </div>
+
+      {rows.length > 0 && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 12 }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              {[t.licName, t.licCount, t.licPrice, t.licTotal].map(h => (
+                <th key={h} style={{ textAlign: 'left', paddingBottom: 8, paddingRight: 12, color: '#6e6e73', fontWeight: 500 }}>{h}</th>
+              ))}
+              {!readOnly && <th />}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(row => {
+              const e = editing[row.id]
+              const total = (row.count || 0) * (row.unit_price || 0)
+              return (
+                <tr key={row.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  {e ? (
+                    <>
+                      <td style={{ padding: '6px 12px 6px 0' }}>
+                        <input style={{ ...INPUT, padding: '4px 8px', fontSize: 12 }} value={e.name}
+                          placeholder={t.licNamePlaceholder}
+                          onChange={ev => setEditing(p => ({ ...p, [row.id]: { ...p[row.id], name: ev.target.value } }))}
+                          onKeyDown={ev => ev.key === 'Enter' && saveRow(row.id)} onFocus={fi} />
+                      </td>
+                      <td style={{ padding: '6px 12px 6px 0' }}>
+                        <input style={{ ...INPUT, padding: '4px 8px', fontSize: 12, width: 72, textAlign: 'right' }} type="number" min="0" value={e.count}
+                          onChange={ev => setEditing(p => ({ ...p, [row.id]: { ...p[row.id], count: ev.target.value } }))}
+                          onKeyDown={ev => ev.key === 'Enter' && saveRow(row.id)} onFocus={fi} />
+                      </td>
+                      <td style={{ padding: '6px 12px 6px 0' }}>
+                        <div className="flex items-center gap-1">
+                          <input style={{ ...INPUT, padding: '4px 6px', fontSize: 12, width: 32, textAlign: 'center' }} value={e.currency}
+                            maxLength={3}
+                            onChange={ev => setEditing(p => ({ ...p, [row.id]: { ...p[row.id], currency: ev.target.value } }))}
+                            onFocus={fi} />
+                          <input style={{ ...INPUT, padding: '4px 8px', fontSize: 12, width: 80, textAlign: 'right' }} type="number" min="0" value={e.unit_price}
+                            onChange={ev => setEditing(p => ({ ...p, [row.id]: { ...p[row.id], unit_price: ev.target.value } }))}
+                            onKeyDown={ev => ev.key === 'Enter' && saveRow(row.id)} onFocus={fi} />
+                        </div>
+                      </td>
+                      <td style={{ padding: '6px 12px 6px 0', color: '#bf5af2', fontWeight: 500 }}>
+                        {fmtMoney((parseInt(e.count) || 0) * (parseFloat(e.unit_price) || 0), e.currency || '€')}
+                      </td>
+                      <td style={{ padding: '6px 0', whiteSpace: 'nowrap' }}>
+                        <button onClick={() => saveRow(row.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#30d158', fontSize: 12, marginRight: 6 }}>✓</button>
+                        <button onClick={() => setEditing(p => { const n = { ...p }; delete n[row.id]; return n })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6e6e73', fontSize: 12 }}>✕</button>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td style={{ padding: '8px 12px 8px 0', color: row.name ? '#f5f5f7' : '#3a3a3a', fontStyle: row.name ? 'normal' : 'italic' }}>
+                        {row.name || t.licNamePlaceholder}
+                      </td>
+                      <td style={{ padding: '8px 12px 8px 0', color: '#f5f5f7', textAlign: 'right', paddingRight: 24 }}>{row.count}</td>
+                      <td style={{ padding: '8px 12px 8px 0', color: '#6e6e73' }}>{fmtMoney(row.unit_price, row.currency)}</td>
+                      <td style={{ padding: '8px 12px 8px 0', color: '#bf5af2', fontWeight: 600 }}>{fmtMoney(total, row.currency)}</td>
+                      {!readOnly && (
+                        <td style={{ padding: '8px 0', whiteSpace: 'nowrap' }}>
+                          <button onClick={() => startEdit(row)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6e6e73', fontSize: 12, marginRight: 6 }}>✎</button>
+                          <button onClick={() => deleteRow(row.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff453a', fontSize: 12 }}>✕</button>
+                        </td>
+                      )}
+                    </>
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+          {rows.length > 1 && (
+            <tfoot>
+              <tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <td colSpan={3} style={{ paddingTop: 8, color: '#6e6e73', fontWeight: 600 }}>{t.licGrandTotal}</td>
+                <td style={{ paddingTop: 8, color: '#bf5af2', fontWeight: 700, fontSize: 15 }}>{fmtMoney(grandTotal, currency)}</td>
+                {!readOnly && <td />}
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      )}
+
+      {!readOnly && (
+        <button onClick={addRow} style={{
+          background: 'none', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 8,
+          cursor: 'pointer', color: '#6e6e73', fontSize: 12, padding: '6px 14px',
+          transition: 'color 0.15s, border-color 0.15s',
+        }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}>
+          {t.licAddRow}
+        </button>
+      )}
     </div>
   )
 }
@@ -2203,6 +2359,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
   const invoices    = snapshot.invoices ?? []
   const allocations    = snapshot.allocations ?? []
   const snapDeliverables = snapshot.deliverables ?? []
+  const snapLicenses = snapshot.licenses ?? []
   const snapComments   = proj.section_comments ?? {}
   const snapDate       = snapshot.date ?? new Date().toISOString().slice(0, 10)
 
@@ -2773,6 +2930,11 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                         </table>
                       </div>
                     )}
+
+                    {/* Licenses (snapshot) */}
+                    {snapLicenses.length > 0 && (
+                      <LicensesCard projectId={null} lang={lang} readOnly initialRows={snapLicenses} />
+                    )}
                   </>
               }
             </div>
@@ -3013,6 +3175,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
         team_kpis: teamKpis ?? [], effort: effort ?? [],
         financial: financial ?? null, invoices: invoices ?? [], allocations,
         deliverables: deliverables ?? [],
+        licenses: (await supabase.from('project_licenses').select('*').eq('project_id', project.id).order('created_at')).data ?? [],
       }
       const { data: saved, error } = await supabase.from('status_report_versions')
         .insert({ project_id: project.id, name: newVersionName.trim(), snapshot })
