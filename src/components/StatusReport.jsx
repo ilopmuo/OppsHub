@@ -144,10 +144,13 @@ const SR = {
     statusPending: 'Pendiente', statusInProgress: 'En progreso', statusDone: 'Hecho',
     // section 05
     noFinancialData: 'Sin datos financieros. Configúralos en la pestaña Recursos & Finanzas.',
-    budget: 'Presupuesto', etdCost: 'Coste ETD', billed: 'Facturado', currentMargin: 'Margen actual',
+    budget: 'Presupuesto', etdCost: 'Coste real (ETD)', billed: 'Facturado', currentMargin: 'Margen actual',
     financialStatus: 'Estado financiero', onTarget: 'En objetivo', critical: 'Crítico',
     etdBar: 'Coste real (ETD)', targetMargin: 'Margen objetivo', currentProfit: 'Beneficio actual',
     remainingBudget: 'Presupuesto restante',
+    estimatedCostLabel: 'Coste estimado total', budgetConsumed: 'del presupuesto consumido',
+    estimatedMarginLabel: 'Margen estimado', healthGood: 'Bajo control', healthWarning: 'Atención',
+    healthRisk: 'En riesgo', budgetHealth: 'Salud presupuestaria',
     resourceBreakdown: 'Desglose por recurso', resName: 'Nombre', resRole: 'Rol', resHours: 'Horas', resRate: 'Tarifa/h', resCost: 'Coste', resTotal: 'Total',
     invoiceList: 'Facturas', invDate: 'Fecha', invDesc: 'Descripción', invAmount: 'Importe', invNoDesc: '—',
     costEvolution: 'Evolución mensual', evoCost: 'Coste', evoBilled: 'Facturado',
@@ -218,10 +221,13 @@ const SR = {
     statusPending: 'Pending', statusInProgress: 'In progress', statusDone: 'Done',
     // section 05
     noFinancialData: 'No financial data. Configure it in the Resources & Finances tab.',
-    budget: 'Budget', etdCost: 'ETD Cost', billed: 'Billed', currentMargin: 'Current margin',
+    budget: 'Budget', etdCost: 'Actual cost (ETD)', billed: 'Billed', currentMargin: 'Current margin',
     financialStatus: 'Financial status', onTarget: 'On target', critical: 'Critical',
     etdBar: 'Actual cost (ETD)', targetMargin: 'Target margin', currentProfit: 'Current profit',
     remainingBudget: 'Remaining budget',
+    estimatedCostLabel: 'Estimated total cost', budgetConsumed: 'of budget consumed',
+    estimatedMarginLabel: 'Estimated margin', healthGood: 'Under control', healthWarning: 'Warning',
+    healthRisk: 'At risk', budgetHealth: 'Budget health',
     resourceBreakdown: 'Resource breakdown', resName: 'Name', resRole: 'Role', resHours: 'Hours', resRate: 'Rate/h', resCost: 'Cost', resTotal: 'Total',
     invoiceList: 'Invoices', invDate: 'Date', invDesc: 'Description', invAmount: 'Amount', invNoDesc: '—',
     costEvolution: 'Monthly evolution', evoCost: 'Cost', evoBilled: 'Billed',
@@ -1856,6 +1862,7 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
   const [fin,       setFin]       = useState(null)
   const [resources, setResources] = useState([])
   const [actual,    setActual]    = useState({})
+  const [planned,   setPlanned]   = useState({})
   const [invoices,  setInvoices]  = useState([])
 
   useEffect(() => {
@@ -1867,7 +1874,7 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
       const [{ data: finData }, { data: allocData }, { data: invData }] = await Promise.all([
         supabase.from('project_financials').select('*').eq('project_id', projectId).maybeSingle(),
         ids.length > 0
-          ? supabase.from('resource_allocations').select('resource_id,week_start,actual_hours').in('resource_id', ids)
+          ? supabase.from('resource_allocations').select('resource_id,week_start,hours,actual_hours').in('resource_id', ids)
           : { data: [] },
         supabase.from('project_invoices').select('amount,invoice_date,description').eq('project_id', projectId).order('invoice_date'),
       ])
@@ -1875,11 +1882,13 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
       setFin(finData)
       setResources(resData ?? [])
       setInvoices(invData ?? [])
-      const aMap = {}
+      const aMap = {}, pMap = {}
       ;(allocData ?? []).forEach(a => {
         if (a.actual_hours) aMap[`${a.resource_id}_${a.week_start}`] = a.actual_hours
+        if (a.hours)        pMap[`${a.resource_id}_${a.week_start}`] = a.hours
       })
       setActual(aMap)
+      setPlanned(pMap)
     }
     load()
   }, [projectId])
@@ -1897,6 +1906,7 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
   const etdBase  = fin?.effort_to_date != null ? Number(fin.effort_to_date) : 0
   const today    = new Date().toISOString().slice(0, 10)
 
+  // Actual ETD cost (actual hours logged to date)
   const etd = etdBase + resources.reduce((sum, r) => {
     const hours = Object.keys(actual)
       .filter(k => k.startsWith(r.id + '_') && k.slice(r.id.length + 1) <= today)
@@ -1904,95 +1914,116 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
     return sum + (hours + (r.hours_to_date || 0)) * (r.hourly_rate || 0)
   }, 0)
 
+  // Estimated total cost (from planned allocation hours — forward-looking)
+  const hasPlanned = Object.keys(planned).length > 0
+  const estimatedCost = hasPlanned
+    ? etdBase + resources.reduce((sum, r) => {
+        const hours = Object.keys(planned)
+          .filter(k => k.startsWith(r.id + '_'))
+          .reduce((s, k) => s + (planned[k] || 0), 0) + (r.hours_to_date || 0)
+        return sum + hours * (r.hourly_rate || 0)
+      }, 0)
+    : etd
+
   const billed = invoices.length > 0
     ? invoices.reduce((s, i) => s + i.amount, 0)
     : (fin?.invoiced_to_date ?? 0)
 
-  const currentProfit = billed - etd
-  const currentMargin = billed > 0 ? (currentProfit / billed) * 100 : 0
-  const remainingBudget = contract - etd
-  const h = profitHealth(currentMargin, target, lang)
+  const currentProfit      = billed - etd
+  const currentMargin      = billed > 0 ? (currentProfit / billed) * 100 : 0
+  const remainingBudget    = contract - etd
+  const estimatedProfit    = contract - estimatedCost
+  const estimatedMarginPct = contract > 0 ? (estimatedProfit / contract) * 100 : 0
+  const budgetConsumedPct  = contract > 0 ? Math.min(100, (etd / contract) * 100) : 0
+  const estConsumedPct     = contract > 0 ? Math.min(100, (estimatedCost / contract) * 100) : 0
 
-  // Bar widths (relative to contract)
-  const maxVal = Math.max(contract, etd, billed, 1)
-  const etdPct    = Math.min(100, (etd    / maxVal) * 100)
-  const billedPct = Math.min(100, (billed / maxVal) * 100)
+  const heroColor = estConsumedPct < 75 ? '#30d158' : estConsumedPct < 95 ? '#ff9f0a' : '#ff453a'
+  const heroLabel = estConsumedPct < 75 ? t.healthGood : estConsumedPct < 95 ? t.healthWarning : t.healthRisk
+  const h = profitHealth(currentMargin, target, lang)
 
   return (
     <div className="mb-2">
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <KpiCard label={t.budget} value={fmtMoney(contract, cur)} color="#f5f5f7" />
-        <KpiCard label={t.etdCost} value={fmtMoney(etd, cur)} color="#64d2ff" />
-        <KpiCard label={t.billed} value={fmtMoney(billed, cur)} color="#30d158" />
-        <KpiCard label={t.currentMargin} value={billed > 0 ? `${currentMargin.toFixed(1)}%` : '—'}
-          color={h.color} />
+      {/* ── Hero health card ── */}
+      <div style={{ ...CARD, marginBottom: 16 }}>
+        {/* Badge row */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: heroColor,
+              boxShadow: `0 0 7px ${heroColor}` }} />
+            <span className="text-xs font-semibold tracking-wide" style={{ color: heroColor }}>
+              {heroLabel}
+            </span>
+          </div>
+          <span className="text-xs" style={{ color: '#6e6e73' }}>{t.budgetHealth}</span>
+        </div>
+
+        {/* Large % + right info */}
+        <div className="flex items-end justify-between mb-3">
+          <div>
+            <div style={{ fontSize: 52, fontWeight: 700, lineHeight: 1, color: heroColor }}>
+              {budgetConsumedPct.toFixed(0)}<span style={{ fontSize: 28, fontWeight: 600 }}>%</span>
+            </div>
+            <div className="text-xs mt-1" style={{ color: '#6e6e73' }}>{t.budgetConsumed}</div>
+          </div>
+          {hasPlanned && (
+            <div className="text-right pb-1">
+              <div className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.estimatedCostLabel}</div>
+              <div className="text-sm font-semibold" style={{ color: estConsumedPct > 100 ? '#ff453a' : '#f5f5f7' }}>
+                {fmtMoney(estimatedCost, cur)}
+              </div>
+              <div className="text-xs" style={{ color: estConsumedPct > 95 ? '#ff453a' : '#6e6e73' }}>
+                {estConsumedPct.toFixed(0)}% {lang === 'en' ? 'of contract' : 'del contrato'}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Budget bars */}
+        <div className="mb-1">
+          {/* Estimated bar (dim, behind) */}
+          {hasPlanned && (
+            <div style={{ height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.05)',
+              marginBottom: 3, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${estConsumedPct}%`, borderRadius: 3,
+                backgroundColor: `${heroColor}45`, transition: 'width 0.7s ease' }} />
+            </div>
+          )}
+          {/* ETD actual bar */}
+          <div style={{ height: 10, borderRadius: 5,
+            backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${budgetConsumedPct}%`, borderRadius: 5,
+              backgroundColor: heroColor, transition: 'width 0.7s ease' }} />
+          </div>
+        </div>
+        <div className="flex justify-between text-xs mb-5" style={{ color: '#6e6e73' }}>
+          <span>{cur}0</span>
+          <span>{fmtMoney(contract, cur)}</span>
+        </div>
+
+        {/* 4-col metric row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          {[
+            { label: t.budget,               value: fmtMoney(contract, cur),  color: '#f5f5f7' },
+            { label: t.etdCost,              value: fmtMoney(etd, cur),        color: '#64d2ff' },
+            { label: t.remainingBudget,      value: fmtMoney(remainingBudget, cur),
+              color: remainingBudget >= 0 ? '#f5f5f7' : '#ff453a' },
+            { label: t.estimatedMarginLabel,
+              value: contract > 0 ? `${estimatedMarginPct.toFixed(1)}%` : '—',
+              color: estimatedMarginPct >= target ? '#30d158' : estimatedMarginPct >= 0 ? '#ff9f0a' : '#ff453a' },
+          ].map(m => (
+            <div key={m.label}>
+              <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>{m.label}</p>
+              <p className="text-base font-semibold" style={{ color: m.color }}>{m.value}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Status + bars */}
-      <div style={CARD}>
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-xs font-medium" style={{ color: '#6e6e73' }}>{t.financialStatus}</p>
-          <span className="text-xs px-2.5 py-1 rounded-full font-medium"
-            style={{ backgroundColor: `${h.color}18`, color: h.color }}>
-            {h.label}
-          </span>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          {/* Budget bar */}
-          <div>
-            <div className="flex justify-between text-xs mb-1.5" style={{ color: '#6e6e73' }}>
-              <span>{t.budget}</span>
-              <span style={{ color: '#f5f5f7' }}>{fmtMoney(contract, cur)}</span>
-            </div>
-            <div className="h-2 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
-              <div className="h-full rounded-full" style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.12)' }} />
-            </div>
-          </div>
-
-          {/* ETD bar */}
-          <div>
-            <div className="flex justify-between text-xs mb-1.5" style={{ color: '#6e6e73' }}>
-              <span>{t.etdBar}</span>
-              <span style={{ color: '#64d2ff' }}>{fmtMoney(etd, cur)}</span>
-            </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${etdPct}%`, backgroundColor: '#64d2ff' }} />
-            </div>
-          </div>
-
-          {/* Billed bar */}
-          <div>
-            <div className="flex justify-between text-xs mb-1.5" style={{ color: '#6e6e73' }}>
-              <span>{t.billed}</span>
-              <span style={{ color: '#30d158' }}>{fmtMoney(billed, cur)}</span>
-            </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${billedPct}%`, backgroundColor: '#30d158' }} />
-            </div>
-          </div>
-        </div>
-
-        {/* Summary row */}
-        <div className="flex gap-6 mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <div>
-            <p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.targetMargin}</p>
-            <p className="text-sm font-semibold" style={{ color: '#f5f5f7' }}>{target}%</p>
-          </div>
-          <div>
-            <p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.currentProfit}</p>
-            <p className="text-sm font-semibold" style={{ color: currentProfit >= 0 ? '#30d158' : '#ff453a' }}>
-              {fmtMoney(currentProfit, cur)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.remainingBudget}</p>
-            <p className="text-sm font-semibold" style={{ color: remainingBudget >= 0 ? '#f5f5f7' : '#ff453a' }}>
-              {fmtMoney(remainingBudget, cur)}
-            </p>
-          </div>
-        </div>
+      {/* Billed + current margin */}
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <KpiCard label={t.billed}        value={fmtMoney(billed, cur)}    color="#30d158" />
+        <KpiCard label={t.currentMargin} value={billed > 0 ? `${currentMargin.toFixed(1)}%` : '—'} color={h.color} />
       </div>
 
       {/* Resource breakdown */}
@@ -2419,17 +2450,32 @@ function SnapshotView({ snapshot, lang = 'es' }) {
   const cur      = financial?.currency ?? '€'
   const contract = financial?.contract_value ?? 0
   const target   = financial?.target_margin ?? 20
-  const etd = (financial?.effort_to_date ?? 0) + resources.reduce((sum, r) => {
+  const etdBase  = financial?.effort_to_date ?? 0
+  const etd = etdBase + resources.reduce((sum, r) => {
     const h = allocations
       .filter(a => a.resource_id === r.id && a.week_start <= snapDate)
       .reduce((s, a) => s + (a.actual_hours || 0), 0)
     return sum + (h + (r.hours_to_date || 0)) * (r.hourly_rate || 0)
   }, 0)
+  const snapHasPlanned = allocations.some(a => a.hours)
+  const estimatedCostSnap = snapHasPlanned
+    ? etdBase + resources.reduce((sum, r) => {
+        const h = allocations.filter(a => a.resource_id === r.id)
+          .reduce((s, a) => s + (a.hours || 0), 0) + (r.hours_to_date || 0)
+        return sum + h * (r.hourly_rate || 0)
+      }, 0)
+    : etd
   const billed  = invoices.length ? invoices.reduce((s, i) => s + i.amount, 0) : (financial?.invoiced_to_date ?? 0)
   const profit  = billed - etd
   const margin  = billed > 0 ? (profit / billed) * 100 : 0
   const maxVal  = Math.max(contract, etd, billed, 1)
   const ph      = profitHealth(margin, target, lang)
+  const snapBudgetConsumedPct  = contract > 0 ? Math.min(100, (etd / contract) * 100) : 0
+  const snapEstConsumedPct     = contract > 0 ? Math.min(100, (estimatedCostSnap / contract) * 100) : 0
+  const snapHeroColor = snapEstConsumedPct < 75 ? '#30d158' : snapEstConsumedPct < 95 ? '#ff9f0a' : '#ff453a'
+  const snapHeroLabel = snapEstConsumedPct < 75 ? t.healthGood : snapEstConsumedPct < 95 ? t.healthWarning : t.healthRisk
+  const snapEstMarginPct = contract > 0 ? ((contract - estimatedCostSnap) / contract) * 100 : 0
+  const snapRemainingBudget = contract - etd
 
   const TYPE_LABELS   = { implementation: t.typeImpl, maintenance: t.typeMaint }
   const STATUS_LABELS = { on_track: 'On track', at_risk: 'At risk', blocked: 'Blocked' }
@@ -2779,38 +2825,73 @@ function SnapshotView({ snapshot, lang = 'es' }) {
               {!financial && resources.length === 0
                 ? <div style={CARD}><p className="text-sm" style={{ color: '#6e6e73' }}>{t.noFinancialData}</p></div>
                 : <>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                      <KpiCard label={t.budget}        value={fmtMoney(contract, cur)} color="#f5f5f7" />
-                      <KpiCard label={t.etdCost}       value={fmtMoney(etd, cur)}      color="#64d2ff" />
-                      <KpiCard label={t.billed}        value={fmtMoney(billed, cur)}   color="#30d158" />
-                      <KpiCard label={t.currentMargin} value={billed > 0 ? `${margin.toFixed(1)}%` : '—'} color={ph.color} />
-                    </div>
-                    <div style={CARD}>
-                      <div className="flex items-center justify-between mb-4">
-                        <p className="text-xs font-medium" style={{ color: '#6e6e73' }}>{t.financialStatus}</p>
-                        <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: `${ph.color}18`, color: ph.color }}>{ph.label}</span>
+                    {/* Hero health card (snapshot) */}
+                    <div style={{ ...CARD, marginBottom: 16 }}>
+                      <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-2">
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: snapHeroColor,
+                            boxShadow: `0 0 7px ${snapHeroColor}` }} />
+                          <span className="text-xs font-semibold tracking-wide" style={{ color: snapHeroColor }}>
+                            {snapHeroLabel}
+                          </span>
+                        </div>
+                        <span className="text-xs" style={{ color: '#6e6e73' }}>{t.budgetHealth}</span>
                       </div>
-                      <div className="flex flex-col gap-3">
+                      <div className="flex items-end justify-between mb-3">
+                        <div>
+                          <div style={{ fontSize: 52, fontWeight: 700, lineHeight: 1, color: snapHeroColor }}>
+                            {snapBudgetConsumedPct.toFixed(0)}<span style={{ fontSize: 28, fontWeight: 600 }}>%</span>
+                          </div>
+                          <div className="text-xs mt-1" style={{ color: '#6e6e73' }}>{t.budgetConsumed}</div>
+                        </div>
+                        {snapHasPlanned && (
+                          <div className="text-right pb-1">
+                            <div className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.estimatedCostLabel}</div>
+                            <div className="text-sm font-semibold" style={{ color: snapEstConsumedPct > 100 ? '#ff453a' : '#f5f5f7' }}>
+                              {fmtMoney(estimatedCostSnap, cur)}
+                            </div>
+                            <div className="text-xs" style={{ color: snapEstConsumedPct > 95 ? '#ff453a' : '#6e6e73' }}>
+                              {snapEstConsumedPct.toFixed(0)}% {lang === 'en' ? 'of contract' : 'del contrato'}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mb-1">
+                        {snapHasPlanned && (
+                          <div style={{ height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.05)',
+                            marginBottom: 3, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${snapEstConsumedPct}%`, borderRadius: 3,
+                              backgroundColor: `${snapHeroColor}45` }} />
+                          </div>
+                        )}
+                        <div style={{ height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${snapBudgetConsumedPct}%`, borderRadius: 5, backgroundColor: snapHeroColor }} />
+                        </div>
+                      </div>
+                      <div className="flex justify-between text-xs mb-5" style={{ color: '#6e6e73' }}>
+                        <span>{cur}0</span><span>{fmtMoney(contract, cur)}</span>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4"
+                        style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                         {[
-                          { label: t.budget,  val: contract, pct: 100,                                     color: 'rgba(255,255,255,0.12)' },
-                          { label: t.etdBar,  val: etd,      pct: Math.min(100, etd    / maxVal * 100),    color: '#64d2ff' },
-                          { label: t.billed,  val: billed,   pct: Math.min(100, billed / maxVal * 100),   color: '#30d158' },
-                        ].map(row => (
-                          <div key={row.label}>
-                            <div className="flex justify-between text-xs mb-1.5" style={{ color: '#6e6e73' }}>
-                              <span>{row.label}</span>
-                              <span style={{ color: row.color === 'rgba(255,255,255,0.12)' ? '#f5f5f7' : row.color }}>{fmtMoney(row.val, cur)}</span>
-                            </div>
-                            <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
-                              <div className="h-full rounded-full" style={{ width: `${row.pct}%`, backgroundColor: row.color }} />
-                            </div>
+                          { label: t.budget,               value: fmtMoney(contract, cur),  color: '#f5f5f7' },
+                          { label: t.etdCost,              value: fmtMoney(etd, cur),        color: '#64d2ff' },
+                          { label: t.remainingBudget,      value: fmtMoney(snapRemainingBudget, cur),
+                            color: snapRemainingBudget >= 0 ? '#f5f5f7' : '#ff453a' },
+                          { label: t.estimatedMarginLabel,
+                            value: contract > 0 ? `${snapEstMarginPct.toFixed(1)}%` : '—',
+                            color: snapEstMarginPct >= target ? '#30d158' : snapEstMarginPct >= 0 ? '#ff9f0a' : '#ff453a' },
+                        ].map(m => (
+                          <div key={m.label}>
+                            <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>{m.label}</p>
+                            <p className="text-base font-semibold" style={{ color: m.color }}>{m.value}</p>
                           </div>
                         ))}
                       </div>
-                      <div className="flex gap-6 mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div><p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.targetMargin}</p><p className="text-sm font-semibold" style={{ color: '#f5f5f7' }}>{target}%</p></div>
-                        <div><p className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.currentProfit}</p><p className="text-sm font-semibold" style={{ color: profit >= 0 ? '#30d158' : '#ff453a' }}>{fmtMoney(profit, cur)}</p></div>
-                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <KpiCard label={t.billed}        value={fmtMoney(billed, cur)}   color="#30d158" />
+                      <KpiCard label={t.currentMargin} value={billed > 0 ? `${margin.toFixed(1)}%` : '—'} color={ph.color} />
                     </div>
 
                     {/* Resource breakdown (snapshot) */}
