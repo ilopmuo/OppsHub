@@ -116,6 +116,14 @@ const SR = {
       { key: 'unknown',  label: 'Sin datos suficientes para determinar la estabilidad',        color: '#6e6e73' },
     ],
     selectVerdict: 'Selecciona el estado del sistema',
+    planVerdicts: [
+      { key: 'on_track',  label: 'El proyecto avanza según el plan',                  color: '#30d158' },
+      { key: 'ahead',     label: 'El proyecto va adelantado respecto al plan',         color: '#64d2ff' },
+      { key: 'delayed',   label: 'Hay fases con retraso que requieren atención',       color: '#ff9f0a' },
+      { key: 'critical',  label: 'Hay fases críticas con retraso significativo',       color: '#ff453a' },
+      { key: 'unknown',   label: 'Sin datos suficientes para evaluar el avance',       color: '#6e6e73' },
+    ],
+    selectPlanVerdict: 'Selecciona el estado del plan',
     thisMonth: 'Este mes', thisYear: 'Este año',
     open: 'Abiertos', inProgress: 'En progreso', closed: 'Cerrados', backlog: 'Backlog',
     bugsPerMonth: 'Bugs por mes — haz click en cualquier celda para editar',
@@ -194,6 +202,14 @@ const SR = {
       { key: 'unknown',  label: 'Insufficient data to assess system stability',            color: '#6e6e73' },
     ],
     selectVerdict: 'Select the system status',
+    planVerdicts: [
+      { key: 'on_track',  label: 'The project is on track',                           color: '#30d158' },
+      { key: 'ahead',     label: 'The project is ahead of schedule',                  color: '#64d2ff' },
+      { key: 'delayed',   label: 'There are phases with delays requiring attention',   color: '#ff9f0a' },
+      { key: 'critical',  label: 'Critical phases with significant delays',            color: '#ff453a' },
+      { key: 'unknown',   label: 'Not enough data to evaluate progress',              color: '#6e6e73' },
+    ],
+    selectPlanVerdict: 'Select plan status',
     thisMonth: 'This month', thisYear: 'This year',
     open: 'Open', inProgress: 'In progress', closed: 'Closed', backlog: 'Backlog',
     bugsPerMonth: 'Bugs per month — click any cell to edit',
@@ -1116,11 +1132,22 @@ function PlanGanttSection({ projectId }) {
   )
 }
 
+const PLAN_VERDICT_ANIM = {
+  on_track: { dur: '4s'   },
+  ahead:    { dur: '3.5s' },
+  delayed:  { dur: '2.5s' },
+  critical: { dur: '1.2s' },
+  unknown:  { dur: '5s'   },
+}
+
 function DeliveringValueSection({ projectId, project, onSave, lang = 'es' }) {
   const [phases, setPhases] = useState([])
   const [hasPlan, setHasPlan] = useState(null)
   const [showAllPhases, setShowAllPhases] = useState(false)
   const PHASES_VISIBLE = 4
+
+  const [planVerdict,     setPlanVerdict]     = useState(project?.plan_verdict ?? null)
+  const [showPlanPicker,  setShowPlanPicker]  = useState(false)
 
   const [deliverables, setDeliverables] = useState([])
   const [addingDeliverable, setAddingDeliverable] = useState(false)
@@ -1173,6 +1200,13 @@ function DeliveringValueSection({ projectId, project, onSave, lang = 'es' }) {
     setDeliverables(prev => prev.filter(d => d.id !== id))
   }
 
+  async function savePlanVerdict(key) {
+    setPlanVerdict(key)
+    setShowPlanPicker(false)
+    await supabase.from('projects').update({ plan_verdict: key }).eq('id', projectId)
+    onSave?.({ plan_verdict: key })
+  }
+
   const t = SR[lang] ?? SR.es
 
   function delivStatusMeta(status) {
@@ -1192,8 +1226,87 @@ function DeliveringValueSection({ projectId, project, onSave, lang = 'es' }) {
   const visiblePhases = showAllPhases ? phasesWithMetrics : phasesWithMetrics.slice(0, PHASES_VISIBLE)
   const hiddenCount   = phasesWithMetrics.length - PHASES_VISIBLE
 
+  const activePlanVerdict = t.planVerdicts.find(v => v.key === planVerdict)
+
   return (
     <div className="mb-2">
+      {/* Plan verdict banner */}
+      <style>{`
+        @keyframes pv-enter { from{opacity:0;transform:translateY(-8px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+        @keyframes pv-glow-on_track { 0%,100%{box-shadow:0 0 0 0 rgba(48,209,88,0)} 50%{box-shadow:0 0 28px 6px rgba(48,209,88,0.16)} }
+        @keyframes pv-glow-ahead    { 0%,100%{box-shadow:0 0 0 0 rgba(100,210,255,0)} 50%{box-shadow:0 0 28px 6px rgba(100,210,255,0.16)} }
+        @keyframes pv-glow-delayed  { 0%,100%{box-shadow:0 0 0 0 rgba(255,159,10,0)} 50%{box-shadow:0 0 22px 5px rgba(255,159,10,0.2)} }
+        @keyframes pv-glow-critical { 0%,100%{box-shadow:0 0 8px 2px rgba(255,69,58,0.25)} 50%{box-shadow:0 0 24px 7px rgba(255,69,58,0.45)} }
+        @keyframes pv-glow-unknown  { 0%,100%{opacity:1} 50%{opacity:0.72} }
+        @keyframes pv-dot { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.45);opacity:0.65} }
+        @keyframes pv-picker { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+      `}</style>
+      <div className="mb-4" style={{ position: 'relative' }}>
+        {activePlanVerdict ? (
+          <div key={activePlanVerdict.key} onClick={() => setShowPlanPicker(v => !v)}
+            style={{
+              padding: '16px 22px', borderRadius: 14, cursor: 'pointer',
+              backgroundColor: `${activePlanVerdict.color}12`,
+              border: `1px solid ${activePlanVerdict.color}30`,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              animation: `pv-enter 0.35s cubic-bezier(0.16,1,0.3,1), pv-glow-${activePlanVerdict.key} ${PLAN_VERDICT_ANIM[activePlanVerdict.key]?.dur ?? '3s'} ease-in-out infinite 0.35s`,
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
+                backgroundColor: activePlanVerdict.color,
+                boxShadow: `0 0 8px ${activePlanVerdict.color}`,
+                animation: `pv-dot ${PLAN_VERDICT_ANIM[activePlanVerdict.key]?.dur ?? '3s'} ease-in-out infinite`,
+              }} />
+              <span style={{ fontSize: 15, fontWeight: 600, color: activePlanVerdict.color }}>
+                {activePlanVerdict.label}
+              </span>
+            </div>
+            <span style={{ fontSize: 11, color: activePlanVerdict.color, opacity: 0.6 }}>
+              {showPlanPicker ? '▲' : '▼'}
+            </span>
+          </div>
+        ) : (
+          <button onClick={() => setShowPlanPicker(v => !v)} style={{
+            width: '100%', padding: '13px 22px', borderRadius: 14, cursor: 'pointer',
+            backgroundColor: 'rgba(255,255,255,0.03)',
+            border: '1px dashed rgba(255,255,255,0.1)',
+            color: '#6e6e73', fontSize: 13, fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <span>{t.selectPlanVerdict}</span>
+            <span style={{ fontSize: 11 }}>{showPlanPicker ? '▲' : '▼'}</span>
+          </button>
+        )}
+
+        {showPlanPicker && (
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, zIndex: 50,
+            backgroundColor: '#1c1c1e', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 14, padding: 8,
+            boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+            animation: 'pv-picker 0.2s ease',
+          }}>
+            {t.planVerdicts.map(v => (
+              <button key={v.key} onClick={() => savePlanVerdict(v.key)} style={{
+                width: '100%', padding: '10px 14px', borderRadius: 10, border: 'none',
+                cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 10, transition: 'background 0.15s',
+                backgroundColor: planVerdict === v.key ? `${v.color}18` : 'transparent',
+              }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = `${v.color}14`}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = planVerdict === v.key ? `${v.color}18` : 'transparent'}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: v.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 13, fontWeight: planVerdict === v.key ? 600 : 400,
+                  color: planVerdict === v.key ? v.color : '#d1d1d6' }}>
+                  {v.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {hasPlan === false && (
         <div style={{ ...CARD, marginBottom: 16 }}>
           <p className="text-sm" style={{ color: '#6e6e73' }}>{t.noPlan}</p>
@@ -2718,6 +2831,21 @@ function SnapshotView({ snapshot, lang = 'es' }) {
 
           {sec.number === '03' && (
             <div className="mb-2">
+              {/* Plan verdict banner (snapshot read-only) */}
+              {proj.plan_verdict && (() => {
+                const pv = t.planVerdicts.find(v => v.key === proj.plan_verdict)
+                if (!pv) return null
+                return (
+                  <div style={{
+                    borderRadius: 14, padding: '20px 28px', marginBottom: 16,
+                    backgroundColor: `${pv.color}10`, border: `1px solid ${pv.color}30`,
+                  }}>
+                    <p style={{ fontSize: 22, fontWeight: 700, color: pv.color, lineHeight: 1.2, letterSpacing: '-0.01em', margin: 0 }}>
+                      {pv.label}
+                    </p>
+                  </div>
+                )
+              })()}
               {phases.length === 0
                 ? <div style={CARD}><p className="text-sm" style={{ color: '#6e6e73' }}>{t.noPlan}</p></div>
                 : <>
@@ -3311,6 +3439,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
           customer_satisfaction_text: project.customer_satisfaction_text,
           opportunities: project.opportunities, challenges: project.challenges,
           stability_verdict: project.stability_verdict ?? null,
+          plan_verdict: project.plan_verdict ?? null,
           effort_target_hours: project.effort_target_hours ?? null,
           status_report_section_statuses: project.status_report_section_statuses ?? {},
           section_comments: project.section_comments ?? {},
