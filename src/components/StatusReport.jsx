@@ -803,24 +803,72 @@ function SystemStabilitySection({ projectId, project, onSave, lang = 'es' }) {
 
   const SEP = <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
 
+  const VERDICT_ANIM = {
+    stable:   { glow: `0 0 24px 6px rgba(48,209,88,0.18)`,   border: `rgba(48,209,88,0.7)`,   dur: '4s'   },
+    minor:    { glow: `0 0 24px 6px rgba(255,159,10,0.22)`,  border: `rgba(255,159,10,0.7)`,  dur: '2.5s' },
+    critical: { glow: `0 0 28px 8px rgba(255,69,58,0.38)`,   border: `rgba(255,69,58,0.85)`,  dur: '1.2s' },
+    unknown:  { glow: `0 0 0 0 transparent`,                  border: `rgba(110,110,115,0.4)`, dur: '5s'   },
+  }
+
   return (
     <div className="mb-2">
+      <style>{`
+        @keyframes verdict-enter {
+          from { opacity: 0; transform: translateY(-10px) scale(0.985); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes glow-stable {
+          0%,100% { box-shadow: 0 0 0 0 rgba(48,209,88,0);    border-color: rgba(48,209,88,0.3); }
+          50%     { box-shadow: 0 0 24px 6px rgba(48,209,88,0.18); border-color: rgba(48,209,88,0.7); }
+        }
+        @keyframes glow-minor {
+          0%,100% { box-shadow: 0 0 0 0 rgba(255,159,10,0);   border-color: rgba(255,159,10,0.3); }
+          50%     { box-shadow: 0 0 24px 6px rgba(255,159,10,0.22); border-color: rgba(255,159,10,0.7); }
+        }
+        @keyframes glow-critical {
+          0%,100% { box-shadow: 0 0 10px 2px rgba(255,69,58,0.22); border-color: rgba(255,69,58,0.45); }
+          50%     { box-shadow: 0 0 28px 8px rgba(255,69,58,0.42); border-color: rgba(255,69,58,0.9); }
+        }
+        @keyframes glow-unknown {
+          0%,100% { opacity: 1; }
+          50%     { opacity: 0.55; }
+        }
+        @keyframes dot-pulse {
+          0%,100% { transform: scale(1);   opacity: 1; }
+          50%     { transform: scale(1.5); opacity: 0.6; }
+        }
+        @keyframes picker-enter {
+          from { opacity: 0; transform: translateY(-6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
       {/* Verdict banner */}
       <div style={{ position: 'relative', marginBottom: 16 }}>
         {activeVerdict ? (
           <button onClick={() => setShowPicker(v => !v)} style={{
             width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0,
           }}>
-            <div style={{
-              borderRadius: 14, padding: '20px 28px',
-              backgroundColor: `${activeVerdict.color}10`,
-              border: `1px solid ${activeVerdict.color}30`,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-            }}>
-              <p style={{ fontSize: 22, fontWeight: 700, color: activeVerdict.color, lineHeight: 1.2, letterSpacing: '-0.01em', margin: 0 }}>
-                {activeVerdict.label}
-              </p>
-              <span style={{ fontSize: 11, color: activeVerdict.color, opacity: 0.6, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <div
+              key={activeVerdict.key}
+              style={{
+                borderRadius: 14, padding: '20px 28px',
+                backgroundColor: `${activeVerdict.color}10`,
+                border: `1px solid ${activeVerdict.color}30`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+                animation: `verdict-enter 0.35s cubic-bezier(0.16,1,0.3,1), glow-${activeVerdict.key} ${VERDICT_ANIM[activeVerdict.key]?.dur ?? '3s'} ease-in-out infinite 0.35s`,
+              }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{
+                  width: 10, height: 10, borderRadius: '50%',
+                  backgroundColor: activeVerdict.color, flexShrink: 0,
+                  animation: `dot-pulse ${VERDICT_ANIM[activeVerdict.key]?.dur ?? '3s'} ease-in-out infinite`,
+                }} />
+                <p style={{ fontSize: 22, fontWeight: 700, color: activeVerdict.color, lineHeight: 1.2, letterSpacing: '-0.01em', margin: 0 }}>
+                  {activeVerdict.label}
+                </p>
+              </div>
+              <span style={{ fontSize: 11, color: activeVerdict.color, opacity: 0.5, whiteSpace: 'nowrap', flexShrink: 0 }}>
                 {showPicker ? '▲' : '▼'}
               </span>
             </div>
@@ -847,6 +895,7 @@ function SystemStabilitySection({ projectId, project, onSave, lang = 'es' }) {
             border: '1px solid rgba(255,255,255,0.1)',
             backgroundColor: '#1c1c1e',
             boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
+            animation: 'picker-enter 0.2s cubic-bezier(0.16,1,0.3,1)',
           }}>
             {t.stabilityVerdicts.map(v => (
               <button key={v.key} onClick={() => saveVerdict(v.key)} style={{
@@ -854,7 +903,7 @@ function SystemStabilitySection({ projectId, project, onSave, lang = 'es' }) {
                 padding: '14px 20px', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
                 display: 'flex', alignItems: 'center', gap: 12,
                 backgroundColor: verdict === v.key ? `${v.color}10` : 'transparent',
-                transition: 'background 0.1s',
+                transition: 'background 0.15s',
               }}
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = `${v.color}10`}
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = verdict === v.key ? `${v.color}10` : 'transparent'}
