@@ -1531,10 +1531,10 @@ function EffortOverview({ projectId, project, onSave, lang = 'es' }) {
           <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
           <Bar dataKey="horas" fill="#64d2ff" radius={[4,4,0,0]} name={t.hoursBar} />
-          {target != null && (
-            <ReferenceLine y={target} stroke="#ff9f0a" strokeDasharray="5 4" strokeWidth={1.5}
-              label={{ value: `${target}h`, position: 'insideTopRight', fill: '#ff9f0a', fontSize: 10, dy: -4 }} />
-          )}
+          {target != null
+            ? <ReferenceLine y={Number(target)} stroke="#ff9f0a" strokeWidth={2}
+                label={{ value: `${target}h`, position: 'insideTopRight', fill: '#ff9f0a', fontSize: 11, fontWeight: 600, dy: -6 }} />
+            : null}
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -2764,10 +2764,10 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                     <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
                     <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
                     <Bar dataKey="horas" fill="#64d2ff" radius={[4,4,0,0]} name={t.hoursBar} />
-                    {proj.effort_target_hours != null && (
-                      <ReferenceLine y={proj.effort_target_hours} stroke="#ff9f0a" strokeDasharray="5 4" strokeWidth={1.5}
-                        label={{ value: `${proj.effort_target_hours}h`, position: 'insideTopRight', fill: '#ff9f0a', fontSize: 10, dy: -4 }} />
-                    )}
+                    {proj.effort_target_hours != null
+                      ? <ReferenceLine y={Number(proj.effort_target_hours)} stroke="#ff9f0a" strokeWidth={2}
+                          label={{ value: `${proj.effort_target_hours}h`, position: 'insideTopRight', fill: '#ff9f0a', fontSize: 11, fontWeight: 600, dy: -6 }} />
+                      : null}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
