@@ -104,9 +104,11 @@ const SR = {
     // section 01
     projectType: 'Tipo de proyecto', typeImpl: 'Implementación', typeMaint: 'Mantenimiento',
     renewalDate: 'Fecha de renovación', deadline: 'Deadline', status: 'Estado',
+    startDate: 'Fecha de inicio', currentPhase: 'Fase actual', noActivePhase: 'Sin fase activa',
     teamAlloc: 'Team allocation', resource: 'recurso', resources: 'recursos',
     noResources: 'Sin recursos. Añádelos en la tab Recursos & Finanzas.',
     nameRole: 'Nombre / Rol', dedication: 'Dedicación',
+    hideFromReport: 'Ocultar de este informe (no afecta a finanzas)',
     satPlaceholder: 'Describe la satisfacción del cliente…',
     // section 02
     stabilityVerdicts: [
@@ -132,6 +134,7 @@ const SR = {
     // phase status labels
     phaseCompleted: 'Completada', phasePending: 'Pendiente', phaseOverdue: 'Retrasada',
     phaseAtRisk: 'En riesgo', phaseAhead: n => `+${n}% adelantado`, phaseBehind: n => `${n}% retrasado`, phaseOnTrack: 'En plazo',
+    typeSprint: 'Sprint', typePhase: 'Fase',
     // section 03
     noPlan: 'Sin plan vinculado. Crea uno en la tab Plan para ver métricas de progreso.',
     globalProgress: 'Progreso global', phasesCompleted: 'Fases completadas', plannedHours: 'Horas planificadas',
@@ -190,9 +193,11 @@ const SR = {
     // section 01
     projectType: 'Project type', typeImpl: 'Implementation', typeMaint: 'Maintenance',
     renewalDate: 'Renewal date', deadline: 'Deadline', status: 'Status',
+    startDate: 'Start date', currentPhase: 'Current phase', noActivePhase: 'No active phase',
     teamAlloc: 'Team allocation', resource: 'resource', resources: 'resources',
     noResources: 'No resources. Add them in the Resources & Finances tab.',
     nameRole: 'Name / Role', dedication: 'Dedication',
+    hideFromReport: 'Hide from this report (does not affect finances)',
     satPlaceholder: 'Describe customer satisfaction…',
     // section 02
     stabilityVerdicts: [
@@ -218,6 +223,7 @@ const SR = {
     // phase status labels
     phaseCompleted: 'Completed', phasePending: 'Pending', phaseOverdue: 'Overdue',
     phaseAtRisk: 'At risk', phaseAhead: n => `+${n}% ahead`, phaseBehind: n => `${n}% behind`, phaseOnTrack: 'On track',
+    typeSprint: 'Sprint', typePhase: 'Phase',
     // section 03
     noPlan: 'No plan linked. Create one in the Plan tab to see progress metrics.',
     globalProgress: 'Global progress', phasesCompleted: 'Phases completed', plannedHours: 'Planned hours',
@@ -517,7 +523,8 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
 
   // Resources
   const [resources, setResources] = useState([])
-  const [editingPct, setEditingPct] = useState({}) // id → string value
+  const [editingPct, setEditingPct] = useState({})
+  const [hiddenResourceIds, setHiddenResourceIds] = useState(project.status_report_hidden_resources ?? [])
 
   useEffect(() => {
     supabase
@@ -539,6 +546,31 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
     setResources(prev => prev.map(r => r.id === id ? { ...r, dedication_pct: pct } : r))
     setEditingPct(prev => { const n = { ...prev }; delete n[id]; return n })
   }
+
+  async function toggleHideResource(id) {
+    const next = hiddenResourceIds.includes(id)
+      ? hiddenResourceIds.filter(x => x !== id)
+      : [...hiddenResourceIds, id]
+    setHiddenResourceIds(next)
+    await supabase.from('projects').update({ status_report_hidden_resources: next }).eq('id', project.id)
+    onSave({ status_report_hidden_resources: next })
+  }
+
+  // Active phase
+  const [activePhase, setActivePhase] = useState(null)
+  useEffect(() => {
+    async function loadPhase() {
+      const { data: plans } = await supabase.from('project_plans').select('id').eq('project_id', project.id).limit(1)
+      if (!plans?.length) return
+      const { data: phases } = await supabase.from('plan_phases')
+        .select('id, name, start_date, end_date, progress, is_milestone')
+        .eq('plan_id', plans[0].id).order('order_index')
+      const today = new Date().toISOString().slice(0, 10)
+      const active = (phases ?? []).filter(p => !p.is_milestone).find(p => p.start_date <= today && today <= p.end_date)
+      setActivePhase(active ?? null)
+    }
+    loadPhase()
+  }, [project.id])
 
   const t = SR[lang] ?? SR.es
   const TYPE_LABELS = { implementation: t.typeImpl, maintenance: t.typeMaint }
@@ -569,6 +601,18 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
               <p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(project.deadline, t.locale)}</p>
             </div>
           )}
+          {project.start_date && (
+            <div className="mt-3">
+              <p className="text-xs" style={{ color: '#6e6e73' }}>{t.startDate}</p>
+              <p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(project.start_date, t.locale)}</p>
+            </div>
+          )}
+          <div className="mt-3">
+            <p className="text-xs" style={{ color: '#6e6e73' }}>{t.currentPhase}</p>
+            <p className="text-sm font-medium mt-0.5" style={{ color: activePhase ? '#64d2ff' : '#3a3a3a' }}>
+              {activePhase ? activePhase.name : t.noActivePhase}
+            </p>
+          </div>
           <div className="mt-3">
             <p className="text-xs" style={{ color: '#6e6e73' }}>{t.status}</p>
             <span className="text-sm font-medium mt-0.5 inline-block"
@@ -581,24 +625,26 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
         {/* Team allocation */}
         <div style={CARD}>
           <p className="text-xs mb-3" style={{ color: '#6e6e73' }}>
-            {t.teamAlloc} ({resources.length} {resources.length !== 1 ? t.resources : t.resource})
+            {t.teamAlloc} ({resources.filter(r => !hiddenResourceIds.includes(r.id)).length} {resources.filter(r => !hiddenResourceIds.includes(r.id)).length !== 1 ? t.resources : t.resource})
           </p>
           {resources.length === 0 ? (
             <p className="text-xs" style={{ color: '#6e6e73' }}>{t.noResources}</p>
           ) : (
             <div className="flex flex-col gap-3">
-              <div className="grid gap-2 text-xs" style={{ color: '#6e6e73', gridTemplateColumns: '1fr auto auto' }}>
+              <div className="grid gap-2 text-xs" style={{ color: '#6e6e73', gridTemplateColumns: '1fr auto auto auto' }}>
                 <span>{t.nameRole}</span>
                 <span style={{ textAlign: 'right' }}>€/h</span>
                 <span style={{ textAlign: 'right', minWidth: 64 }}>{t.dedication}</span>
+                <span />
               </div>
               {resources.map(r => {
                 const isEditing = editingPct[r.id] !== undefined
+                const isHidden = hiddenResourceIds.includes(r.id)
                 return (
                   <div key={r.id} className="grid gap-2 items-center"
-                    style={{ gridTemplateColumns: '1fr auto auto' }}>
+                    style={{ gridTemplateColumns: '1fr auto auto auto', opacity: isHidden ? 0.35 : 1 }}>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: '#f5f5f7' }}>{r.name}</p>
+                      <p className="text-sm font-medium truncate" style={{ color: '#f5f5f7', textDecoration: isHidden ? 'line-through' : 'none' }}>{r.name}</p>
                       {r.role && <p className="text-xs truncate" style={{ color: '#6e6e73' }}>{r.role}</p>}
                     </div>
                     <span className="text-xs font-mono" style={{ color: '#6e6e73', textAlign: 'right' }}>
@@ -630,6 +676,21 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
                         {r.dedication_pct != null ? `${r.dedication_pct}%` : '—'}
                       </button>
                     )}
+                    <button
+                      onClick={() => toggleHideResource(r.id)}
+                      title={t.hideFromReport}
+                      style={{
+                        width: 22, height: 22, borderRadius: 6, border: 'none', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0,
+                        backgroundColor: isHidden ? 'rgba(255,69,58,0.15)' : 'rgba(255,255,255,0.04)',
+                        color: isHidden ? '#ff453a' : '#3a3a3a',
+                        transition: 'background 0.15s, color 0.15s',
+                      }}
+                      onMouseEnter={e => { if (!isHidden) { e.currentTarget.style.backgroundColor = 'rgba(255,69,58,0.1)'; e.currentTarget.style.color = '#ff453a' } }}
+                      onMouseLeave={e => { if (!isHidden) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#3a3a3a' } }}
+                    >
+                      <Trash2 size={11} />
+                    </button>
                   </div>
                 )
               })}
@@ -1105,6 +1166,97 @@ function phaseMetrics(phase, lang = 'es') {
            scheduleStatus, scheduleColor, scheduleLabel }
 }
 
+// ── Phase progress bar (shared between live and snapshot) ─────────────────────
+function PhaseProgressRow({ phase, m, locale, t }) {
+  const todayPct = Math.min(100, m.timePct)
+
+  let arrow = '→'
+  if (m.scheduleStatus === 'ahead')  arrow = '↑'
+  else if (m.scheduleStatus === 'behind' || m.scheduleStatus === 'risk') arrow = '↓'
+  else if (m.scheduleStatus === 'overdue') arrow = '⚠'
+
+  let statusMsg = null
+  if (!m.isUpcoming && !m.isCompleted) {
+    if      (m.scheduleStatus === 'ahead')   statusMsg = t.aheadMsg(Math.round(m.delta))
+    else if (m.scheduleStatus === 'behind' || m.scheduleStatus === 'risk') statusMsg = t.behindMsg(Math.abs(Math.round(m.delta)))
+    else if (m.scheduleStatus === 'ontrack') statusMsg = t.onTrackMsg
+    else if (m.scheduleStatus === 'overdue') statusMsg = t.daysOverdue(m.daysRemaining)
+  }
+
+  return (
+    <div style={{ opacity: m.isUpcoming ? 0.45 : 1 }}>
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
+          <span className="text-sm font-medium truncate" style={{ color: '#f5f5f7' }}>{phase.name}</span>
+          {m.isActive && (
+            <span className="text-xs px-1.5 py-0.5 rounded-full shrink-0"
+              style={{ backgroundColor: `${phase.color}20`, color: phase.color }}>{t.activeLabel}</span>
+          )}
+          {phase.is_sprint && (
+            <span className="shrink-0" style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: '0.05em',
+              padding: '2px 6px', borderRadius: 4,
+              backgroundColor: 'rgba(100,210,255,0.1)', color: '#64d2ff',
+            }}>{t.typeSprint}</span>
+          )}
+        </div>
+        <span className="shrink-0 ml-3" style={{
+          fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+          backgroundColor: `${m.scheduleColor}18`, color: m.scheduleColor,
+        }}>{m.scheduleLabel}</span>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ position: 'relative', height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.06)' }}>
+        {/* Completion fill — color = status */}
+        {m.progress > 0 && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, bottom: 0,
+            width: `${Math.min(100, m.progress)}%`,
+            backgroundColor: m.scheduleColor,
+            borderRadius: 5,
+            opacity: 0.85,
+          }} />
+        )}
+        {/* Today marker line */}
+        {!m.isUpcoming && !m.isCompleted && todayPct > 0 && (
+          <div style={{
+            position: 'absolute',
+            left: `${todayPct}%`,
+            top: -4, height: 18,
+            width: 2,
+            backgroundColor: m.scheduleColor,
+            borderRadius: 1,
+            transform: 'translateX(-50%)',
+            zIndex: 2,
+            boxShadow: `0 0 4px ${m.scheduleColor}`,
+          }} />
+        )}
+      </div>
+
+      {/* Footer: dates + % */}
+      <div className="flex justify-between mt-1.5">
+        <span style={{ fontSize: 11, color: '#3a3a3a' }}>
+          {new Date(phase.start_date + 'T00:00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+          {' → '}
+          {new Date(phase.end_date + 'T00:00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: m.scheduleColor }}>{m.progress}%</span>
+      </div>
+
+      {/* Status message */}
+      {statusMsg && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
+          <span style={{ fontSize: 12, color: m.scheduleColor, lineHeight: 1 }}>{arrow}</span>
+          <span style={{ fontSize: 11, color: m.scheduleColor }}>{statusMsg}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Gantt section (own block, between 01 and 02) ─────────────────────────────
 function PlanGanttSection({ projectId }) {
   const [plan,   setPlan]   = useState(null)
@@ -1161,7 +1313,7 @@ function DeliveringValueSection({ projectId, project, onSave, lang = 'es' }) {
         setHasPlan(true)
         const { data: ph } = await supabase
           .from('plan_phases')
-          .select('id, name, color, start_date, end_date, hours, is_milestone, progress')
+          .select('id, name, color, start_date, end_date, hours, is_milestone, is_sprint, progress')
           .eq('plan_id', plans[0].id).order('order_index')
         setPhases((ph ?? []).filter(p => !p.is_milestone))
       } else {
@@ -1217,7 +1369,7 @@ function DeliveringValueSection({ projectId, project, onSave, lang = 'es' }) {
 
   // Derived plan stats
   const phasesWithMetrics = phases.map(p => ({ ...p, metrics: phaseMetrics(p, lang) }))
-  const activePhase     = phasesWithMetrics.find(p => p.metrics.isActive)
+  const activePhases    = phasesWithMetrics.filter(p => p.metrics.isActive)
   const totalHours      = phases.reduce((s, p) => s + (p.hours ?? 0), 0)
   const overallPct      = phases.length > 0
     ? Math.round(phases.reduce((s, p) => s + (p.progress ?? 0), 0) / phases.length) : 0
@@ -1324,109 +1476,65 @@ function DeliveringValueSection({ projectId, project, onSave, lang = 'es' }) {
             color="#64d2ff" />
         </div>
 
-        {/* Active phase spotlight */}
-        {activePhase && (() => {
-          const m = activePhase.metrics
-          return (
-            <div style={{ ...CARD, marginBottom: 16, border: `1px solid ${activePhase.color}30` }}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: activePhase.color }} />
-                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: activePhase.color }}>{t.activePhase}</span>
-                </div>
-                <span className="text-xs px-2.5 py-1 rounded-full font-medium"
-                  style={{ backgroundColor: `${m.scheduleColor}18`, color: m.scheduleColor }}>
-                  {m.scheduleLabel}
-                </span>
-              </div>
-              <p className="text-lg font-semibold mb-4" style={{ color: '#f5f5f7' }}>{activePhase.name}</p>
-
-              {/* Tiempo transcurrido */}
-              <div className="mb-3">
-                <div className="flex justify-between text-xs mb-1.5" style={{ color: '#6e6e73' }}>
-                  <span>{t.timeElapsed}</span>
-                  <span style={{ color: '#f5f5f7' }}>{Math.round(m.timePct)}%</span>
-                </div>
-                <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
-                  <div className="h-full rounded-full" style={{ width: `${m.timePct}%`, backgroundColor: '#6e6e73' }} />
-                </div>
-                <p className="text-xs mt-1" style={{ color: '#6e6e73' }}>
-                  {m.daysRemaining > 0 ? t.daysRemaining(m.daysRemaining) : t.daysOverdue(m.daysRemaining)}
-                </p>
-              </div>
-
-              {/* Progreso */}
-              <div className="mb-4">
-                <div className="flex justify-between text-xs mb-1.5" style={{ color: '#6e6e73' }}>
-                  <span>{t.progressLabel}</span>
-                  <span style={{ color: activePhase.color }}>{m.progress}%</span>
-                </div>
-                <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
-                  <div className="h-full rounded-full transition-all" style={{ width: `${m.progress}%`, backgroundColor: activePhase.color }} />
-                </div>
-              </div>
-
-              {/* Delta indicator */}
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                style={{ backgroundColor: `${m.scheduleColor}10` }}>
-                <span style={{ fontSize: 16 }}>
-                  {m.scheduleStatus === 'ahead' ? '↑' : m.scheduleStatus === 'behind' ? '↓' : '→'}
-                </span>
-                <p className="text-xs" style={{ color: m.scheduleColor }}>
-                  {m.scheduleStatus === 'ahead'   && t.aheadMsg(Math.round(m.delta))}
-                  {m.scheduleStatus === 'behind'  && t.behindMsg(Math.abs(Math.round(m.delta)))}
-                  {m.scheduleStatus === 'ontrack' && t.onTrackMsg}
-                </p>
-              </div>
-            </div>
-          )
-        })()}
-
-        {/* All phases */}
-        <div style={CARD} className="mb-4">
-          <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.allPhases}</p>
-          <div className="flex flex-col gap-4">
-            {visiblePhases.map(phase => {
-              const m = phase.metrics
-              const isActive = phase.id === activePhase?.id
+        {/* Active phase spotlight(s) */}
+        {activePhases.length > 0 && (
+          <div className="flex flex-col gap-3 mb-4">
+            {activePhases.map(ap => {
+              const m = ap.metrics
               return (
-                <div key={phase.id} style={{ opacity: m.isUpcoming ? 0.5 : 1 }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
-                      <span className="text-sm font-medium truncate" style={{ color: '#f5f5f7' }}>{phase.name}</span>
-                      {isActive && (
-                        <span className="text-xs px-1.5 py-0.5 rounded-full shrink-0"
-                          style={{ backgroundColor: `${phase.color}20`, color: phase.color }}>{t.activeLabel}</span>
+                <div key={ap.id} style={{ ...CARD, border: `1px solid ${ap.color}30`, padding: '16px 18px' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: ap.color }} />
+                      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', color: ap.color }}>{t.activePhase.toUpperCase()}</span>
+                      {ap.is_sprint && (
+                        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 4, backgroundColor: 'rgba(100,210,255,0.1)', color: '#64d2ff' }}>{t.typeSprint}</span>
                       )}
                     </div>
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ml-3"
-                      style={{ backgroundColor: `${m.scheduleColor}15`, color: m.scheduleColor }}>
-                      {m.scheduleLabel}
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, backgroundColor: `${m.scheduleColor}18`, color: m.scheduleColor }}>{m.scheduleLabel}</span>
+                  </div>
+                  <p style={{ fontSize: 15, fontWeight: 600, color: '#f5f5f7', marginBottom: 12 }}>{ap.name}</p>
+                  {/* Combined bar */}
+                  <div style={{ position: 'relative', height: 12, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.06)', marginBottom: 6 }}>
+                    {m.progress > 0 && (
+                      <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${Math.min(100, m.progress)}%`, backgroundColor: m.scheduleColor, borderRadius: 6, opacity: 0.85 }} />
+                    )}
+                    <div style={{ position: 'absolute', left: `${Math.min(100, m.timePct)}%`, top: -4, height: 20, width: 2, backgroundColor: m.scheduleColor, borderRadius: 1, transform: 'translateX(-50%)', zIndex: 2, boxShadow: `0 0 5px ${m.scheduleColor}` }} />
+                  </div>
+                  <div className="flex justify-between" style={{ marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, color: '#6e6e73' }}>
+                      {m.daysRemaining > 0 ? t.daysRemaining(m.daysRemaining) : t.daysOverdue(m.daysRemaining)}
                     </span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: m.scheduleColor }}>{m.progress}% {t.progressLabel.toLowerCase()}</span>
                   </div>
-
-                  <div className="relative h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
-                    <div className="absolute inset-y-0 left-0 rounded-full"
-                      style={{ width: `${m.timePct}%`, backgroundColor: 'rgba(255,255,255,0.1)' }} />
-                    <div className="absolute inset-y-0 left-0 rounded-full transition-all"
-                      style={{ width: `${m.progress}%`, backgroundColor: phase.color }} />
-                  </div>
-
-                  <div className="flex justify-between mt-1">
-                    <span className="text-xs" style={{ color: '#3a3a3a' }}>
-                      {new Date(phase.start_date + 'T00:00:00').toLocaleDateString(t.locale, { day: 'numeric', month: 'short' })}
-                      {' → '}
-                      {new Date(phase.end_date + 'T00:00:00').toLocaleDateString(t.locale, { day: 'numeric', month: 'short' })}
-                    </span>
-                    <span className="text-xs font-semibold" style={{ color: phase.color }}>{m.progress}%</span>
-                  </div>
+                  {!m.isCompleted && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, backgroundColor: `${m.scheduleColor}0e` }}>
+                      <span style={{ fontSize: 13, color: m.scheduleColor }}>
+                        {m.scheduleStatus === 'ahead' ? '↑' : m.scheduleStatus === 'behind' || m.scheduleStatus === 'risk' ? '↓' : m.scheduleStatus === 'overdue' ? '⚠' : '→'}
+                      </span>
+                      <span style={{ fontSize: 12, color: m.scheduleColor }}>
+                        {m.scheduleStatus === 'ahead'   && t.aheadMsg(Math.round(m.delta))}
+                        {(m.scheduleStatus === 'behind' || m.scheduleStatus === 'risk') && t.behindMsg(Math.abs(Math.round(m.delta)))}
+                        {m.scheduleStatus === 'ontrack' && t.onTrackMsg}
+                        {m.scheduleStatus === 'overdue' && t.daysOverdue(m.daysRemaining)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )
             })}
           </div>
+        )}
 
-          {/* Expand / collapse */}
+        {/* All phases */}
+        <div style={CARD} className="mb-4">
+          <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.allPhases}</p>
+          <div className="flex flex-col gap-5">
+            {visiblePhases.map(phase => (
+              <PhaseProgressRow key={phase.id} phase={phase} m={phase.metrics} locale={t.locale} t={t} />
+            ))}
+          </div>
+
           {hiddenCount > 0 && (
             <button
               onClick={() => setShowAllPhases(v => !v)}
@@ -2546,20 +2654,27 @@ function SnapshotView({ snapshot, lang = 'es' }) {
     const ref   = new Date(snapDate + 'T00:00:00')
     const start = new Date(phase.start_date + 'T00:00:00')
     const end   = new Date(phase.end_date   + 'T00:00:00')
-    const totalDays = Math.max(1, Math.round((end - start) / 86400000))
-    const elapsed   = Math.round((ref - start) / 86400000)
-    const timePct   = Math.min(100, Math.max(0, elapsed / totalDays * 100))
-    const progress  = phase.progress ?? 0
+    const totalDays   = Math.max(1, Math.round((end - start) / 86400000))
+    const elapsed     = Math.round((ref - start) / 86400000)
+    const timePct     = Math.min(100, Math.max(0, elapsed / totalDays * 100))
+    const progress    = phase.progress ?? 0
     const isCompleted = progress >= 100
     const isUpcoming  = ref < start
     const isOverdue   = ref > end && !isCompleted
-    let color, label
-    if (isCompleted)              { color = '#30d158'; label = t.phaseCompleted }
-    else if (isUpcoming)          { color = '#6e6e73'; label = t.phasePending }
-    else if (isOverdue)           { color = '#ff453a'; label = t.phaseOverdue }
-    else if (timePct - progress > 25) { color = '#ff9f0a'; label = t.phaseAtRisk }
-    else                          { color = '#64d2ff'; label = t.phaseOnTrack }
-    return { timePct, progress, color, label, isUpcoming, isCompleted }
+    const isActive    = !isUpcoming && !isCompleted && ref <= end
+    const delta       = progress - timePct
+    const daysRemaining = Math.round((end - ref) / 86400000)
+    let scheduleStatus, scheduleColor, scheduleLabel
+    if (isCompleted)                  { scheduleStatus = 'done';    scheduleColor = '#30d158'; scheduleLabel = t.phaseCompleted }
+    else if (isUpcoming)              { scheduleStatus = 'upcoming';scheduleColor = '#6e6e73'; scheduleLabel = t.phasePending }
+    else if (isOverdue)               { scheduleStatus = 'overdue'; scheduleColor = '#ff453a'; scheduleLabel = t.phaseOverdue }
+    else if (timePct - progress > 25) { scheduleStatus = 'risk';    scheduleColor = '#ff9f0a'; scheduleLabel = t.phaseAtRisk }
+    else if (delta > 8)               { scheduleStatus = 'ahead';   scheduleColor = '#30d158'; scheduleLabel = t.phaseAhead(Math.round(delta)) }
+    else if (delta < -8)              { scheduleStatus = 'behind';  scheduleColor = '#ff9f0a'; scheduleLabel = t.phaseBehind(Math.round(delta)) }
+    else                              { scheduleStatus = 'ontrack'; scheduleColor = '#64d2ff'; scheduleLabel = t.phaseOnTrack }
+    return { timePct, progress, delta, daysRemaining, isCompleted, isUpcoming, isOverdue, isActive,
+             scheduleStatus, scheduleColor, scheduleLabel,
+             color: scheduleColor, label: scheduleLabel }
   }
 
   const months6    = lastNMonthsFrom(6, snapDate)
@@ -2584,6 +2699,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
 
   // Phases
   const phasesWithMet   = phases.map(p => ({ ...p, met: phaseMetAt(p) }))
+  const snapActivePhases = phasesWithMet.filter(p => p.met.isActive)
   const overallPct      = phases.length ? Math.round(phases.reduce((s, p) => s + (p.progress ?? 0), 0) / phases.length) : 0
   const completedPhases = phasesWithMet.filter(p => p.met.isCompleted).length
   const totalHoursSnap  = phases.reduce((s, p) => s + (p.hours ?? 0), 0)
@@ -2685,6 +2801,18 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                   </span>
                   {!isImpl && proj.renewal_date && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.renewalDate}</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.renewal_date, locale)}</p></div>}
                   {isImpl  && proj.deadline      && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.deadline}</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.deadline, locale)}</p></div>}
+                  {proj.start_date && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.startDate}</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.start_date, locale)}</p></div>}
+                  {(() => {
+                    const snapActivePhase = phases.find(p => p.start_date <= snapDate && snapDate <= p.end_date)
+                    return (
+                      <div className="mt-3">
+                        <p className="text-xs" style={{ color: '#6e6e73' }}>{t.currentPhase}</p>
+                        <p className="text-sm font-medium mt-0.5" style={{ color: snapActivePhase ? '#64d2ff' : '#3a3a3a' }}>
+                          {snapActivePhase ? snapActivePhase.name : t.noActivePhase}
+                        </p>
+                      </div>
+                    )
+                  })()}
                   <div className="mt-3">
                     <p className="text-xs" style={{ color: '#6e6e73' }}>{t.status}</p>
                     <span className="text-sm font-medium mt-0.5 inline-block" style={{ color: STATUS_COLORS[proj.status] ?? '#f5f5f7' }}>
@@ -2692,26 +2820,32 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                     </span>
                   </div>
                 </div>
-                <div style={CARD}>
-                  <p className="text-xs mb-3" style={{ color: '#6e6e73' }}>{t.teamAlloc} ({resources.length} {resources.length !== 1 ? t.resources : t.resource})</p>
-                  {resources.length === 0 ? <p className="text-xs" style={{ color: '#6e6e73' }}>{t.noResources}</p> : (
-                    <div className="flex flex-col gap-3">
-                      <div className="grid gap-2 text-xs" style={{ color: '#6e6e73', gridTemplateColumns: '1fr auto auto' }}>
-                        <span>{t.nameRole}</span><span style={{ textAlign: 'right' }}>€/h</span><span style={{ textAlign: 'right', minWidth: 64 }}>{t.dedication}</span>
-                      </div>
-                      {resources.map((r, ri) => (
-                        <div key={ri} className="grid gap-2 items-center" style={{ gridTemplateColumns: '1fr auto auto' }}>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate" style={{ color: '#f5f5f7' }}>{r.name}</p>
-                            {r.role && <p className="text-xs truncate" style={{ color: '#6e6e73' }}>{r.role}</p>}
+                {(() => {
+                  const hiddenIds = proj.status_report_hidden_resources ?? []
+                  const visibleResources = resources.filter(r => !hiddenIds.includes(r.id))
+                  return (
+                    <div style={CARD}>
+                      <p className="text-xs mb-3" style={{ color: '#6e6e73' }}>{t.teamAlloc} ({visibleResources.length} {visibleResources.length !== 1 ? t.resources : t.resource})</p>
+                      {visibleResources.length === 0 ? <p className="text-xs" style={{ color: '#6e6e73' }}>{t.noResources}</p> : (
+                        <div className="flex flex-col gap-3">
+                          <div className="grid gap-2 text-xs" style={{ color: '#6e6e73', gridTemplateColumns: '1fr auto auto' }}>
+                            <span>{t.nameRole}</span><span style={{ textAlign: 'right' }}>€/h</span><span style={{ textAlign: 'right', minWidth: 64 }}>{t.dedication}</span>
                           </div>
-                          <span className="text-xs font-mono" style={{ color: '#6e6e73', textAlign: 'right' }}>{r.hourly_rate != null ? `${r.hourly_rate}€` : '—'}</span>
-                          <span className="text-xs font-medium" style={{ color: '#f5f5f7', textAlign: 'right', minWidth: 56 }}>{r.dedication_pct != null ? `${r.dedication_pct}%` : '—'}</span>
+                          {visibleResources.map((r, ri) => (
+                            <div key={ri} className="grid gap-2 items-center" style={{ gridTemplateColumns: '1fr auto auto' }}>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate" style={{ color: '#f5f5f7' }}>{r.name}</p>
+                                {r.role && <p className="text-xs truncate" style={{ color: '#6e6e73' }}>{r.role}</p>}
+                              </div>
+                              <span className="text-xs font-mono" style={{ color: '#6e6e73', textAlign: 'right' }}>{r.hourly_rate != null ? `${r.hourly_rate}€` : '—'}</span>
+                              <span className="text-xs font-medium" style={{ color: '#f5f5f7', textAlign: 'right', minWidth: 56 }}>{r.dedication_pct != null ? `${r.dedication_pct}%` : '—'}</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
                     </div>
-                  )}
-                </div>
+                  )
+                })()}
               </div>
               <div style={CARD}>
                 <div className="flex items-center justify-between mb-3">
@@ -2854,36 +2988,40 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                       <KpiCard label={t.phasesCompleted} value={`${completedPhases}/${phases.length}`} color="#f5f5f7" />
                       <KpiCard label={t.plannedHours} value={totalHoursSnap > 0 ? `${totalHoursSnap}h` : '—'} color="#64d2ff" />
                     </div>
-                    <div style={{ ...CARD, marginBottom: 16 }}>
-                      <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.allPhases}</p>
-                      <div className="flex flex-col gap-4">
-                        {phasesWithMet.map(phase => {
-                          const m = phase.met
+                    {snapActivePhases.length > 0 && (
+                      <div className="flex flex-col gap-3 mb-4">
+                        {snapActivePhases.map(ap => {
+                          const m = ap.met
                           return (
-                            <div key={phase.id} style={{ opacity: m.isUpcoming ? 0.5 : 1 }}>
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
-                                  <span className="text-sm font-medium truncate" style={{ color: '#f5f5f7' }}>{phase.name}</span>
+                            <div key={ap.id} style={{ ...CARD, border: `1px solid ${ap.color}30`, padding: '16px 18px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: ap.color }} />
+                                  <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', color: ap.color }}>{t.activePhase.toUpperCase()}</span>
+                                  {ap.is_sprint && <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 4, backgroundColor: 'rgba(100,210,255,0.1)', color: '#64d2ff' }}>{t.typeSprint}</span>}
                                 </div>
-                                <span className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ml-3"
-                                  style={{ backgroundColor: `${m.color}15`, color: m.color }}>{m.label}</span>
+                                <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, backgroundColor: `${m.scheduleColor}18`, color: m.scheduleColor }}>{m.scheduleLabel}</span>
                               </div>
-                              <div className="relative h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
-                                <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${m.timePct}%`, backgroundColor: 'rgba(255,255,255,0.1)' }} />
-                                <div className="absolute inset-y-0 left-0 rounded-full transition-all" style={{ width: `${m.progress}%`, backgroundColor: phase.color }} />
+                              <p style={{ fontSize: 15, fontWeight: 600, color: '#f5f5f7', marginBottom: 10 }}>{ap.name}</p>
+                              <div style={{ position: 'relative', height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.06)', marginBottom: 6 }}>
+                                {m.progress > 0 && <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${Math.min(100, m.progress)}%`, backgroundColor: m.scheduleColor, borderRadius: 5, opacity: 0.85 }} />}
+                                <div style={{ position: 'absolute', left: `${Math.min(100, m.timePct)}%`, top: -3, height: 16, width: 2, backgroundColor: m.scheduleColor, borderRadius: 1, transform: 'translateX(-50%)', zIndex: 2 }} />
                               </div>
-                              <div className="flex justify-between mt-1">
-                                <span className="text-xs" style={{ color: '#3a3a3a' }}>
-                                  {new Date(phase.start_date + 'T00:00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
-                                  {' → '}
-                                  {new Date(phase.end_date + 'T00:00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
-                                </span>
-                                <span className="text-xs font-semibold" style={{ color: phase.color }}>{m.progress}%</span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: 11, color: '#6e6e73' }}>{m.daysRemaining > 0 ? t.daysRemaining(m.daysRemaining) : t.daysOverdue(m.daysRemaining)}</span>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: m.scheduleColor }}>{m.progress}%</span>
                               </div>
                             </div>
                           )
                         })}
+                      </div>
+                    )}
+                    <div style={{ ...CARD, marginBottom: 16 }}>
+                      <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.allPhases}</p>
+                      <div className="flex flex-col gap-5">
+                        {phasesWithMet.map(phase => (
+                          <PhaseProgressRow key={phase.id} phase={phase} m={phase.met} locale={locale} t={t} />
+                        ))}
                       </div>
                     </div>
                     {snapDeliverables.length > 0 && (
@@ -3435,6 +3573,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
         project: {
           type: project.type, status: project.status,
           deadline: project.deadline, renewal_date: project.renewal_date,
+          start_date: project.start_date ?? null,
           customer_satisfaction_status: project.customer_satisfaction_status,
           customer_satisfaction_text: project.customer_satisfaction_text,
           opportunities: project.opportunities, challenges: project.challenges,
@@ -3443,6 +3582,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
           effort_target_hours: project.effort_target_hours ?? null,
           status_report_section_statuses: project.status_report_section_statuses ?? {},
           section_comments: project.section_comments ?? {},
+          status_report_hidden_resources: project.status_report_hidden_resources ?? [],
         },
         resources: resources ?? [], bug_stats: bugStats ?? [], plan: snapPlan, phases,
         team_kpis: teamKpis ?? [], effort: effort ?? [],
