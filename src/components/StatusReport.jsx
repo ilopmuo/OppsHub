@@ -6,6 +6,7 @@ import { useLang } from '../contexts/LanguageContext'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, PieChart, Pie, Cell, ReferenceLine,
+  LineChart, Line,
 } from 'recharts'
 import { Pencil, ChevronDown, ChevronUp, Save, Clock, GalleryHorizontal, MessageSquare, Zap, Plus, Trash2 } from 'lucide-react'
 
@@ -162,6 +163,8 @@ const SR = {
     estimatedCostLabel: 'Coste estimado total', budgetConsumed: 'del presupuesto consumido',
     estimatedMarginLabel: 'Margen estimado', healthGood: 'Bajo control', healthWarning: 'Atención',
     healthRisk: 'En riesgo', budgetHealth: 'Salud presupuestaria',
+    estimatedProfit: 'Beneficio estimado', profitTrend: 'Tendencia de rentabilidad',
+    baselinePlan: 'Plan día 0', weeklyForecast: 'Previsión semanal',
     resourceBreakdown: 'Desglose por recurso', resName: 'Nombre', resRole: 'Rol', resHours: 'H. reales', resRate: 'Tarifa/h', resCost: 'Coste real', resTotal: 'Total',
     resPlannedH: 'H. planificadas', resRemH: 'H. restantes', resRemCost: 'Coste restante',
     invoiceList: 'Facturas', invDate: 'Fecha', invDesc: 'Descripción', invAmount: 'Importe', invNoDesc: '—',
@@ -251,6 +254,8 @@ const SR = {
     estimatedCostLabel: 'Estimated total cost', budgetConsumed: 'of budget consumed',
     estimatedMarginLabel: 'Estimated margin', healthGood: 'Under control', healthWarning: 'Warning',
     healthRisk: 'At risk', budgetHealth: 'Budget health',
+    estimatedProfit: 'Estimated profit', profitTrend: 'Profitability trend',
+    baselinePlan: 'Day 0 plan', weeklyForecast: 'Weekly forecast',
     resourceBreakdown: 'Resource breakdown', resName: 'Name', resRole: 'Role', resHours: 'Actual h.', resRate: 'Rate/h', resCost: 'Actual cost', resTotal: 'Total',
     resPlannedH: 'Planned h.', resRemH: 'Remaining h.', resRemCost: 'Remaining cost',
     invoiceList: 'Invoices', invDate: 'Date', invDesc: 'Description', invAmount: 'Amount', invNoDesc: '—',
@@ -2229,8 +2234,9 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
           {[
             { label: t.budget,               value: fmtMoney(contract, cur),  color: '#f5f5f7' },
             { label: t.etdCost,              value: fmtMoney(etd, cur),        color: '#64d2ff' },
-            { label: t.remainingBudget,      value: fmtMoney(remainingBudget, cur),
-              color: remainingBudget >= 0 ? '#f5f5f7' : '#ff453a' },
+            { label: t.estimatedProfit,
+              value: contract > 0 ? fmtMoney(estimatedProfit, cur) : '—',
+              color: estimatedProfit >= 0 ? '#30d158' : '#ff453a' },
             { label: t.estimatedMarginLabel,
               value: contract > 0 ? `${estimatedMarginPct.toFixed(1)}%` : '—',
               color: estimatedMarginPct >= target ? '#30d158' : estimatedMarginPct >= 0 ? '#ff9f0a' : '#ff453a' },
@@ -2248,6 +2254,68 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
         <KpiCard label={t.billed}        value={fmtMoney(billed, cur)}    color="#30d158" />
         <KpiCard label={t.currentMargin} value={billed > 0 ? `${currentMargin.toFixed(1)}%` : '—'} color={h.color} />
       </div>
+
+      {/* Profitability trend chart */}
+      {(() => {
+        if (contract <= 0) return null
+        const weekMap = {}
+        resources.forEach(r => {
+          const rate = r.hourly_rate || 0
+          Object.entries(actual).forEach(([k, h]) => {
+            if (!k.startsWith(r.id + '_')) return
+            const w = k.slice(r.id.length + 1)
+            if (!weekMap[w]) weekMap[w] = { actual: 0, planned: 0 }
+            weekMap[w].actual += h * rate
+          })
+          Object.entries(planned).forEach(([k, h]) => {
+            if (!k.startsWith(r.id + '_')) return
+            const w = k.slice(r.id.length + 1)
+            if (!weekMap[w]) weekMap[w] = { actual: 0, planned: 0 }
+            weekMap[w].planned += h * rate
+          })
+        })
+        const weeks = Object.keys(weekMap).sort()
+        if (weeks.length < 2) return null
+        const totalPlanned = weeks.reduce((s, w) => s + weekMap[w].planned, 0)
+        const day0 = Math.round(contract - (etdBase + totalPlanned))
+        let cumCost = 0, remPlanned = totalPlanned
+        const trendData = weeks.map(w => {
+          const a = weekMap[w].actual, p = weekMap[w].planned
+          cumCost += a > 0 ? a : p
+          remPlanned = Math.max(0, remPlanned - p)
+          const profit = Math.round(contract - (etdBase + cumCost + remPlanned))
+          return { week: w, [t.weeklyForecast]: profit, [t.baselinePlan]: day0 }
+        })
+        const lastProfit = trendData.length ? trendData[trendData.length - 1][t.weeklyForecast] : 0
+        const forecastColor = lastProfit >= 0 ? '#30d158' : '#ff453a'
+        return (
+          <div style={{ ...CARD, marginBottom: 12 }}>
+            <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.profitTrend}</p>
+            <div className="flex items-center gap-5 mb-3">
+              {[{ color: forecastColor, label: t.weeklyForecast, dashed: false },
+                { color: '#ff9f0a', label: t.baselinePlan, dashed: true }].map(l => (
+                <div key={l.label} className="flex items-center gap-1.5">
+                  <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke={l.color} strokeWidth="2" strokeDasharray={l.dashed ? '4 3' : undefined} /></svg>
+                  <span className="text-xs" style={{ color: '#6e6e73' }}>{l.label}</span>
+                </div>
+              ))}
+            </div>
+            <ResponsiveContainer width="100%" height={160}>
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="week" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false}
+                  tickFormatter={v => v.slice(5)} interval="preserveStartEnd" />
+                <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false}
+                  tickFormatter={v => fmtMoney(v, cur)} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={v => [fmtMoney(v, cur)]} />
+                <ReferenceLine y={0} stroke="rgba(255,255,255,0.12)" strokeDasharray="4 4" />
+                <Line dataKey={t.baselinePlan}   stroke="#ff9f0a"     strokeWidth={1.5} strokeDasharray="5 3" dot={false} />
+                <Line dataKey={t.weeklyForecast} stroke={forecastColor} strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )
+      })()}
 
       {/* Resource breakdown */}
       {resources.length > 0 && (() => {
@@ -3174,15 +3242,19 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4"
                         style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                        {[
-                          { label: t.budget,               value: fmtMoney(contract, cur),  color: '#f5f5f7' },
-                          { label: t.etdCost,              value: fmtMoney(etd, cur),        color: '#64d2ff' },
-                          { label: t.remainingBudget,      value: fmtMoney(snapRemainingBudget, cur),
-                            color: snapRemainingBudget >= 0 ? '#f5f5f7' : '#ff453a' },
-                          { label: t.estimatedMarginLabel,
-                            value: contract > 0 ? `${snapEstMarginPct.toFixed(1)}%` : '—',
-                            color: snapEstMarginPct >= target ? '#30d158' : snapEstMarginPct >= 0 ? '#ff9f0a' : '#ff453a' },
-                        ].map(m => (
+                        {(() => {
+                          const snapEstProfit = contract - estimatedCostSnap
+                          return [
+                            { label: t.budget,               value: fmtMoney(contract, cur),  color: '#f5f5f7' },
+                            { label: t.etdCost,              value: fmtMoney(etd, cur),        color: '#64d2ff' },
+                            { label: t.estimatedProfit,
+                              value: contract > 0 ? fmtMoney(snapEstProfit, cur) : '—',
+                              color: snapEstProfit >= 0 ? '#30d158' : '#ff453a' },
+                            { label: t.estimatedMarginLabel,
+                              value: contract > 0 ? `${snapEstMarginPct.toFixed(1)}%` : '—',
+                              color: snapEstMarginPct >= target ? '#30d158' : snapEstMarginPct >= 0 ? '#ff9f0a' : '#ff453a' },
+                          ]
+                        })().map(m => (
                           <div key={m.label}>
                             <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>{m.label}</p>
                             <p className="text-base font-semibold" style={{ color: m.color }}>{m.value}</p>
@@ -3194,6 +3266,63 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                       <KpiCard label={t.billed}        value={fmtMoney(billed, cur)}   color="#30d158" />
                       <KpiCard label={t.currentMargin} value={billed > 0 ? `${margin.toFixed(1)}%` : '—'} color={ph.color} />
                     </div>
+
+                    {/* Profitability trend chart (snapshot) */}
+                    {(() => {
+                      if (contract <= 0) return null
+                      const weekMap = {}
+                      resources.forEach(r => {
+                        const rate = r.hourly_rate || 0
+                        allocations.forEach(a => {
+                          if (a.resource_id !== r.id) return
+                          const w = a.week_start
+                          if (!weekMap[w]) weekMap[w] = { actual: 0, planned: 0 }
+                          if (a.actual_hours) weekMap[w].actual += a.actual_hours * rate
+                          if (a.hours)        weekMap[w].planned += a.hours * rate
+                        })
+                      })
+                      const weeks = Object.keys(weekMap).sort()
+                      if (weeks.length < 2) return null
+                      const totalPlanned = weeks.reduce((s, w) => s + weekMap[w].planned, 0)
+                      const day0 = Math.round(contract - (etdBase + totalPlanned))
+                      let cumCost = 0, remPlanned = totalPlanned
+                      const trendData = weeks.map(w => {
+                        const a = weekMap[w].actual, p = weekMap[w].planned
+                        cumCost += a > 0 ? a : p
+                        remPlanned = Math.max(0, remPlanned - p)
+                        const profit = Math.round(contract - (etdBase + cumCost + remPlanned))
+                        return { week: w, [t.weeklyForecast]: profit, [t.baselinePlan]: day0 }
+                      })
+                      const lastProfit = trendData.length ? trendData[trendData.length - 1][t.weeklyForecast] : 0
+                      const fColor = lastProfit >= 0 ? '#30d158' : '#ff453a'
+                      return (
+                        <div style={{ ...CARD, marginBottom: 12 }}>
+                          <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.profitTrend}</p>
+                          <div className="flex items-center gap-5 mb-3">
+                            {[{ color: fColor, label: t.weeklyForecast, dashed: false },
+                              { color: '#ff9f0a', label: t.baselinePlan, dashed: true }].map(l => (
+                              <div key={l.label} className="flex items-center gap-1.5">
+                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke={l.color} strokeWidth="2" strokeDasharray={l.dashed ? '4 3' : undefined} /></svg>
+                                <span className="text-xs" style={{ color: '#6e6e73' }}>{l.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <ResponsiveContainer width="100%" height={160}>
+                            <LineChart data={trendData}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                              <XAxis dataKey="week" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false}
+                                tickFormatter={v => v.slice(5)} interval="preserveStartEnd" />
+                              <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false}
+                                tickFormatter={v => fmtMoney(v, cur)} />
+                              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={v => [fmtMoney(v, cur)]} />
+                              <ReferenceLine y={0} stroke="rgba(255,255,255,0.12)" strokeDasharray="4 4" />
+                              <Line dataKey={t.baselinePlan}   stroke="#ff9f0a" strokeWidth={1.5} strokeDasharray="5 3" dot={false} />
+                              <Line dataKey={t.weeklyForecast} stroke={fColor}  strokeWidth={2}   dot={false} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )
+                    })()}
 
                     {/* Resource breakdown (snapshot) */}
                     {resources.length > 0 && (() => {
