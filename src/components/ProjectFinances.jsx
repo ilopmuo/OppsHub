@@ -314,8 +314,10 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
   const [resForm,        setResForm]        = useState({ name: '', role: '', hourly_rate: '', hours_to_date: '' })
   const [plannedBuf,     setPlannedBuf]     = useState({})
   const [actualBuf,      setActualBuf]      = useState({})
-  const [showAddInvoice, setShowAddInvoice] = useState(false)
-  const [invoiceForm,    setInvoiceForm]    = useState({ amount: '', invoice_date: '', description: '' })
+  const [showAddInvoice,    setShowAddInvoice]    = useState(false)
+  const [invoiceForm,       setInvoiceForm]       = useState({ amount: '', invoice_date: '', description: '' })
+  const [editingInvoiceId,  setEditingInvoiceId]  = useState(null)
+  const [editingInvoiceForm,setEditingInvoiceForm] = useState({ amount: '', invoice_date: '', description: '' })
 
   const weekIso    = isoDate(week)
   const today      = isoDate(new Date())          // fecha real de hoy
@@ -369,7 +371,7 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
     const amount = parseFloat(invoiceForm.amount)
     if (!amount || !invoiceForm.invoice_date) { toast.error('Importe y fecha son obligatorios'); return }
     const { data, error } = await supabase.from('project_invoices')
-      .insert({ project_id: projectId, amount, invoice_date: invoiceForm.invoice_date, description: invoiceForm.description || null })
+      .insert({ project_id: projectId, amount, invoice_date: invoiceForm.invoice_date, description: invoiceForm.description || null, is_active: false })
       .select().single()
     if (error) { toast.error('Error al guardar'); return }
     setInvoices(prev => [...prev, data].sort((a, b) => a.invoice_date.localeCompare(b.invoice_date)))
@@ -382,6 +384,21 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
     const { error } = await supabase.from('project_invoices').delete().eq('id', id)
     if (error) { toast.error('Error'); return }
     setInvoices(prev => prev.filter(i => i.id !== id))
+  }
+  async function toggleInvoiceActive(id, currentVal) {
+    const { error } = await supabase.from('project_invoices').update({ is_active: !currentVal }).eq('id', id)
+    if (error) { toast.error('Error'); return }
+    setInvoices(prev => prev.map(i => i.id === id ? { ...i, is_active: !currentVal } : i))
+  }
+  async function saveInvoiceEdit(id) {
+    const amount = parseFloat(editingInvoiceForm.amount)
+    if (!amount || !editingInvoiceForm.invoice_date) { toast.error('Importe y fecha son obligatorios'); return }
+    const { error } = await supabase.from('project_invoices')
+      .update({ amount, invoice_date: editingInvoiceForm.invoice_date, description: editingInvoiceForm.description || null })
+      .eq('id', id)
+    if (error) { toast.error('Error'); return }
+    setInvoices(prev => prev.map(i => i.id === id ? { ...i, amount, invoice_date: editingInvoiceForm.invoice_date, description: editingInvoiceForm.description || null } : i))
+    setEditingInvoiceId(null)
   }
 
   // ── Allocation saves ──────────────────────────────────────────────────────
@@ -447,9 +464,10 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
   const target   = financials.target_margin  || 20
   const etdBase  = financials.effort_to_date != null ? Number(financials.effort_to_date) : 0
 
-  // billed = sum of invoices if any, otherwise manual field
+  // billed = sum of active invoices if any exist, otherwise manual field
+  const activeInvoices = invoices.filter(i => i.is_active)
   const billed = invoices.length > 0
-    ? invoices.reduce((s, i) => s + i.amount, 0)
+    ? activeInvoices.reduce((s, i) => s + i.amount, 0)
     : (financials.invoiced_to_date || 0)
 
   // ETD = etdBase + Σ resources × (hours_to_date + weekly_actuals_up_to_today) × rate
@@ -729,7 +747,7 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
             <TimelineChart
               pastWeeks={chartWeeks} etdFn={etdAt}
               forecastPoints={forecastPoints}
-              contract={contract} invoices={invoices} cur={cur}
+              contract={contract} invoices={activeInvoices} cur={cur}
             />
           </div>
         )}
@@ -765,9 +783,14 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 20px', borderBottom: invoices.length > 0 || showAddInvoice ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: '#6e6e73' }}>Facturas emitidas</span>
-            {invoices.length > 0 && (
+            {activeInvoices.length > 0 && (
               <span style={{ fontSize: 11, fontWeight: 700, color: '#30d158' }}>
-                {fmtFull(invoices.reduce((s, i) => s + i.amount, 0), cur)}
+                {fmtFull(activeInvoices.reduce((s, i) => s + i.amount, 0), cur)}
+              </span>
+            )}
+            {invoices.length > 0 && invoices.length !== activeInvoices.length && (
+              <span style={{ fontSize: 10, color: '#3a3a3a' }}>
+                ({invoices.length - activeInvoices.length} pendiente{invoices.length - activeInvoices.length !== 1 ? 's' : ''})
               </span>
             )}
             {invoices.length === 0 && financials.invoiced_to_date > 0 && (
@@ -819,29 +842,73 @@ export default function ProjectFinances({ projectId, startDate, endDate }) {
           <div>
             {invoices.map((inv, idx) => (
               <div key={inv.id}
-                style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', borderBottom: idx < invoices.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
-                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.015)'}
-                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                style={{ opacity: inv.is_active ? 1 : 0.45, borderBottom: idx < invoices.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
               >
-                <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#30d158', marginRight: 12, flexShrink: 0 }} />
-                <span style={{ fontSize: 12, color: '#6e6e73', minWidth: 110 }}>{fmtDate(inv.invoice_date)}</span>
-                <span style={{ fontSize: 12, color: '#f5f5f7', fontWeight: 600, minWidth: 100 }}>{fmtFull(inv.amount, cur)}</span>
-                <span style={{ fontSize: 12, color: '#3a3a3a', flex: 1 }}>{inv.description || ''}</span>
-                <button onClick={() => deleteInvoice(inv.id)}
-                  style={{ width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', color: '#6e6e73', flexShrink: 0 }}
-                  onMouseEnter={e => { e.currentTarget.style.color = '#ff453a'; e.currentTarget.style.backgroundColor = 'rgba(255,69,58,0.12)' }}
-                  onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
-                ><Trash2 size={11} /></button>
+                {editingInvoiceId === inv.id ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr auto', gap: 8, padding: '10px 20px', alignItems: 'end', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                    <input style={INPUT_S} type="number" min="0" step="100"
+                      value={editingInvoiceForm.amount}
+                      onChange={e => setEditingInvoiceForm(p => ({ ...p, amount: e.target.value }))} autoFocus />
+                    <input style={INPUT_S} type="date"
+                      value={editingInvoiceForm.invoice_date}
+                      onChange={e => setEditingInvoiceForm(p => ({ ...p, invoice_date: e.target.value }))} />
+                    <input style={INPUT_S} type="text" placeholder="Concepto"
+                      value={editingInvoiceForm.description}
+                      onChange={e => setEditingInvoiceForm(p => ({ ...p, description: e.target.value }))}
+                      onKeyDown={e => { if (e.key === 'Enter') saveInvoiceEdit(inv.id); if (e.key === 'Escape') setEditingInvoiceId(null) }} />
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      <button onClick={() => saveInvoiceEdit(inv.id)}
+                        style={{ height: 34, paddingInline: 12, borderRadius: 8, backgroundColor: '#30d158', color: '#000', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                        <Check size={13} />
+                      </button>
+                      <button onClick={() => setEditingInvoiceId(null)}
+                        style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.06)', color: '#6e6e73', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <X size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', gap: 0 }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.015)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    {/* Activate toggle */}
+                    <button onClick={() => toggleInvoiceActive(inv.id, inv.is_active)}
+                      title={inv.is_active ? 'Desactivar factura' : 'Activar factura'}
+                      style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${inv.is_active ? '#30d158' : 'rgba(255,255,255,0.2)'}`, backgroundColor: inv.is_active ? '#30d158' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, marginRight: 12, transition: 'all 0.15s' }}>
+                      {inv.is_active && <Check size={10} color="#000" strokeWidth={3} />}
+                    </button>
+                    <span style={{ fontSize: 12, color: '#6e6e73', minWidth: 110 }}>{fmtDate(inv.invoice_date)}</span>
+                    <span style={{ fontSize: 12, color: inv.is_active ? '#f5f5f7' : '#6e6e73', fontWeight: 600, minWidth: 100 }}>{fmtFull(inv.amount, cur)}</span>
+                    <span style={{ fontSize: 12, color: '#3a3a3a', flex: 1 }}>{inv.description || ''}</span>
+                    {!inv.is_active && <span style={{ fontSize: 10, color: '#3a3a3a', marginRight: 8, whiteSpace: 'nowrap' }}>pendiente</span>}
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <button onClick={() => { setEditingInvoiceId(inv.id); setEditingInvoiceForm({ amount: String(inv.amount), invoice_date: inv.invoice_date, description: inv.description || '' }) }}
+                        style={{ width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', color: '#6e6e73', flexShrink: 0 }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#f5f5f7'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+                      ><Pencil size={10} /></button>
+                      <button onClick={() => deleteInvoice(inv.id)}
+                        style={{ width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', color: '#6e6e73', flexShrink: 0 }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#ff453a'; e.currentTarget.style.backgroundColor = 'rgba(255,69,58,0.12)' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = '#6e6e73'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+                      ><Trash2 size={11} /></button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
             {/* Total row */}
             <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,0.06)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
-              <div style={{ width: 8, marginRight: 12 }} />
-              <span style={{ fontSize: 10, fontWeight: 600, color: '#3a3a3a', textTransform: 'uppercase', letterSpacing: '0.07em', minWidth: 110 }}>Total</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#30d158' }}>{fmtFull(invoices.reduce((s, i) => s + i.amount, 0), cur)}</span>
-              {hasBudget && (
+              <div style={{ width: 20, marginRight: 12 }} />
+              <span style={{ fontSize: 10, fontWeight: 600, color: '#3a3a3a', textTransform: 'uppercase', letterSpacing: '0.07em', minWidth: 110 }}>Total activo</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: activeInvoices.length > 0 ? '#30d158' : '#3a3a3a' }}>
+                {fmtFull(activeInvoices.reduce((s, i) => s + i.amount, 0), cur)}
+              </span>
+              {hasBudget && activeInvoices.length > 0 && (
                 <span style={{ fontSize: 10, color: '#3a3a3a', marginLeft: 10 }}>
-                  ({((invoices.reduce((s, i) => s + i.amount, 0) / contract) * 100).toFixed(0)}% del contrato)
+                  ({((activeInvoices.reduce((s, i) => s + i.amount, 0) / contract) * 100).toFixed(0)}% del contrato)
                 </span>
               )}
             </div>

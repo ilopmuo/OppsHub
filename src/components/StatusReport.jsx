@@ -2104,7 +2104,7 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
         ids.length > 0
           ? supabase.from('resource_allocations').select('resource_id,week_start,hours,actual_hours').in('resource_id', ids)
           : { data: [] },
-        supabase.from('project_invoices').select('amount,invoice_date,description').eq('project_id', projectId).order('invoice_date'),
+        supabase.from('project_invoices').select('amount,invoice_date,description,is_active').eq('project_id', projectId).order('invoice_date'),
       ])
 
       setFin(finData)
@@ -2153,8 +2153,9 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
       }, 0)
     : etd
 
+  const activeInvoices = invoices.filter(i => i.is_active)
   const billed = invoices.length > 0
-    ? invoices.reduce((s, i) => s + i.amount, 0)
+    ? activeInvoices.reduce((s, i) => s + i.amount, 0)
     : (fin?.invoiced_to_date ?? 0)
 
   const currentProfit      = billed - etd
@@ -2406,7 +2407,7 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
           })
         })
         const invByMonth = {}
-        invoices.forEach(inv => {
+        activeInvoices.forEach(inv => {
           if (!inv.invoice_date) return
           const month = inv.invoice_date.slice(0, 7)
           invByMonth[month] = (invByMonth[month] || 0) + inv.amount
@@ -2444,7 +2445,7 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
       })()}
 
       {/* Invoice list */}
-      {invoices.length > 0 && (
+      {activeInvoices.length > 0 && (
         <div style={{ ...CARD, marginTop: 12, overflowX: 'auto' }}>
           <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.invoiceList}</p>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -2456,7 +2457,7 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
               </tr>
             </thead>
             <tbody>
-              {invoices.map((inv, i) => (
+              {activeInvoices.map((inv, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                   <td style={{ padding: '8px 16px 8px 0', color: '#6e6e73', whiteSpace: 'nowrap' }}>{inv.invoice_date ? fmtDate(inv.invoice_date, lang === 'en' ? 'en-GB' : 'es-ES') : '—'}</td>
                   <td style={{ padding: '8px 16px 8px 0', color: '#d1d1d6' }}>{inv.description || t.invNoDesc}</td>
@@ -2467,7 +2468,7 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
             <tfoot>
               <tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                 <td colSpan={2} style={{ paddingTop: 8, color: '#6e6e73', fontWeight: 600 }}>{t.resTotal}</td>
-                <td style={{ paddingTop: 8, color: '#30d158', fontWeight: 600 }}>{fmtMoney(invoices.reduce((s, i) => s + i.amount, 0), cur)}</td>
+                <td style={{ paddingTop: 8, color: '#30d158', fontWeight: 600 }}>{fmtMoney(activeInvoices.reduce((s, i) => s + i.amount, 0), cur)}</td>
               </tr>
             </tfoot>
           </table>
@@ -2797,7 +2798,8 @@ function SnapshotView({ snapshot, lang = 'es' }) {
         return sum + h * (r.hourly_rate || 0)
       }, 0)
     : etd
-  const billed  = invoices.length ? invoices.reduce((s, i) => s + i.amount, 0) : (financial?.invoiced_to_date ?? 0)
+  const snapActiveInvoices = invoices.filter(i => i.is_active)
+  const billed  = invoices.length ? snapActiveInvoices.reduce((s, i) => s + i.amount, 0) : (financial?.invoiced_to_date ?? 0)
   const profit  = billed - etd
   const margin  = billed > 0 ? (profit / billed) * 100 : 0
   const maxVal  = Math.max(contract, etd, billed, 1)
@@ -3406,7 +3408,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                         })
                       })
                       const invByMonth = {}
-                      invoices.forEach(inv => {
+                      snapActiveInvoices.forEach(inv => {
                         if (!inv.invoice_date) return
                         const month = inv.invoice_date.slice(0, 7)
                         invByMonth[month] = (invByMonth[month] || 0) + inv.amount
@@ -3444,7 +3446,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                     })()}
 
                     {/* Invoice list (snapshot) */}
-                    {invoices.length > 0 && (
+                    {snapActiveInvoices.length > 0 && (
                       <div style={{ ...CARD, marginTop: 12, overflowX: 'auto' }}>
                         <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.invoiceList}</p>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -3454,7 +3456,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                             ))}
                           </tr></thead>
                           <tbody>
-                            {invoices.map((inv, i) => (
+                            {snapActiveInvoices.map((inv, i) => (
                               <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                                 <td style={{ padding: '8px 16px 8px 0', color: '#6e6e73', whiteSpace: 'nowrap' }}>{inv.invoice_date ? fmtDate(inv.invoice_date, locale) : '—'}</td>
                                 <td style={{ padding: '8px 16px 8px 0', color: '#d1d1d6' }}>{inv.description || t.invNoDesc}</td>
@@ -3464,7 +3466,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                           </tbody>
                           <tfoot><tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                             <td colSpan={2} style={{ paddingTop: 8, color: '#6e6e73', fontWeight: 600 }}>{t.resTotal}</td>
-                            <td style={{ paddingTop: 8, color: '#30d158', fontWeight: 600 }}>{fmtMoney(invoices.reduce((s, i) => s + i.amount, 0), cur)}</td>
+                            <td style={{ paddingTop: 8, color: '#30d158', fontWeight: 600 }}>{fmtMoney(snapActiveInvoices.reduce((s, i) => s + i.amount, 0), cur)}</td>
                           </tr></tfoot>
                         </table>
                       </div>
@@ -3675,7 +3677,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
         supabase.from('project_team_kpis').select('*').eq('project_id', project.id),
         supabase.from('project_effort').select('*').eq('project_id', project.id),
         supabase.from('project_financials').select('*').eq('project_id', project.id).maybeSingle(),
-        supabase.from('project_invoices').select('amount,invoice_date,description').eq('project_id', project.id).order('invoice_date'),
+        supabase.from('project_invoices').select('amount,invoice_date,description,is_active').eq('project_id', project.id).order('invoice_date'),
         supabase.from('project_deliverables').select('id, name, status').eq('project_id', project.id).order('created_at'),
       ])
       let snapPlan = null
@@ -3782,7 +3784,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
         supabase.from('project_plans').select('id').eq('project_id', project.id).limit(1),
         supabase.from('project_team_kpis').select('*').eq('project_id', project.id).in('month_year', months2),
         supabase.from('project_financials').select('*').eq('project_id', project.id).maybeSingle(),
-        supabase.from('project_invoices').select('amount,invoice_date,description').eq('project_id', project.id).order('invoice_date'),
+        supabase.from('project_invoices').select('amount,invoice_date,description,is_active').eq('project_id', project.id).order('invoice_date'),
       ])
 
       // 01 — project status field
@@ -3830,8 +3832,9 @@ export default function StatusReport({ project: initialProject, members, tasks }
       if (fin) {
         const target  = fin.target_margin ?? 20
         const etd     = fin.effort_to_date ?? 0
+        const activeInv = (invoices ?? []).filter(i => i.is_active)
         const billed  = invoices?.length
-          ? invoices.reduce((s, i) => s + i.amount, 0)
+          ? activeInv.reduce((s, i) => s + i.amount, 0)
           : (fin.invoiced_to_date ?? 0)
         const margin  = billed > 0 ? ((billed - etd) / billed) * 100 : null
         if (margin !== null) {
