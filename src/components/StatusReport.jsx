@@ -1208,8 +1208,6 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
   const [saving, setSaving]               = useState(null) // 'goal' | 'blockers'
   const [editingGoal, setEditingGoal]         = useState(false)
   const [editingBlockers, setEditingBlockers] = useState(false)
-  const [newTaskTitle, setNewTaskTitle]       = useState('')
-  const [addingTask, setAddingTask]           = useState(false)
   const [dropdownOpen, setDropdownOpen]   = useState(false)
   const dropdownRef                       = useRef(null)
 
@@ -1258,30 +1256,6 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
   }
 
   const selectedPhase = phases.find(p => p.id === sprintReport.phase_id)
-
-  async function addTask() {
-    const title = newTaskTitle.trim()
-    if (!title || !selectedPhase) return
-    const nextIdx = (selectedPhase.plan_tasks ?? []).length
-    const { data, error } = await supabase.from('plan_tasks')
-      .insert({ phase_id: selectedPhase.id, title, done: false, order_index: nextIdx })
-      .select().single()
-    if (error) { toast.error('Error al guardar'); return }
-    setPhases(prev => prev.map(p => p.id === selectedPhase.id
-      ? { ...p, plan_tasks: [...(p.plan_tasks ?? []), data] }
-      : p
-    ))
-    setNewTaskTitle('')
-    setAddingTask(false)
-  }
-
-  async function deleteTask(id) {
-    setPhases(prev => prev.map(p => p.id === selectedPhase?.id
-      ? { ...p, plan_tasks: (p.plan_tasks ?? []).filter(t => t.id !== id) }
-      : p
-    ))
-    await supabase.from('plan_tasks').delete().eq('id', id)
-  }
   const m = selectedPhase ? phaseMetrics(selectedPhase, lang) : null
   const tasks = selectedPhase?.plan_tasks ?? []
   const doneTasks = tasks.filter(tk => tk.done)
@@ -1295,9 +1269,8 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
     <div>
       <style>{`
         @keyframes sprint-fade { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes sprint-bar  { from{width:0} to{width:var(--w)} }
         .sprint-section { animation: sprint-fade 0.4s cubic-bezier(0.16,1,0.3,1) }
-        .task-row:hover .task-delete-btn { color: #ff453a !important; background-color: rgba(255,69,58,0.1) !important; }
-        .task-delete-btn:hover { color: #ff453a !important; background-color: rgba(255,69,58,0.18) !important; }
       `}</style>
 
       {/* ── Phase selector ── */}
@@ -1468,46 +1441,23 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
           </div>
 
           {/* Tasks breakdown */}
-          {selectedPhase && (
+          {tasks.length > 0 && (
             <div style={{ ...CARD, padding: '20px 24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: tasks.length > 0 ? 16 : 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', margin: 0 }}>{t.sprintTasksAll}</p>
-                  {tasks.length > 0 && (
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      <span style={{ fontSize: 11, color: '#30d158' }}>✓ {doneTasks.length}</span>
-                      <span style={{ fontSize: 11, color: '#6e6e73' }}>○ {pendingTasks.length}</span>
-                    </div>
-                  )}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', margin: 0 }}>{t.sprintTasksAll}</p>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <span style={{ fontSize: 11, color: '#30d158' }}>✓ {doneTasks.length} {t.sprintTasksDone.toLowerCase()}</span>
+                  <span style={{ fontSize: 11, color: '#6e6e73' }}>○ {pendingTasks.length} {t.sprintTasksPending.toLowerCase()}</span>
                 </div>
-                <button
-                  onClick={() => { setAddingTask(true); setNewTaskTitle('') }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 8,
-                    border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                    backgroundColor: 'rgba(100,210,255,0.1)', color: '#64d2ff',
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(100,210,255,0.18)'}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(100,210,255,0.1)'}
-                >
-                  <Plus size={11} /> {lang === 'es' ? 'Añadir' : 'Add'}
-                </button>
               </div>
-
-              {/* Progress bar */}
-              {tasks.length > 0 && (
-                <div style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden', marginBottom: 14 }}>
-                  <div style={{ height: '100%', borderRadius: 3, backgroundColor: '#30d158',
-                    width: `${taskPct}%`, transition: 'width 0.8s cubic-bezier(0.16,1,0.3,1)' }} />
-                </div>
-              )}
-
-              {/* Task list */}
+              {/* Task progress bar */}
+              <div style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden', marginBottom: 16 }}>
+                <div style={{ height: '100%', borderRadius: 3, backgroundColor: '#30d158',
+                  width: `${taskPct}%`, transition: 'width 0.8s cubic-bezier(0.16,1,0.3,1)' }} />
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {tasks.map(tk => (
-                  <div key={tk.id} className="task-row" style={{
+                  <div key={tk.id} style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
                     borderRadius: 10, backgroundColor: tk.done ? 'rgba(48,209,88,0.06)' : 'rgba(255,255,255,0.02)',
                     border: `1px solid ${tk.done ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.04)'}`,
@@ -1536,53 +1486,12 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
                       {tk.done && <span style={{ fontSize: 9, color: '#000', fontWeight: 700 }}>✓</span>}
                     </button>
                     <span style={{ flex: 1, fontSize: 13, color: tk.done ? '#6e6e73' : '#f5f5f7',
-                      textDecoration: tk.done ? 'line-through' : 'none' }}>{tk.title}</span>
+                      textDecoration: tk.done ? 'line-through' : 'none', cursor: 'default' }}>{tk.title}</span>
                     {tk.hours > 0 && (
                       <span style={{ fontSize: 11, color: '#6e6e73', flexShrink: 0 }}>{tk.hours}h</span>
                     )}
-                    <button
-                      onClick={() => deleteTask(tk.id)}
-                      title={lang === 'es' ? 'Eliminar tarea' : 'Delete task'}
-                      style={{
-                        width: 20, height: 20, borderRadius: 5, border: 'none', padding: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', backgroundColor: 'transparent', color: 'transparent',
-                        flexShrink: 0, transition: 'all 0.15s',
-                      }}
-                      className="task-delete-btn"
-                    >
-                      <Trash2 size={11} />
-                    </button>
                   </div>
                 ))}
-
-                {/* Add new task input */}
-                {addingTask && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                    <div style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                      border: '1.5px dashed rgba(100,210,255,0.4)' }} />
-                    <input
-                      autoFocus
-                      type="text"
-                      value={newTaskTitle}
-                      onChange={e => setNewTaskTitle(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') addTask()
-                        if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle('') }
-                      }}
-                      onBlur={() => { if (newTaskTitle.trim()) addTask(); else setAddingTask(false) }}
-                      placeholder={lang === 'es' ? 'Nombre de la tarea… (Enter para guardar)' : 'Task name… (Enter to save)'}
-                      style={{ ...INPUT, flex: 1, padding: '6px 10px', fontSize: 13 }}
-                    />
-                  </div>
-                )}
-
-                {/* Empty state */}
-                {tasks.length === 0 && !addingTask && (
-                  <p style={{ fontSize: 13, color: '#3a3a3a', fontStyle: 'italic', margin: '4px 0 0' }}>
-                    {lang === 'es' ? 'Sin tareas. Pulsa + Añadir para crear la primera.' : 'No tasks yet. Click + Add to create one.'}
-                  </p>
-                )}
               </div>
             </div>
           )}
