@@ -1269,7 +1269,7 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
   const tasks = selectedPhase?.plan_tasks ?? []
   const doneTasks = tasks.filter(tk => tk.done)
   const pendingTasks = tasks.filter(tk => !tk.done)
-  const totalHours = tasks.reduce((s, tk) => s + (tk.hours ?? 0), 0)
+  const totalHours = selectedPhase?.hours ?? 0
   const doneHours = doneTasks.reduce((s, tk) => s + (tk.hours ?? 0), 0)
   const taskPct = tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0
 
