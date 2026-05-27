@@ -1262,7 +1262,6 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
   const doneHours = doneTasks.reduce((s, tk) => s + (tk.hours ?? 0), 0)
   const taskPct = tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0
 
-  const ACCENT = selectedPhase?.color ?? '#64d2ff'
 
   return (
     <div>
@@ -1280,14 +1279,14 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             width: '100%', padding: '12px 16px', borderRadius: 14, cursor: 'pointer',
             fontFamily: 'inherit',
-            backgroundColor: selectedPhase ? `${ACCENT}10` : 'rgba(255,255,255,0.03)',
-            border: `1px solid ${selectedPhase ? `${ACCENT}30` : 'rgba(255,255,255,0.08)'}`,
-            color: selectedPhase ? ACCENT : '#6e6e73',
+            backgroundColor: selectedPhase ? 'rgba(100,210,255,0.08)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${selectedPhase ? 'rgba(100,210,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
+            color: selectedPhase ? '#64d2ff' : '#6e6e73',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {selectedPhase && (
-              <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: ACCENT, flexShrink: 0 }} />
+              <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#64d2ff', flexShrink: 0 }} />
             )}
             <span style={{ fontSize: 13, fontWeight: selectedPhase ? 600 : 400 }}>
               {selectedPhase ? selectedPhase.name : t.sprintSelectPlaceholder}
@@ -1365,7 +1364,7 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: ACCENT,
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: m.scheduleColor,
                     boxShadow: m.isActive ? `0 0 8px 2px ${m.scheduleColor}60` : 'none',
                     animation: m.isActive ? 'pv-dot 3s ease-in-out infinite' : 'none' }} />
                   <h3 style={{ fontSize: 17, fontWeight: 700, color: '#f5f5f7', margin: 0 }}>{selectedPhase.name}</h3>
@@ -3924,7 +3923,6 @@ function SnapshotView({ snapshot, lang = 'es' }) {
             const sTaskPct = sTasks.length > 0 ? Math.round((sDone.length / sTasks.length) * 100) : 0
             const sDoneHours = sDone.reduce((s, tk) => s + (tk.hours ?? 0), 0)
             const sTotalHours = sTasks.reduce((s, tk) => s + (tk.hours ?? 0), 0)
-            const SACENT = sprintPhase.color ?? '#64d2ff'
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* Header */}
@@ -3932,7 +3930,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                        <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: SACENT }} />
+                        <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: sm.scheduleColor }} />
                         <h3 style={{ fontSize: 17, fontWeight: 700, color: '#f5f5f7', margin: 0 }}>{sprintPhase.name}</h3>
                         {sprintPhase.is_sprint && <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, backgroundColor: 'rgba(100,210,255,0.12)', color: '#64d2ff' }}>SPRINT</span>}
                       </div>
