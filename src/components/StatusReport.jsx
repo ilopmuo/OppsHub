@@ -1462,16 +1462,30 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
                     border: `1px solid ${tk.done ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.04)'}`,
                     transition: 'all 0.2s',
                   }}>
-                    <div style={{
-                      width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      backgroundColor: tk.done ? '#30d158' : 'transparent',
-                      border: tk.done ? 'none' : '1.5px solid rgba(255,255,255,0.15)',
-                    }}>
+                    <button
+                      onClick={async () => {
+                        const next = !tk.done
+                        setPhases(prev => prev.map(p => p.id === selectedPhase.id
+                          ? { ...p, plan_tasks: p.plan_tasks.map(t => t.id === tk.id ? { ...t, done: next } : t) }
+                          : p
+                        ))
+                        await supabase.from('plan_tasks').update({ done: next }).eq('id', tk.id)
+                      }}
+                      title={tk.done ? 'Marcar como pendiente' : 'Marcar como completada'}
+                      style={{
+                        width: 20, height: 20, borderRadius: '50%', flexShrink: 0, padding: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: tk.done ? '#30d158' : 'transparent',
+                        border: tk.done ? 'none' : '1.5px solid rgba(255,255,255,0.2)',
+                        cursor: 'pointer', transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => { if (!tk.done) { e.currentTarget.style.borderColor = '#30d158'; e.currentTarget.style.backgroundColor = 'rgba(48,209,88,0.15)' } }}
+                      onMouseLeave={e => { if (!tk.done) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.backgroundColor = 'transparent' } }}
+                    >
                       {tk.done && <span style={{ fontSize: 9, color: '#000', fontWeight: 700 }}>✓</span>}
-                    </div>
+                    </button>
                     <span style={{ flex: 1, fontSize: 13, color: tk.done ? '#6e6e73' : '#f5f5f7',
-                      textDecoration: tk.done ? 'line-through' : 'none' }}>{tk.title}</span>
+                      textDecoration: tk.done ? 'line-through' : 'none', cursor: 'default' }}>{tk.title}</span>
                     {tk.hours > 0 && (
                       <span style={{ fontSize: 11, color: '#6e6e73', flexShrink: 0 }}>{tk.hours}h</span>
                     )}
