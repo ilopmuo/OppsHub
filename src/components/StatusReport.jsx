@@ -1201,6 +1201,8 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
   const [phases, setPhases]               = useState([])
   const [hasPlan, setHasPlan]             = useState(true)
   const [sprintReport, setSprintReport]   = useState(project.sprint_report ?? {})
+  const [tasksDone,  setTasksDone]        = useState(project.sprint_report?.tasks_done  ?? '')
+  const [tasksTotal, setTasksTotal]       = useState(project.sprint_report?.tasks_total ?? '')
   const [goal, setGoal]                   = useState(project.sprint_report?.goal ?? '')
   const [blockers, setBlockers]           = useState(project.sprint_report?.blockers ?? '')
   const [goalDirty, setGoalDirty]         = useState(false)
@@ -1239,6 +1241,13 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
   async function selectPhase(phaseId) {
     setDropdownOpen(false)
     const next = { ...sprintReport, phase_id: phaseId }
+    setSprintReport(next)
+    await supabase.from('projects').update({ sprint_report: next }).eq('id', projectId)
+    onSave?.({ sprint_report: next })
+  }
+
+  async function saveTaskCount(done, total) {
+    const next = { ...sprintReport, tasks_done: done, tasks_total: total }
     setSprintReport(next)
     await supabase.from('projects').update({ sprint_report: next }).eq('id', projectId)
     onSave?.({ sprint_report: next })
@@ -1394,18 +1403,69 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
 
           {/* KPI cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-            {[
-              { label: t.sprintProgress,      value: `${m.progress}%`,   sub: `${Math.round(m.timePct)}% ${t.sprintTimeElapsed}`, color: m.scheduleColor },
-              { label: t.sprintTasksAll,        value: `${doneTasks.length}/${tasks.length}`, sub: `${taskPct}%`, color: '#30d158' },
-              { label: t.sprintHoursPlanned,   value: totalHours > 0 ? `${totalHours}h` : '—', sub: totalHours > 0 ? `${doneHours}h completadas` : '', color: '#ff9f0a' },
-              { label: t.sprintBlockers,       value: blockers && blockers.trim() ? '⚠' : '✓', sub: blockers && blockers.trim() ? lang === 'es' ? 'Hay impedimentos' : 'Blockers present' : lang === 'es' ? 'Sin impedimentos' : 'Clear', color: blockers && blockers.trim() ? '#ff9f0a' : '#30d158' },
-            ].map(kpi => (
-              <div key={kpi.label} style={{ ...CARD, padding: '16px', textAlign: 'center' }}>
-                <p style={{ fontSize: 11, color: '#6e6e73', marginBottom: 6, letterSpacing: '0.04em' }}>{kpi.label.toUpperCase()}</p>
-                <p style={{ fontSize: 22, fontWeight: 700, color: kpi.color, margin: 0, lineHeight: 1 }}>{kpi.value}</p>
-                {kpi.sub && <p style={{ fontSize: 11, color: '#6e6e73', marginTop: 4 }}>{kpi.sub}</p>}
-              </div>
-            ))}
+            {/* Progress KPI */}
+            <div style={{ ...CARD, padding: '16px', textAlign: 'center' }}>
+              <p style={{ fontSize: 11, color: '#6e6e73', marginBottom: 6, letterSpacing: '0.04em' }}>{t.sprintProgress.toUpperCase()}</p>
+              <p style={{ fontSize: 22, fontWeight: 700, color: m.scheduleColor, margin: 0, lineHeight: 1 }}>{m.progress}%</p>
+              <p style={{ fontSize: 11, color: '#6e6e73', marginTop: 4 }}>{Math.round(m.timePct)}% {t.sprintTimeElapsed}</p>
+            </div>
+
+            {/* Tasks KPI — editable */}
+            {(() => {
+              const done  = tasksDone  === '' ? '—' : tasksDone
+              const total = tasksTotal === '' ? '—' : tasksTotal
+              const pct   = (tasksDone !== '' && tasksTotal !== '' && Number(tasksTotal) > 0)
+                ? Math.round((Number(tasksDone) / Number(tasksTotal)) * 100) : null
+              return (
+                <div style={{ ...CARD, padding: '16px', textAlign: 'center' }}>
+                  <p style={{ fontSize: 11, color: '#6e6e73', marginBottom: 8, letterSpacing: '0.04em' }}>{t.sprintTasksAll.toUpperCase()}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                    <input
+                      type="number" min="0"
+                      value={tasksDone}
+                      onChange={e => setTasksDone(e.target.value)}
+                      onBlur={() => saveTaskCount(tasksDone, tasksTotal)}
+                      onFocus={fi}
+                      placeholder="0"
+                      style={{ width: 44, textAlign: 'center', fontSize: 22, fontWeight: 700,
+                        color: '#30d158', background: 'none', border: 'none', outline: 'none',
+                        padding: 0, fontFamily: 'inherit', MozAppearance: 'textfield' }}
+                    />
+                    <span style={{ fontSize: 18, color: '#3a3a3a', fontWeight: 300 }}>/</span>
+                    <input
+                      type="number" min="0"
+                      value={tasksTotal}
+                      onChange={e => setTasksTotal(e.target.value)}
+                      onBlur={() => saveTaskCount(tasksDone, tasksTotal)}
+                      onFocus={fi}
+                      placeholder="0"
+                      style={{ width: 44, textAlign: 'center', fontSize: 22, fontWeight: 700,
+                        color: '#f5f5f7', background: 'none', border: 'none', outline: 'none',
+                        padding: 0, fontFamily: 'inherit', MozAppearance: 'textfield' }}
+                    />
+                  </div>
+                  {pct !== null && <p style={{ fontSize: 11, color: '#6e6e73', marginTop: 4 }}>{pct}%</p>}
+                </div>
+              )
+            })()}
+
+            {/* Hours KPI */}
+            <div style={{ ...CARD, padding: '16px', textAlign: 'center' }}>
+              <p style={{ fontSize: 11, color: '#6e6e73', marginBottom: 6, letterSpacing: '0.04em' }}>{t.sprintHoursPlanned.toUpperCase()}</p>
+              <p style={{ fontSize: 22, fontWeight: 700, color: '#ff9f0a', margin: 0, lineHeight: 1 }}>{totalHours > 0 ? `${totalHours}h` : '—'}</p>
+              {totalHours > 0 && <p style={{ fontSize: 11, color: '#6e6e73', marginTop: 4 }}>{doneHours}h completadas</p>}
+            </div>
+
+            {/* Blockers KPI */}
+            <div style={{ ...CARD, padding: '16px', textAlign: 'center' }}>
+              <p style={{ fontSize: 11, color: '#6e6e73', marginBottom: 6, letterSpacing: '0.04em' }}>{t.sprintBlockers.toUpperCase()}</p>
+              <p style={{ fontSize: 22, fontWeight: 700, color: blockers && blockers.trim() ? '#ff9f0a' : '#30d158', margin: 0, lineHeight: 1 }}>
+                {blockers && blockers.trim() ? '!' : '✓'}
+              </p>
+              <p style={{ fontSize: 11, color: '#6e6e73', marginTop: 4 }}>
+                {blockers && blockers.trim() ? (lang === 'es' ? 'Hay impedimentos' : 'Blockers present') : (lang === 'es' ? 'Sin impedimentos' : 'Clear')}
+              </p>
+            </div>
           </div>
 
           {/* Dual progress bars */}
