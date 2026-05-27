@@ -1361,12 +1361,12 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
         <div className="sprint-section flex flex-col gap-4">
 
           {/* Header card */}
-          <div style={{ ...CARD, borderColor: `${ACCENT}25`, padding: '20px 24px' }}>
+          <div style={{ ...CARD, borderColor: `${m.scheduleColor}30`, padding: '20px 24px' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                   <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: ACCENT,
-                    boxShadow: m.isActive ? `0 0 8px 2px ${ACCENT}60` : 'none',
+                    boxShadow: m.isActive ? `0 0 8px 2px ${m.scheduleColor}60` : 'none',
                     animation: m.isActive ? 'pv-dot 3s ease-in-out infinite' : 'none' }} />
                   <h3 style={{ fontSize: 17, fontWeight: 700, color: '#f5f5f7', margin: 0 }}>{selectedPhase.name}</h3>
                   {selectedPhase.is_sprint && (
@@ -1394,7 +1394,7 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
           {/* KPI cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
             {[
-              { label: t.sprintProgress,      value: `${m.progress}%`,   sub: `${Math.round(m.timePct)}% ${t.sprintTimeElapsed}`, color: ACCENT },
+              { label: t.sprintProgress,      value: `${m.progress}%`,   sub: `${Math.round(m.timePct)}% ${t.sprintTimeElapsed}`, color: m.scheduleColor },
               { label: t.sprintTasksAll,        value: `${doneTasks.length}/${tasks.length}`, sub: `${taskPct}%`, color: '#30d158' },
               { label: t.sprintHoursPlanned,   value: totalHours > 0 ? `${totalHours}h` : '—', sub: totalHours > 0 ? `${doneHours}h completadas` : '', color: '#ff9f0a' },
               { label: t.sprintBlockers,       value: blockers && blockers.trim() ? '⚠' : '✓', sub: blockers && blockers.trim() ? lang === 'es' ? 'Hay impedimentos' : 'Blockers present' : lang === 'es' ? 'Sin impedimentos' : 'Clear', color: blockers && blockers.trim() ? '#ff9f0a' : '#30d158' },
@@ -1413,7 +1413,7 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
               @keyframes bar-fill { from { width: 0 } to { width: 100% } }
             `}</style>
             {[
-              { label: t.sprintProgress,    pct: m.progress,            color: ACCENT },
+              { label: t.sprintProgress,    pct: m.progress,            color: m.scheduleColor },
               { label: t.sprintTimeElapsed, pct: Math.round(m.timePct), color: 'rgba(255,255,255,0.15)' },
             ].map(bar => (
               <div key={bar.label} style={{ marginBottom: 14 }}>
@@ -1502,7 +1502,7 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
               {goalDirty && (
                 <button onClick={() => saveField('goal', goal)} style={{
                   fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 8, border: 'none',
-                  cursor: 'pointer', backgroundColor: `${ACCENT}20`, color: ACCENT, fontFamily: 'inherit',
+                  cursor: 'pointer', backgroundColor: 'rgba(100,210,255,0.12)', color: '#64d2ff', fontFamily: 'inherit',
                 }}>
                   {saving === 'goal' ? t.saving : t.sprintSave}
                 </button>
@@ -3928,7 +3928,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* Header */}
-                <div style={{ ...CARD, borderColor: `${SACENT}25`, padding: '20px 24px' }}>
+                <div style={{ ...CARD, borderColor: `${sm.scheduleColor}30`, padding: '20px 24px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
@@ -3947,7 +3947,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                 {/* KPIs */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
                   {[
-                    { label: t.sprintProgress,     value: `${sm.progress}%`,                    color: SACENT },
+                    { label: t.sprintProgress,     value: `${sm.progress}%`,                    color: sm.scheduleColor },
                     { label: t.sprintTasksAll,       value: `${sDone.length}/${sTasks.length}`,  color: '#30d158' },
                     { label: t.sprintHoursPlanned,  value: sTotalHours > 0 ? `${sTotalHours}h` : '—', color: '#ff9f0a' },
                     { label: t.sprintTimeElapsed,   value: `${Math.round(sm.timePct)}%`,        color: '#6e6e73' },
@@ -3961,7 +3961,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                 {/* Progress bars */}
                 <div style={{ ...CARD, padding: '20px 24px' }}>
                   {[
-                    { label: t.sprintProgress, pct: sm.progress, color: SACENT },
+                    { label: t.sprintProgress, pct: sm.progress, color: sm.scheduleColor },
                     { label: t.sprintTimeElapsed, pct: Math.round(sm.timePct), color: 'rgba(255,255,255,0.15)' },
                   ].map(bar => (
                     <div key={bar.label} style={{ marginBottom: 14 }}>
