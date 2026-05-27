@@ -2880,14 +2880,16 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
         })
         const weeks = Object.keys(weekMap).sort()
         if (weeks.length < 2) return null
+        const htdCost = resources.reduce((s, r) => s + (r.hours_to_date || 0) * (r.hourly_rate || 0), 0)
+        const baseCost = etdBase + htdCost
         const totalPlanned = weeks.reduce((s, w) => s + weekMap[w].planned, 0)
-        const day0 = Math.round(contract - (etdBase + totalPlanned))
+        const day0 = Math.round(contract - (baseCost + totalPlanned))
         let cumCost = 0, remPlanned = totalPlanned
         const trendData = weeks.map(w => {
           const a = weekMap[w].actual, p = weekMap[w].planned
           cumCost += a > 0 ? a : p
           remPlanned = Math.max(0, remPlanned - p)
-          const profit = Math.round(contract - (etdBase + cumCost + remPlanned))
+          const profit = Math.round(contract - (baseCost + cumCost + remPlanned))
           return { week: w, [t.weeklyForecast]: profit, [t.baselinePlan]: day0 }
         })
         const lastProfit = trendData.length ? trendData[trendData.length - 1][t.weeklyForecast] : 0
@@ -3893,14 +3895,16 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                       })
                       const weeks = Object.keys(weekMap).sort()
                       if (weeks.length < 2) return null
+                      const htdCostSnap = resources.reduce((s, r) => s + (r.hours_to_date || 0) * (r.hourly_rate || 0), 0)
+                      const baseCostSnap = etdBase + htdCostSnap
                       const totalPlanned = weeks.reduce((s, w) => s + weekMap[w].planned, 0)
-                      const day0 = Math.round(contract - (etdBase + totalPlanned))
+                      const day0 = Math.round(contract - (baseCostSnap + totalPlanned))
                       let cumCost = 0, remPlanned = totalPlanned
                       const trendData = weeks.map(w => {
                         const a = weekMap[w].actual, p = weekMap[w].planned
                         cumCost += a > 0 ? a : p
                         remPlanned = Math.max(0, remPlanned - p)
-                        const profit = Math.round(contract - (etdBase + cumCost + remPlanned))
+                        const profit = Math.round(contract - (baseCostSnap + cumCost + remPlanned))
                         return { week: w, [t.weeklyForecast]: profit, [t.baselinePlan]: day0 }
                       })
                       const lastProfit = trendData.length ? trendData[trendData.length - 1][t.weeklyForecast] : 0
