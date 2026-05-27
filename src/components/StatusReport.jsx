@@ -104,7 +104,7 @@ const SR = {
     sub06: 'Nuevas oportunidades de negocio y retos actuales',
     // section 01
     projectType: 'Tipo de proyecto', typeImpl: 'Implementación', typeMaint: 'Mantenimiento',
-    renewalDate: 'Fecha de renovación', deadline: 'Deadline', status: 'Estado',
+    renewalDate: 'Fecha de renovación', deadline: 'Deadline', goLiveDate: 'Go Live', status: 'Estado',
     startDate: 'Fecha de inicio', currentPhase: 'Fase actual', noActivePhase: 'Sin fase activa',
     teamAlloc: 'Team allocation', resource: 'recurso', resources: 'recursos',
     noResources: 'Sin recursos. Añádelos en la tab Recursos & Finanzas.',
@@ -195,7 +195,7 @@ const SR = {
     sub06: 'New business opportunities and current challenges',
     // section 01
     projectType: 'Project type', typeImpl: 'Implementation', typeMaint: 'Maintenance',
-    renewalDate: 'Renewal date', deadline: 'Deadline', status: 'Status',
+    renewalDate: 'Renewal date', deadline: 'Deadline', goLiveDate: 'Go Live', status: 'Status',
     startDate: 'Start date', currentPhase: 'Current phase', noActivePhase: 'No active phase',
     teamAlloc: 'Team allocation', resource: 'resource', resources: 'resources',
     noResources: 'No resources. Add them in the Resources & Finances tab.',
@@ -552,13 +552,22 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
     setEditingPct(prev => { const n = { ...prev }; delete n[id]; return n })
   }
 
-  async function toggleHideResource(id) {
-    const next = hiddenResourceIds.includes(id)
-      ? hiddenResourceIds.filter(x => x !== id)
-      : [...hiddenResourceIds, id]
+  async function hideResource(id) {
+    const next = [...hiddenResourceIds, id]
     setHiddenResourceIds(next)
     await supabase.from('projects').update({ status_report_hidden_resources: next }).eq('id', project.id)
     onSave({ status_report_hidden_resources: next })
+  }
+
+  // Go Live Date
+  const [goLiveDate, setGoLiveDate] = useState(project.go_live_date ?? '')
+  const [editingGoLive, setEditingGoLive] = useState(false)
+  async function saveGoLiveDate(val) {
+    setEditingGoLive(false)
+    const date = val || null
+    setGoLiveDate(date ?? '')
+    await supabase.from('projects').update({ go_live_date: date }).eq('id', project.id)
+    onSave({ go_live_date: date })
   }
 
   // Active phase
@@ -606,6 +615,32 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
               <p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(project.deadline, t.locale)}</p>
             </div>
           )}
+          {isImpl && (
+            <div className="mt-3">
+              <p className="text-xs" style={{ color: '#6e6e73' }}>{t.goLiveDate}</p>
+              {editingGoLive ? (
+                <input
+                  autoFocus
+                  type="date"
+                  style={{ ...INPUT, marginTop: 2, padding: '3px 8px', fontSize: 13 }}
+                  value={goLiveDate}
+                  onChange={e => setGoLiveDate(e.target.value)}
+                  onBlur={e => saveGoLiveDate(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveGoLiveDate(e.target.value); if (e.key === 'Escape') setEditingGoLive(false) }}
+                  onFocus={fi}
+                />
+              ) : (
+                <p
+                  className="text-sm font-medium mt-0.5 cursor-pointer"
+                  style={{ color: goLiveDate ? '#30d158' : '#3a3a3a' }}
+                  onClick={() => setEditingGoLive(true)}
+                  title="Click para editar"
+                >
+                  {goLiveDate ? fmtDate(goLiveDate, t.locale) : '—'}
+                </p>
+              )}
+            </div>
+          )}
           {project.start_date && (
             <div className="mt-3">
               <p className="text-xs" style={{ color: '#6e6e73' }}>{t.startDate}</p>
@@ -645,14 +680,13 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
                 <span style={{ textAlign: 'right', minWidth: 64 }}>{t.dedication}</span>
                 <span />
               </div>
-              {resources.map(r => {
+              {resources.filter(r => !hiddenResourceIds.includes(r.id)).map(r => {
                 const isEditing = editingPct[r.id] !== undefined
-                const isHidden = hiddenResourceIds.includes(r.id)
                 return (
                   <div key={r.id} className="grid gap-2 items-center"
-                    style={{ gridTemplateColumns: '1fr auto auto auto', opacity: isHidden ? 0.35 : 1 }}>
+                    style={{ gridTemplateColumns: '1fr auto auto auto' }}>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: '#f5f5f7', textDecoration: isHidden ? 'line-through' : 'none' }}>{r.name}</p>
+                      <p className="text-sm font-medium truncate" style={{ color: '#f5f5f7' }}>{r.name}</p>
                       {r.role && <p className="text-xs truncate" style={{ color: '#6e6e73' }}>{r.role}</p>}
                     </div>
                     <span className="text-xs font-mono" style={{ color: '#6e6e73', textAlign: 'right' }}>
@@ -685,17 +719,16 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
                       </button>
                     )}
                     <button
-                      onClick={() => toggleHideResource(r.id)}
+                      onClick={() => hideResource(r.id)}
                       title={t.hideFromReport}
                       style={{
                         width: 22, height: 22, borderRadius: 6, border: 'none', cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0,
-                        backgroundColor: isHidden ? 'rgba(255,69,58,0.15)' : 'rgba(255,255,255,0.04)',
-                        color: isHidden ? '#ff453a' : '#3a3a3a',
+                        backgroundColor: 'rgba(255,255,255,0.04)', color: '#3a3a3a',
                         transition: 'background 0.15s, color 0.15s',
                       }}
-                      onMouseEnter={e => { if (!isHidden) { e.currentTarget.style.backgroundColor = 'rgba(255,69,58,0.1)'; e.currentTarget.style.color = '#ff453a' } }}
-                      onMouseLeave={e => { if (!isHidden) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#3a3a3a' } }}
+                      onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,69,58,0.1)'; e.currentTarget.style.color = '#ff453a' }}
+                      onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#3a3a3a' }}
                     >
                       <Trash2 size={11} />
                     </button>
@@ -2874,6 +2907,7 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                   </span>
                   {!isImpl && proj.renewal_date && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.renewalDate}</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.renewal_date, locale)}</p></div>}
                   {isImpl  && proj.deadline      && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.deadline}</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.deadline, locale)}</p></div>}
+                  {isImpl && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.goLiveDate}</p><p className="text-sm font-medium mt-0.5" style={{ color: proj.go_live_date ? '#30d158' : '#3a3a3a' }}>{proj.go_live_date ? fmtDate(proj.go_live_date, locale) : '—'}</p></div>}
                   {proj.start_date && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.startDate}</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.start_date, locale)}</p></div>}
                   {(() => {
                     const snapActivePhases = phases.filter(p => !p.is_milestone && p.start_date <= snapDate && snapDate <= p.end_date)
@@ -3710,6 +3744,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
         project: {
           type: project.type, status: project.status,
           deadline: project.deadline, renewal_date: project.renewal_date,
+          go_live_date: goLiveDate || null,
           start_date: project.start_date ?? null,
           customer_satisfaction_status: project.customer_satisfaction_status,
           customer_satisfaction_text: project.customer_satisfaction_text,
