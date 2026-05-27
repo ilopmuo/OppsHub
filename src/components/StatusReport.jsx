@@ -1205,6 +1205,7 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
   const [editingGoal, setEditingGoal]         = useState(false)
   const [editingBlockers, setEditingBlockers] = useState(false)
   const [dropdownOpen, setDropdownOpen]   = useState(false)
+  const [plannedHoursInput, setPlannedHoursInput] = useState('')
   const dropdownRef                       = useRef(null)
 
   useEffect(() => {
@@ -1259,6 +1260,19 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
   }
 
   const selectedPhase = phases.find(p => p.id === sprintReport.phase_id)
+
+  // Sync planned hours input when phase changes
+  useEffect(() => {
+    setPlannedHoursInput(selectedPhase?.hours != null ? String(selectedPhase.hours) : '')
+  }, [selectedPhase?.id])
+
+  async function savePlannedHours(value) {
+    if (!selectedPhase) return
+    const hrs = value === '' ? null : Number(value)
+    setPhases(prev => prev.map(p => p.id === selectedPhase.id ? { ...p, hours: hrs } : p))
+    await supabase.from('plan_phases').update({ hours: hrs }).eq('id', selectedPhase.id)
+  }
+
   const m = selectedPhase ? phaseMetrics(selectedPhase, lang) : null
   const tasks = selectedPhase?.plan_tasks ?? []
   const doneTasks = tasks.filter(tk => tk.done)
@@ -1398,11 +1412,19 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
           {/* KPI cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
             {/* Progress KPI */}
-            <div style={{ ...CARD, padding: '16px', textAlign: 'center' }}>
-              <p style={{ fontSize: 11, color: '#6e6e73', marginBottom: 6, letterSpacing: '0.04em' }}>{t.sprintProgress.toUpperCase()}</p>
-              <p style={{ fontSize: 22, fontWeight: 700, color: m.scheduleColor, margin: 0, lineHeight: 1 }}>{m.progress}%</p>
-              <p style={{ fontSize: 11, color: '#6e6e73', marginTop: 4 }}>{Math.round(m.timePct)}% {t.sprintTimeElapsed}</p>
-            </div>
+            {(() => {
+              const taskPct = (tasksDone !== '' && tasksTotal !== '' && Number(tasksTotal) > 0)
+                ? Math.round(Number(tasksDone) / Number(tasksTotal) * 100) : m.progress
+              const diff = taskPct - Math.round(m.timePct)
+              const c = diff >= 0 ? '#30d158' : diff >= -15 ? '#ff9f0a' : '#ff453a'
+              return (
+                <div style={{ ...CARD, padding: '16px', textAlign: 'center' }}>
+                  <p style={{ fontSize: 11, color: '#6e6e73', marginBottom: 6, letterSpacing: '0.04em' }}>{(lang === 'es' ? 'Completado' : 'Completed').toUpperCase()}</p>
+                  <p style={{ fontSize: 22, fontWeight: 700, color: c, margin: 0, lineHeight: 1 }}>{taskPct}%</p>
+                  <p style={{ fontSize: 11, color: '#6e6e73', marginTop: 4 }}>{Math.round(m.timePct)}% {lang === 'es' ? 'tiempo' : 'time'}</p>
+                </div>
+              )
+            })()}
 
             {/* Tasks KPI — editable */}
             {(() => {
@@ -1438,15 +1460,27 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
                         padding: 0, fontFamily: 'inherit', MozAppearance: 'textfield' }}
                     />
                   </div>
-                  {pct !== null && <p style={{ fontSize: 11, color: '#6e6e73', marginTop: 4 }}>{pct}%</p>}
                 </div>
               )
             })()}
 
-            {/* Hours KPI */}
+            {/* Hours KPI — editable */}
             <div style={{ ...CARD, padding: '16px', textAlign: 'center' }}>
               <p style={{ fontSize: 11, color: '#6e6e73', marginBottom: 6, letterSpacing: '0.04em' }}>{t.sprintHoursPlanned.toUpperCase()}</p>
-              <p style={{ fontSize: 22, fontWeight: 700, color: '#ff9f0a', margin: 0, lineHeight: 1 }}>{totalHours > 0 ? `${totalHours}h` : '—'}</p>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 2 }}>
+                <input
+                  type="number" min="0"
+                  value={plannedHoursInput}
+                  onChange={e => setPlannedHoursInput(e.target.value)}
+                  onBlur={() => savePlannedHours(plannedHoursInput)}
+                  onFocus={fi}
+                  placeholder="0"
+                  style={{ width: 52, textAlign: 'center', fontSize: 22, fontWeight: 700,
+                    color: '#ff9f0a', background: 'none', border: 'none', outline: 'none',
+                    padding: 0, fontFamily: 'inherit', MozAppearance: 'textfield' }}
+                />
+                <span style={{ fontSize: 14, color: '#ff9f0a', fontWeight: 600 }}>h</span>
+              </div>
             </div>
 
             {/* Blockers KPI */}
@@ -1462,36 +1496,43 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
           </div>
 
           {/* Dual progress bars */}
-          <div style={{ ...CARD, padding: '20px 24px' }}>
-            <style>{`
-              @keyframes bar-fill { from { width: 0 } to { width: 100% } }
-            `}</style>
-            {[
-              { label: t.sprintProgress,    pct: m.progress,            color: m.scheduleColor },
-              { label: t.sprintTimeElapsed, pct: Math.round(m.timePct), color: 'rgba(255,255,255,0.15)' },
-            ].map(bar => (
-              <div key={bar.label} style={{ marginBottom: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, color: '#6e6e73' }}>{bar.label}</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: bar.color === 'rgba(255,255,255,0.15)' ? '#6e6e73' : bar.color }}>{bar.pct}%</span>
-                </div>
-                <div style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', borderRadius: 4, backgroundColor: bar.color,
-                    width: `${bar.pct}%`, transition: 'width 0.8s cubic-bezier(0.16,1,0.3,1)',
-                  }} />
-                </div>
+          {(() => {
+            const taskPct = (tasksDone !== '' && tasksTotal !== '' && Number(tasksTotal) > 0)
+              ? Math.round(Number(tasksDone) / Number(tasksTotal) * 100)
+              : m.progress
+            const timePct = Math.round(m.timePct)
+            const diff = taskPct - timePct
+            const barColor = diff >= 0 ? '#30d158' : diff >= -15 ? '#ff9f0a' : '#ff453a'
+            const completedLabel = lang === 'es' ? 'Progreso completado' : 'Progress completed'
+            const elapsedLabel   = lang === 'es' ? 'Tiempo transcurrido' : 'Time elapsed'
+            const deltaMsg = !m.isCompleted && !m.isUpcoming
+              ? diff > 8   ? (lang === 'es' ? `${Math.round(diff)}% por delante del tiempo` : `${Math.round(diff)}% ahead of schedule`)
+              : diff < -8  ? (lang === 'es' ? `${Math.round(Math.abs(diff))}% por detrás del tiempo` : `${Math.round(Math.abs(diff))}% behind schedule`)
+              : (lang === 'es' ? 'En plazo' : 'On track')
+              : null
+            return (
+              <div style={{ ...CARD, padding: '20px 24px' }}>
+                {[
+                  { label: completedLabel, pct: taskPct, color: barColor,                    valueColor: barColor },
+                  { label: elapsedLabel,   pct: timePct, color: 'rgba(255,255,255,0.18)',    valueColor: '#6e6e73' },
+                ].map(bar => (
+                  <div key={bar.label} style={{ marginBottom: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: '#6e6e73' }}>{bar.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: bar.valueColor }}>{bar.pct}%</span>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', borderRadius: 4, backgroundColor: bar.color,
+                        width: `${bar.pct}%`, transition: 'width 0.8s cubic-bezier(0.16,1,0.3,1)' }} />
+                    </div>
+                  </div>
+                ))}
+                {deltaMsg && (
+                  <p style={{ fontSize: 12, color: barColor, marginTop: 4, fontWeight: 500 }}>{deltaMsg}</p>
+                )}
               </div>
-            ))}
-            {/* Delta message */}
-            {!m.isCompleted && !m.isUpcoming && (
-              <p style={{ fontSize: 12, color: m.scheduleColor, marginTop: 4, fontWeight: 500 }}>
-                {m.scheduleStatus === 'ahead'  ? (lang === 'es' ? `${Math.round(m.delta)}% por delante del tiempo` : `${Math.round(m.delta)}% ahead of schedule`) :
-                 m.scheduleStatus === 'behind' || m.scheduleStatus === 'risk' ? (lang === 'es' ? `${Math.round(Math.abs(m.delta))}% por detrás del tiempo` : `${Math.round(Math.abs(m.delta))}% behind schedule`) :
-                 m.scheduleStatus === 'ontrack' ? (lang === 'es' ? 'En plazo' : 'On track') : ''}
-              </p>
-            )}
-          </div>
+            )
+          })()}
 
           {/* Tasks breakdown */}
           {tasks.length > 0 && (
