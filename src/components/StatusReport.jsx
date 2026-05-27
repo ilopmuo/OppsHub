@@ -2665,6 +2665,162 @@ function TeamPerformanceSection({ projectId, lang = 'es' }) {
   )
 }
 
+// ── Date helpers (same as ProjectFinances) ────────────────────────────────────
+function srWeekMonday(date = new Date()) {
+  const d = new Date(date)
+  const day = d.getDay()
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+function srIsoDate(d) {
+  const p = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+// ── Cost timeline chart (mirrors ProjectFinances TimelineChart) ───────────────
+function CostTimelineChart({ pastWeeks, etdFn, forecastPoints, contract, invoices, cur, lang }) {
+  const hasPast     = pastWeeks.length > 0
+  const hasForecast = forecastPoints.length > 0
+  if (!hasPast && !hasForecast) return null
+
+  const W = 820, H = 160
+  const PL = 52, PR = 16, PT = 12, PB = 32
+  const cw = W - PL - PR, ch = H - PT - PB
+
+  const pastData  = pastWeeks.map(w => ({ week: w, cost: etdFn(w) }))
+  const allPoints = [...pastData, ...forecastPoints]
+  const n         = allPoints.length
+
+  const sortedInvoices = [...invoices].sort((a, b) => a.invoice_date.localeCompare(b.invoice_date))
+  function billedAt(weekStr) {
+    return sortedInvoices.filter(i => i.invoice_date <= weekStr).reduce((s, i) => s + i.amount, 0)
+  }
+  const maxBilled = sortedInvoices.reduce((s, i) => s + i.amount, 0)
+  const maxVal    = Math.max(contract || 0, maxBilled, ...allPoints.map(p => p.cost), 1) * 1.08
+
+  const xOf = i => PL + (n <= 1 ? cw / 2 : (i / (n - 1)) * cw)
+  const yOf = v => PT + ch - (v / maxVal) * ch
+
+  const pLine = pastData.map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(i).toFixed(1)},${yOf(p.cost).toFixed(1)}`).join(' ')
+  const pArea = hasPast
+    ? `${pLine} L${xOf(pastData.length - 1).toFixed(1)},${(PT + ch).toFixed(1)} L${xOf(0).toFixed(1)},${(PT + ch).toFixed(1)} Z`
+    : ''
+
+  const fcStart = hasPast ? pastData.length - 1 : 0
+  const fcPts   = hasPast ? [pastData[pastData.length - 1], ...forecastPoints] : forecastPoints
+  const fcLine  = fcPts.map((p, i) =>
+    `${i === 0 ? 'M' : 'L'}${xOf(fcStart + i).toFixed(1)},${yOf(p.cost).toFixed(1)}`
+  ).join(' ')
+
+  const billedPath = (() => {
+    if (allPoints.length === 0) return ''
+    const pts = allPoints.map((p, i) => ({ x: xOf(i), y: yOf(billedAt(p.week)) }))
+    let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`
+    for (let i = 1; i < pts.length; i++) d += ` H ${pts[i].x.toFixed(1)} V ${pts[i].y.toFixed(1)}`
+    return d
+  })()
+
+  const yTicks  = [0, 0.25, 0.5, 0.75, 1].map(t => ({ v: maxVal * t, y: yOf(maxVal * t) }))
+  const step    = Math.max(1, Math.floor(n / 6))
+  const locale  = lang === 'en' ? 'en-GB' : 'es-ES'
+  const xLabels = allPoints
+    .map((p, i) => ({ ...p, i }))
+    .filter(({ i }) => i % step === 0 || i === n - 1)
+    .map(({ week, i }) => ({
+      x: xOf(i), isForecast: i >= pastData.length,
+      label: new Date(week + 'T12:00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short' }),
+    }))
+
+  const todayX    = hasPast ? xOf(pastData.length - 1) : null
+  const contractY = contract > 0 ? yOf(contract) : null
+
+  const invoiceMarkers = sortedInvoices.map(inv => {
+    const weekStr = srIsoDate(srWeekMonday(new Date(inv.invoice_date + 'T12:00:00')))
+    const idx     = allPoints.findIndex(p => p.week >= weekStr)
+    if (idx < 0) return null
+    return { x: xOf(idx), y: yOf(billedAt(weekStr)), amount: inv.amount }
+  }).filter(Boolean)
+
+  const etdLabel      = lang === 'en' ? 'ETD' : 'ETD'
+  const forecastLabel = lang === 'en' ? 'forecast' : 'proyección'
+  const billedLabel   = lang === 'en' ? 'billed' : 'facturado'
+  const contractLabel = lang === 'en' ? 'contract' : 'contrato'
+  const todayLabel    = lang === 'en' ? 'today' : 'hoy'
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: 'block' }}>
+      {yTicks.map((t, i) => (
+        <line key={i} x1={PL} y1={t.y} x2={W - PR} y2={t.y} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+      ))}
+      {yTicks.filter(t => t.v > 0).map((t, i) => (
+        <text key={i} x={PL - 6} y={t.y + 4} textAnchor="end"
+          style={{ fontSize: 10, fill: '#4a4a4f', fontFamily: 'Inter,system-ui,sans-serif' }}>
+          {fmtMoney(t.v, cur)}
+        </text>
+      ))}
+      {contractY != null && (
+        <>
+          <line x1={PL} y1={contractY} x2={W - PR} y2={contractY}
+            stroke="rgba(255,255,255,0.1)" strokeWidth="1" strokeDasharray="6,3" />
+          <text x={W - PR - 4} y={contractY - 4} textAnchor="end"
+            style={{ fontSize: 9, fill: 'rgba(255,255,255,0.25)', fontFamily: 'Inter,system-ui,sans-serif' }}>
+            {contractLabel}
+          </text>
+        </>
+      )}
+      {todayX != null && hasForecast && (
+        <>
+          <line x1={todayX} y1={PT} x2={todayX} y2={PT + ch} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+          <text x={todayX + 4} y={PT + 10}
+            style={{ fontSize: 9, fill: 'rgba(255,255,255,0.18)', fontFamily: 'Inter,system-ui,sans-serif' }}>
+            {todayLabel}
+          </text>
+        </>
+      )}
+      {pArea && <path d={pArea} fill="rgba(100,210,255,0.07)" />}
+      {pLine && <path d={pLine} stroke="#64d2ff" strokeWidth="1.5" fill="none" strokeLinejoin="round" />}
+      {hasForecast && (
+        <path d={fcLine} stroke="rgba(255,159,10,0.7)" strokeWidth="1.5" fill="none" strokeLinejoin="round" strokeDasharray="6,3" />
+      )}
+      {billedPath && maxBilled > 0 && (
+        <path d={billedPath} stroke="rgba(48,209,88,0.6)" strokeWidth="1.5" fill="none" />
+      )}
+      {invoiceMarkers.map((m, i) => (
+        <g key={i}>
+          <circle cx={m.x} cy={m.y} r="3.5" fill="#30d158" />
+          <line x1={m.x} y1={m.y - 4} x2={m.x} y2={PT} stroke="rgba(48,209,88,0.15)" strokeWidth="1" strokeDasharray="3,3" />
+        </g>
+      ))}
+      {hasPast && (
+        <circle cx={xOf(pastData.length - 1)} cy={yOf(pastData[pastData.length - 1].cost)} r="3.5" fill="#64d2ff" />
+      )}
+      <line x1={PL} y1={PT + ch} x2={W - PR} y2={PT + ch} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+      {xLabels.map((l, i) => (
+        <text key={i} x={l.x} y={H - 6} textAnchor="middle"
+          style={{ fontSize: 9, fill: l.isForecast ? '#3a3a3a' : '#4a4a4f', fontFamily: 'Inter,system-ui,sans-serif' }}>
+          {l.label}
+        </text>
+      ))}
+      {/* Legend */}
+      <circle cx={PL + 8} cy={PT + 6} r="3" fill="#64d2ff" />
+      <text x={PL + 15} y={PT + 10} style={{ fontSize: 9, fill: '#64d2ff', fontFamily: 'Inter,system-ui,sans-serif' }}>{etdLabel}</text>
+      {hasForecast && (
+        <>
+          <line x1={PL + 44} y1={PT + 6} x2={PL + 56} y2={PT + 6} stroke="rgba(255,159,10,0.7)" strokeWidth="1.5" strokeDasharray="4,2" />
+          <text x={PL + 61} y={PT + 10} style={{ fontSize: 9, fill: 'rgba(255,159,10,0.7)', fontFamily: 'Inter,system-ui,sans-serif' }}>{forecastLabel}</text>
+        </>
+      )}
+      {maxBilled > 0 && (
+        <>
+          <line x1={PL + (hasForecast ? 120 : 44)} y1={PT + 6} x2={PL + (hasForecast ? 132 : 56)} y2={PT + 6} stroke="rgba(48,209,88,0.6)" strokeWidth="1.5" />
+          <text x={PL + (hasForecast ? 137 : 61)} y={PT + 10} style={{ fontSize: 9, fill: 'rgba(48,209,88,0.6)', fontFamily: 'Inter,system-ui,sans-serif' }}>{billedLabel}</text>
+        </>
+      )}
+    </svg>
+  )
+}
+
 // ── Helpers (shared with ProjectFinances) ─────────────────────────────────────
 function fmtMoney(n, cur = '€') {
   if (n == null || isNaN(n)) return '—'
@@ -2681,7 +2837,7 @@ function profitHealth(margin, target, lang = 'es') {
 }
 
 // ── Section 5: Profitability ──────────────────────────────────────────────────
-function ProfitabilitySection({ projectId, lang = 'es' }) {
+function ProfitabilitySection({ projectId, startDate, endDate, lang = 'es' }) {
   const [fin,       setFin]       = useState(null)
   const [resources, setResources] = useState([])
   const [actual,    setActual]    = useState({})
@@ -2774,6 +2930,65 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
   const heroLabel = estConsumedPct < 75 ? t.healthGood : estConsumedPct < 95 ? t.healthWarning : t.healthRisk
   const h = profitHealth(currentMargin, target, lang)
 
+  // ── Chart data (same logic as ProjectFinances) ──
+  const todayStr    = today  // already defined above
+  const todayMonday = srIsoDate(srWeekMonday())
+
+  // Past weeks: from startDate (or earliest actual, or 12 weeks ago) up to today
+  const chartWeeks = (() => {
+    const s = new Set([todayStr])
+    Object.keys(actual).forEach(k => {
+      const dp = k.slice(37, 47)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dp)) s.add(dp)
+    })
+    if (startDate) {
+      s.add(srIsoDate(srWeekMonday(new Date(startDate + 'T12:00:00'))))
+    } else {
+      const fallback = new Date(todayStr + 'T12:00:00')
+      fallback.setDate(fallback.getDate() - 84)
+      s.add(srIsoDate(srWeekMonday(fallback)))
+    }
+    const sorted = [...s].filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()
+    const result = []
+    let d = srWeekMonday(new Date(sorted[0] + 'T12:00:00'))
+    while (srIsoDate(d) <= todayStr) {
+      result.push(srIsoDate(d))
+      d = new Date(d); d.setDate(d.getDate() + 7)
+    }
+    if (result.length === 0 || result[result.length - 1] !== todayStr) result.push(todayStr)
+    return result
+  })()
+
+  function etdAt(weekStr) {
+    const cap = weekStr <= todayStr ? weekStr : todayStr
+    return etdBase + resources.reduce((sum, r) => {
+      const wActuals = Object.keys(actual)
+        .filter(k => k.startsWith(r.id + '_') && k.slice(r.id.length + 1) <= cap)
+        .reduce((s, k) => s + (actual[k] || 0), 0)
+      return sum + (wActuals + (r.hours_to_date || 0)) * (r.hourly_rate || 0)
+    }, 0)
+  }
+
+  // Future forecast: from next week to endDate
+  const forecastPoints = (() => {
+    if (!endDate) return []
+    const endIso = srIsoDate(srWeekMonday(new Date(endDate + 'T12:00:00')))
+    const result = []
+    let running = etd
+    let d = new Date(todayMonday + 'T12:00:00'); d.setDate(d.getDate() + 7)
+    while (srIsoDate(d) <= endIso) {
+      const wIso = srIsoDate(d)
+      for (const r of resources) {
+        const act  = actual[`${r.id}_${wIso}`]  || 0
+        const plan = planned[`${r.id}_${wIso}`] || 0
+        running += (act > 0 ? act : plan) * (r.hourly_rate || 0)
+      }
+      result.push({ week: wIso, cost: running })
+      d = new Date(d); d.setDate(d.getDate() + 7)
+    }
+    return result
+  })()
+
   return (
     <div className="mb-2">
       {/* ── Hero health card ── */}
@@ -2860,69 +3075,17 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
         <KpiCard label={t.currentMargin} value={billed > 0 ? `${currentMargin.toFixed(1)}%` : '—'} color={h.color} />
       </div>
 
-      {/* Profitability trend chart */}
-      {(() => {
-        if (contract <= 0) return null
-        const weekMap = {}
-        resources.forEach(r => {
-          const rate = r.hourly_rate || 0
-          Object.entries(actual).forEach(([k, h]) => {
-            if (!k.startsWith(r.id + '_')) return
-            const w = k.slice(r.id.length + 1)
-            if (!weekMap[w]) weekMap[w] = { actual: 0, planned: 0 }
-            weekMap[w].actual += h * rate
-          })
-          Object.entries(planned).forEach(([k, h]) => {
-            if (!k.startsWith(r.id + '_')) return
-            const w = k.slice(r.id.length + 1)
-            if (!weekMap[w]) weekMap[w] = { actual: 0, planned: 0 }
-            weekMap[w].planned += h * rate
-          })
-        })
-        const weeks = Object.keys(weekMap).sort()
-        if (weeks.length < 2) return null
-        const htdCost = resources.reduce((s, r) => s + (r.hours_to_date || 0) * (r.hourly_rate || 0), 0)
-        const baseCost = etdBase + htdCost
-        const totalPlanned = weeks.reduce((s, w) => s + weekMap[w].planned, 0)
-        const day0 = Math.round(contract - (baseCost + totalPlanned))
-        let cumCost = 0, remPlanned = totalPlanned
-        const trendData = weeks.map(w => {
-          const a = weekMap[w].actual, p = weekMap[w].planned
-          cumCost += a > 0 ? a : p
-          remPlanned = Math.max(0, remPlanned - p)
-          const profit = Math.round(contract - (baseCost + cumCost + remPlanned))
-          return { week: w, [t.weeklyForecast]: profit, [t.baselinePlan]: day0 }
-        })
-        const lastProfit = trendData.length ? trendData[trendData.length - 1][t.weeklyForecast] : 0
-        const forecastColor = lastProfit >= 0 ? '#30d158' : '#ff453a'
-        return (
-          <div style={{ ...CARD, marginBottom: 12 }}>
-            <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.profitTrend}</p>
-            <div className="flex items-center gap-5 mb-3">
-              {[{ color: forecastColor, label: t.weeklyForecast, dashed: false },
-                { color: '#ff9f0a', label: t.baselinePlan, dashed: true }].map(l => (
-                <div key={l.label} className="flex items-center gap-1.5">
-                  <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke={l.color} strokeWidth="2" strokeDasharray={l.dashed ? '4 3' : undefined} /></svg>
-                  <span className="text-xs" style={{ color: '#6e6e73' }}>{l.label}</span>
-                </div>
-              ))}
-            </div>
-            <ResponsiveContainer width="100%" height={160}>
-              <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="week" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false}
-                  tickFormatter={v => v.slice(5)} interval="preserveStartEnd" />
-                <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false}
-                  tickFormatter={v => fmtMoney(v, cur)} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={v => [fmtMoney(v, cur)]} />
-                <ReferenceLine y={0} stroke="rgba(255,255,255,0.12)" strokeDasharray="4 4" />
-                <Line dataKey={t.baselinePlan}   stroke="#ff9f0a"     strokeWidth={1.5} strokeDasharray="5 3" dot={false} />
-                <Line dataKey={t.weeklyForecast} stroke={forecastColor} strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )
-      })()}
+      {/* Cost evolution chart */}
+      {(chartWeeks.length >= 1 || forecastPoints.length > 0) && (
+        <div style={{ ...CARD, marginBottom: 12, padding: '14px 16px 12px' }}>
+          <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.profitTrend}</p>
+          <CostTimelineChart
+            pastWeeks={chartWeeks} etdFn={etdAt}
+            forecastPoints={forecastPoints}
+            contract={contract} invoices={activeInvoices} cur={cur} lang={lang}
+          />
+        </div>
+      )}
 
       {/* Resource breakdown */}
       {resources.length > 0 && (() => {
@@ -3880,61 +4043,77 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                       <KpiCard label={t.currentMargin} value={billed > 0 ? `${margin.toFixed(1)}%` : '—'} color={ph.color} />
                     </div>
 
-                    {/* Profitability trend chart (snapshot) */}
+                    {/* Cost evolution chart (snapshot) */}
                     {(() => {
                       if (contract <= 0) return null
-                      const weekMap = {}
-                      resources.forEach(r => {
-                        const rate = r.hourly_rate || 0
-                        allocations.forEach(a => {
-                          if (a.resource_id !== r.id) return
-                          const w = a.week_start
-                          if (!weekMap[w]) weekMap[w] = { actual: 0, planned: 0 }
-                          if (a.actual_hours) weekMap[w].actual += a.actual_hours * rate
-                          if (a.hours)        weekMap[w].planned += a.hours * rate
+                      // Build actual/planned maps from allocations
+                      const snapActMap = {}, snapPlanMap = {}
+                      allocations.forEach(a => {
+                        const k = `${a.resource_id}_${a.week_start}`
+                        if (a.actual_hours) snapActMap[k]  = a.actual_hours
+                        if (a.hours)        snapPlanMap[k] = a.hours
+                      })
+                      // Past weeks up to snapDate
+                      const snapPastWeeks = (() => {
+                        const s = new Set([snapDate])
+                        Object.keys(snapActMap).forEach(k => {
+                          const dp = k.slice(37, 47)
+                          if (/^\d{4}-\d{2}-\d{2}$/.test(dp)) s.add(dp)
                         })
-                      })
-                      const weeks = Object.keys(weekMap).sort()
-                      if (weeks.length < 2) return null
-                      const htdCostSnap = resources.reduce((s, r) => s + (r.hours_to_date || 0) * (r.hourly_rate || 0), 0)
-                      const baseCostSnap = etdBase + htdCostSnap
-                      const totalPlanned = weeks.reduce((s, w) => s + weekMap[w].planned, 0)
-                      const day0 = Math.round(contract - (baseCostSnap + totalPlanned))
-                      let cumCost = 0, remPlanned = totalPlanned
-                      const trendData = weeks.map(w => {
-                        const a = weekMap[w].actual, p = weekMap[w].planned
-                        cumCost += a > 0 ? a : p
-                        remPlanned = Math.max(0, remPlanned - p)
-                        const profit = Math.round(contract - (baseCostSnap + cumCost + remPlanned))
-                        return { week: w, [t.weeklyForecast]: profit, [t.baselinePlan]: day0 }
-                      })
-                      const lastProfit = trendData.length ? trendData[trendData.length - 1][t.weeklyForecast] : 0
-                      const fColor = lastProfit >= 0 ? '#30d158' : '#ff453a'
+                        if (proj.start_date) s.add(srIsoDate(srWeekMonday(new Date(proj.start_date + 'T12:00:00'))))
+                        else {
+                          const fb = new Date(snapDate + 'T12:00:00'); fb.setDate(fb.getDate() - 84)
+                          s.add(srIsoDate(srWeekMonday(fb)))
+                        }
+                        const sorted = [...s].filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()
+                        const result = []
+                        let d = srWeekMonday(new Date(sorted[0] + 'T12:00:00'))
+                        while (srIsoDate(d) <= snapDate) {
+                          result.push(srIsoDate(d))
+                          d = new Date(d); d.setDate(d.getDate() + 7)
+                        }
+                        if (!result.length || result[result.length - 1] !== snapDate) result.push(snapDate)
+                        return result
+                      })()
+                      function snapEtdAt(weekStr) {
+                        const cap = weekStr <= snapDate ? weekStr : snapDate
+                        return etdBase + resources.reduce((sum, r) => {
+                          const wActs = Object.keys(snapActMap)
+                            .filter(k => k.startsWith(r.id + '_') && k.slice(r.id.length + 1) <= cap)
+                            .reduce((s, k) => s + (snapActMap[k] || 0), 0)
+                          return sum + (wActs + (r.hours_to_date || 0)) * (r.hourly_rate || 0)
+                        }, 0)
+                      }
+                      // Forecast: from snapDate+1w to deadline
+                      const snapEndDate = proj.deadline || null
+                      const snapForecast = (() => {
+                        if (!snapEndDate) return []
+                        const endIso = srIsoDate(srWeekMonday(new Date(snapEndDate + 'T12:00:00')))
+                        const result = []
+                        const snapMonday = srIsoDate(srWeekMonday(new Date(snapDate + 'T12:00:00')))
+                        let running = snapEtdAt(snapDate)
+                        let d = new Date(snapMonday + 'T12:00:00'); d.setDate(d.getDate() + 7)
+                        while (srIsoDate(d) <= endIso) {
+                          const wIso = srIsoDate(d)
+                          for (const r of resources) {
+                            const act  = snapActMap[`${r.id}_${wIso}`]  || 0
+                            const plan = snapPlanMap[`${r.id}_${wIso}`] || 0
+                            running += (act > 0 ? act : plan) * (r.hourly_rate || 0)
+                          }
+                          result.push({ week: wIso, cost: running })
+                          d = new Date(d); d.setDate(d.getDate() + 7)
+                        }
+                        return result
+                      })()
+                      if (snapPastWeeks.length < 1 && snapForecast.length === 0) return null
                       return (
-                        <div style={{ ...CARD, marginBottom: 12 }}>
+                        <div style={{ ...CARD, marginBottom: 12, padding: '14px 16px 12px' }}>
                           <p className="text-xs font-medium mb-3" style={{ color: '#6e6e73' }}>{t.profitTrend}</p>
-                          <div className="flex items-center gap-5 mb-3">
-                            {[{ color: fColor, label: t.weeklyForecast, dashed: false },
-                              { color: '#ff9f0a', label: t.baselinePlan, dashed: true }].map(l => (
-                              <div key={l.label} className="flex items-center gap-1.5">
-                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke={l.color} strokeWidth="2" strokeDasharray={l.dashed ? '4 3' : undefined} /></svg>
-                                <span className="text-xs" style={{ color: '#6e6e73' }}>{l.label}</span>
-                              </div>
-                            ))}
-                          </div>
-                          <ResponsiveContainer width="100%" height={160}>
-                            <LineChart data={trendData}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                              <XAxis dataKey="week" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false}
-                                tickFormatter={v => v.slice(5)} interval="preserveStartEnd" />
-                              <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false}
-                                tickFormatter={v => fmtMoney(v, cur)} />
-                              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={v => [fmtMoney(v, cur)]} />
-                              <ReferenceLine y={0} stroke="rgba(255,255,255,0.12)" strokeDasharray="4 4" />
-                              <Line dataKey={t.baselinePlan}   stroke="#ff9f0a" strokeWidth={1.5} strokeDasharray="5 3" dot={false} />
-                              <Line dataKey={t.weeklyForecast} stroke={fColor}  strokeWidth={2}   dot={false} />
-                            </LineChart>
-                          </ResponsiveContainer>
+                          <CostTimelineChart
+                            pastWeeks={snapPastWeeks} etdFn={snapEtdAt}
+                            forecastPoints={snapForecast}
+                            contract={contract} invoices={snapActiveInvoices} cur={cur} lang={lang}
+                          />
                         </div>
                       )
                     })()}
@@ -4630,7 +4809,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
       number: '05',
       title: 'Is the project profitable?',
       subtitle: sr.sub05,
-      content: <ProfitabilitySection projectId={project.id} lang={lang} />,
+      content: <ProfitabilitySection projectId={project.id} startDate={project.start_date ?? null} endDate={project.deadline ?? null} lang={lang} />,
     },
     {
       number: '06',
