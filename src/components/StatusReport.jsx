@@ -2737,16 +2737,24 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
     return sum + (hours + (r.hours_to_date || 0)) * (r.hourly_rate || 0)
   }, 0)
 
-  // Estimated total cost (from planned allocation hours — forward-looking)
-  const hasPlanned = Object.keys(planned).length > 0
-  const estimatedCost = hasPlanned
-    ? etdBase + resources.reduce((sum, r) => {
-        const hours = Object.keys(planned)
-          .filter(k => k.startsWith(r.id + '_'))
-          .reduce((s, k) => s + (planned[k] || 0), 0) + (r.hours_to_date || 0)
-        return sum + hours * (r.hourly_rate || 0)
-      }, 0)
-    : etd
+  // Estimated total cost: ETD real + coste de semanas futuras (actual si hay, planned si no)
+  // Misma fórmula que ProjectFinances: totalCost = etd + etcWeeks
+  const todayWeekIso = (() => {
+    const d = new Date(); const day = d.getDay()
+    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+    return d.toISOString().slice(0, 10)
+  })()
+  const etcWeeks = resources.reduce((sum, r) => {
+    const futureKeys = Object.keys(planned).filter(k =>
+      k.startsWith(r.id + '_') && k.slice(r.id.length + 1) > todayWeekIso
+    )
+    return sum + futureKeys.reduce((s, k) => {
+      const week = k.slice(r.id.length + 1)
+      const hours = actual[`${r.id}_${week}`] != null ? actual[`${r.id}_${week}`] : (planned[k] || 0)
+      return s + hours * (r.hourly_rate || 0)
+    }, 0)
+  }, 0)
+  const estimatedCost = etd + etcWeeks
 
   const activeInvoices = invoices.filter(i => i.is_active)
   const billed = invoices.length > 0
