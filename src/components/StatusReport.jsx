@@ -170,6 +170,19 @@ const SR = {
     invoiceList: 'Facturas', invDate: 'Fecha', invDesc: 'Descripción', invAmount: 'Importe', invNoDesc: '—',
     costEvolution: 'Evolución mensual', evoCost: 'Coste', evoBilled: 'Facturado',
     licensesTitle: 'Licencias del producto', licName: 'Licencia', licCount: 'Unidades', licPrice: 'Precio/u', licTotal: 'Total', licGrandTotal: 'Valor total', licAddRow: '+ Añadir licencia', licNamePlaceholder: 'Nombre…',
+    // section sprint
+    subSprint: 'Seguimiento detallado del sprint en curso',
+    sprintSelectPhase: 'Elige el sprint', sprintSelectPlaceholder: 'Selecciona una fase del plan…',
+    sprintNoPlan: 'Sin plan vinculado. Crea uno en la tab Plan para vincular un sprint.',
+    sprintNoPhase: 'Selecciona una fase del plan para ver el detalle del sprint.',
+    sprintGoal: 'Objetivo del sprint', sprintGoalPlaceholder: '¿Qué queremos conseguir en este sprint?',
+    sprintBlockers: 'Impedimentos', sprintBlockersPlaceholder: 'Describe los impedimentos o riesgos actuales…',
+    sprintTasksDone: 'Completadas', sprintTasksPending: 'Pendientes', sprintTasksAll: 'Tareas',
+    sprintHoursPlanned: 'Horas planif.', sprintHoursDone: 'Horas completadas',
+    sprintProgress: 'Progreso', sprintTimeElapsed: 'Tiempo',
+    sprintDaysRemaining: n => `${Math.abs(n)} días restantes`,
+    sprintDaysOverdue: n => `${Math.abs(n)} días de retraso`,
+    sprintSave: 'Guardar',
     // section 06
     oppPlaceholder: 'Describe las oportunidades de negocio identificadas…',
     chalPlaceholder: 'Describe los retos o bloqueos actuales…', saveChanges: 'Guardar cambios',
@@ -261,6 +274,19 @@ const SR = {
     invoiceList: 'Invoices', invDate: 'Date', invDesc: 'Description', invAmount: 'Amount', invNoDesc: '—',
     costEvolution: 'Monthly evolution', evoCost: 'Cost', evoBilled: 'Billed',
     licensesTitle: 'Product licenses', licName: 'License', licCount: 'Units', licPrice: 'Price/u', licTotal: 'Total', licGrandTotal: 'Total value', licAddRow: '+ Add license', licNamePlaceholder: 'Name…',
+    // section sprint
+    subSprint: 'Detailed tracking of the current sprint',
+    sprintSelectPhase: 'Choose sprint', sprintSelectPlaceholder: 'Select a plan phase…',
+    sprintNoPlan: 'No plan linked. Create one in the Plan tab to link a sprint.',
+    sprintNoPhase: 'Select a plan phase to see sprint details.',
+    sprintGoal: 'Sprint goal', sprintGoalPlaceholder: 'What are we trying to achieve in this sprint?',
+    sprintBlockers: 'Blockers', sprintBlockersPlaceholder: 'Describe current blockers or risks…',
+    sprintTasksDone: 'Completed', sprintTasksPending: 'Pending', sprintTasksAll: 'Tasks',
+    sprintHoursPlanned: 'Planned hrs.', sprintHoursDone: 'Completed hrs.',
+    sprintProgress: 'Progress', sprintTimeElapsed: 'Time',
+    sprintDaysRemaining: n => `${Math.abs(n)} days remaining`,
+    sprintDaysOverdue: n => `${Math.abs(n)} days overdue`,
+    sprintSave: 'Save',
     // section 06
     oppPlaceholder: 'Describe the identified business opportunities…',
     chalPlaceholder: 'Describe the current challenges or blockers…', saveChanges: 'Save changes',
@@ -1165,6 +1191,353 @@ function SystemStabilitySection({ projectId, project, onSave, lang = 'es' }) {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Section Sprint: Sprint Status ────────────────────────────────────────────
+function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
+  const t = SR[lang] ?? SR.es
+  const [phases, setPhases]               = useState([])
+  const [hasPlan, setHasPlan]             = useState(true)
+  const [sprintReport, setSprintReport]   = useState(project.sprint_report ?? {})
+  const [goal, setGoal]                   = useState(project.sprint_report?.goal ?? '')
+  const [blockers, setBlockers]           = useState(project.sprint_report?.blockers ?? '')
+  const [goalDirty, setGoalDirty]         = useState(false)
+  const [blockersDirty, setBlockersDirty] = useState(false)
+  const [saving, setSaving]               = useState(null) // 'goal' | 'blockers'
+  const [dropdownOpen, setDropdownOpen]   = useState(false)
+  const dropdownRef                       = useRef(null)
+
+  useEffect(() => {
+    async function load() {
+      const { data: plans } = await supabase
+        .from('project_plans').select('id').eq('project_id', projectId).limit(1)
+      if (!plans?.length) { setHasPlan(false); return }
+      const { data: ph } = await supabase
+        .from('plan_phases').select('*, plan_tasks(*)')
+        .eq('plan_id', plans[0].id).order('order_index')
+      setPhases((ph ?? []).map(p => ({
+        ...p,
+        plan_tasks: (p.plan_tasks ?? []).sort((a, b) => a.order_index - b.order_index),
+      })))
+    }
+    load()
+  }, [projectId])
+
+  useEffect(() => {
+    function handler(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target))
+        setDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  async function selectPhase(phaseId) {
+    setDropdownOpen(false)
+    const next = { ...sprintReport, phase_id: phaseId }
+    setSprintReport(next)
+    await supabase.from('projects').update({ sprint_report: next }).eq('id', projectId)
+    onSave?.({ sprint_report: next })
+  }
+
+  async function saveField(field, value) {
+    setSaving(field)
+    const next = { ...sprintReport, [field]: value }
+    setSprintReport(next)
+    if (field === 'goal') setGoalDirty(false)
+    else setBlockersDirty(false)
+    await supabase.from('projects').update({ sprint_report: next }).eq('id', projectId)
+    onSave?.({ sprint_report: next })
+    setSaving(null)
+  }
+
+  const selectedPhase = phases.find(p => p.id === sprintReport.phase_id)
+  const m = selectedPhase ? phaseMetrics(selectedPhase, lang) : null
+  const tasks = selectedPhase?.plan_tasks ?? []
+  const doneTasks = tasks.filter(tk => tk.done)
+  const pendingTasks = tasks.filter(tk => !tk.done)
+  const totalHours = tasks.reduce((s, tk) => s + (tk.hours ?? 0), 0)
+  const doneHours = doneTasks.reduce((s, tk) => s + (tk.hours ?? 0), 0)
+  const taskPct = tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0
+
+  const ACCENT = selectedPhase?.color ?? '#64d2ff'
+
+  return (
+    <div>
+      <style>{`
+        @keyframes sprint-fade { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes sprint-bar  { from{width:0} to{width:var(--w)} }
+        .sprint-section { animation: sprint-fade 0.4s cubic-bezier(0.16,1,0.3,1) }
+      `}</style>
+
+      {/* ── Phase selector ── */}
+      <div ref={dropdownRef} style={{ position: 'relative', marginBottom: 20 }}>
+        <button
+          onClick={() => setDropdownOpen(v => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            width: '100%', padding: '12px 16px', borderRadius: 14, cursor: 'pointer',
+            fontFamily: 'inherit',
+            backgroundColor: selectedPhase ? `${ACCENT}10` : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${selectedPhase ? `${ACCENT}30` : 'rgba(255,255,255,0.08)'}`,
+            color: selectedPhase ? ACCENT : '#6e6e73',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {selectedPhase && (
+              <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: ACCENT, flexShrink: 0 }} />
+            )}
+            <span style={{ fontSize: 13, fontWeight: selectedPhase ? 600 : 400 }}>
+              {selectedPhase ? selectedPhase.name : t.sprintSelectPlaceholder}
+            </span>
+            {selectedPhase?.is_sprint && (
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', padding: '2px 6px',
+                borderRadius: 4, backgroundColor: 'rgba(100,210,255,0.12)', color: '#64d2ff' }}>SPRINT</span>
+            )}
+          </div>
+          <ChevronDown size={14} style={{ color: '#6e6e73', flexShrink: 0,
+            transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        </button>
+
+        {dropdownOpen && (
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 60,
+            backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 14, padding: 6, boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+            maxHeight: 280, overflowY: 'auto',
+          }}>
+            {!hasPlan ? (
+              <p style={{ padding: '10px 14px', color: '#6e6e73', fontSize: 13 }}>{t.sprintNoPlan}</p>
+            ) : phases.length === 0 ? (
+              <p style={{ padding: '10px 14px', color: '#6e6e73', fontSize: 13 }}>{t.sprintNoPhase}</p>
+            ) : phases.map(ph => {
+              const phM = phaseMetrics(ph, lang)
+              const isSelected = ph.id === sprintReport.phase_id
+              return (
+                <button key={ph.id} onClick={() => selectPhase(ph.id)} style={{
+                  width: '100%', padding: '10px 14px', borderRadius: 10, border: 'none',
+                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                  display: 'flex', alignItems: 'center', gap: 10, transition: 'background 0.15s',
+                  backgroundColor: isSelected ? `${ph.color}18` : 'transparent',
+                }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)' }}
+                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent' }}
+                >
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: ph.color, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: '#f5f5f7' }}>{ph.name}</span>
+                      {ph.is_sprint && (
+                        <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
+                          backgroundColor: 'rgba(100,210,255,0.12)', color: '#64d2ff' }}>SPRINT</span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 11, color: '#6e6e73' }}>
+                      {ph.start_date && ph.end_date ? `${fmtDate(ph.start_date, t.locale)} → ${fmtDate(ph.end_date, t.locale)}` : '—'}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 12,
+                    backgroundColor: `${phM.scheduleColor}18`, color: phM.scheduleColor, flexShrink: 0 }}>
+                    {phM.scheduleLabel}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── No phase selected ── */}
+      {!selectedPhase && (
+        <div style={{ ...CARD, textAlign: 'center', padding: '40px 24px' }}>
+          <p style={{ color: '#6e6e73', fontSize: 14 }}>{t.sprintNoPhase}</p>
+        </div>
+      )}
+
+      {/* ── Sprint detail ── */}
+      {selectedPhase && m && (
+        <div className="sprint-section flex flex-col gap-4">
+
+          {/* Header card */}
+          <div style={{ ...CARD, borderColor: `${ACCENT}25`, padding: '20px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: ACCENT,
+                    boxShadow: m.isActive ? `0 0 8px 2px ${ACCENT}60` : 'none',
+                    animation: m.isActive ? 'pv-dot 3s ease-in-out infinite' : 'none' }} />
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: '#f5f5f7', margin: 0 }}>{selectedPhase.name}</h3>
+                  {selectedPhase.is_sprint && (
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '3px 8px',
+                      borderRadius: 6, backgroundColor: 'rgba(100,210,255,0.12)', color: '#64d2ff' }}>SPRINT</span>
+                  )}
+                </div>
+                <p style={{ fontSize: 13, color: '#6e6e73', margin: 0 }}>
+                  {fmtDate(selectedPhase.start_date, t.locale)} → {fmtDate(selectedPhase.end_date, t.locale)}
+                  {' · '}{selectedPhase.end_date && selectedPhase.start_date
+                    ? `${Math.round((new Date(selectedPhase.end_date) - new Date(selectedPhase.start_date)) / 86400000) + 1} días`
+                    : ''}
+                </p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20,
+                  backgroundColor: `${m.scheduleColor}18`, color: m.scheduleColor }}>{m.scheduleLabel}</span>
+                <span style={{ fontSize: 12, color: '#6e6e73' }}>
+                  {m.daysRemaining > 0 ? t.sprintDaysRemaining(m.daysRemaining) : m.daysRemaining < 0 ? t.sprintDaysOverdue(m.daysRemaining) : ''}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+            {[
+              { label: t.sprintProgress,      value: `${m.progress}%`,   sub: `${Math.round(m.timePct)}% ${t.sprintTimeElapsed}`, color: ACCENT },
+              { label: t.sprintTasksAll,        value: `${doneTasks.length}/${tasks.length}`, sub: `${taskPct}%`, color: '#30d158' },
+              { label: t.sprintHoursPlanned,   value: totalHours > 0 ? `${totalHours}h` : '—', sub: totalHours > 0 ? `${doneHours}h completadas` : '', color: '#ff9f0a' },
+              { label: t.sprintBlockers,       value: blockers && blockers.trim() ? '⚠' : '✓', sub: blockers && blockers.trim() ? lang === 'es' ? 'Hay impedimentos' : 'Blockers present' : lang === 'es' ? 'Sin impedimentos' : 'Clear', color: blockers && blockers.trim() ? '#ff9f0a' : '#30d158' },
+            ].map(kpi => (
+              <div key={kpi.label} style={{ ...CARD, padding: '16px', textAlign: 'center' }}>
+                <p style={{ fontSize: 11, color: '#6e6e73', marginBottom: 6, letterSpacing: '0.04em' }}>{kpi.label.toUpperCase()}</p>
+                <p style={{ fontSize: 22, fontWeight: 700, color: kpi.color, margin: 0, lineHeight: 1 }}>{kpi.value}</p>
+                {kpi.sub && <p style={{ fontSize: 11, color: '#6e6e73', marginTop: 4 }}>{kpi.sub}</p>}
+              </div>
+            ))}
+          </div>
+
+          {/* Dual progress bars */}
+          <div style={{ ...CARD, padding: '20px 24px' }}>
+            <style>{`
+              @keyframes bar-fill { from { width: 0 } to { width: 100% } }
+            `}</style>
+            {[
+              { label: t.sprintProgress,    pct: m.progress,            color: ACCENT },
+              { label: t.sprintTimeElapsed, pct: Math.round(m.timePct), color: 'rgba(255,255,255,0.15)' },
+            ].map(bar => (
+              <div key={bar.label} style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: '#6e6e73' }}>{bar.label}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: bar.color === 'rgba(255,255,255,0.15)' ? '#6e6e73' : bar.color }}>{bar.pct}%</span>
+                </div>
+                <div style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 4, backgroundColor: bar.color,
+                    width: `${bar.pct}%`, transition: 'width 0.8s cubic-bezier(0.16,1,0.3,1)',
+                  }} />
+                </div>
+              </div>
+            ))}
+            {/* Delta message */}
+            {!m.isCompleted && !m.isUpcoming && (
+              <p style={{ fontSize: 12, color: m.scheduleColor, marginTop: 4, fontWeight: 500 }}>
+                {m.scheduleStatus === 'ahead'  ? (lang === 'es' ? `${Math.round(m.delta)}% por delante del tiempo` : `${Math.round(m.delta)}% ahead of schedule`) :
+                 m.scheduleStatus === 'behind' || m.scheduleStatus === 'risk' ? (lang === 'es' ? `${Math.round(Math.abs(m.delta))}% por detrás del tiempo` : `${Math.round(Math.abs(m.delta))}% behind schedule`) :
+                 m.scheduleStatus === 'ontrack' ? (lang === 'es' ? 'En plazo' : 'On track') : ''}
+              </p>
+            )}
+          </div>
+
+          {/* Tasks breakdown */}
+          {tasks.length > 0 && (
+            <div style={{ ...CARD, padding: '20px 24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', margin: 0 }}>{t.sprintTasksAll}</p>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <span style={{ fontSize: 11, color: '#30d158' }}>✓ {doneTasks.length} {t.sprintTasksDone.toLowerCase()}</span>
+                  <span style={{ fontSize: 11, color: '#6e6e73' }}>○ {pendingTasks.length} {t.sprintTasksPending.toLowerCase()}</span>
+                </div>
+              </div>
+              {/* Task progress bar */}
+              <div style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden', marginBottom: 16 }}>
+                <div style={{ height: '100%', borderRadius: 3, backgroundColor: '#30d158',
+                  width: `${taskPct}%`, transition: 'width 0.8s cubic-bezier(0.16,1,0.3,1)' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {tasks.map(tk => (
+                  <div key={tk.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                    borderRadius: 10, backgroundColor: tk.done ? 'rgba(48,209,88,0.06)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${tk.done ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.04)'}`,
+                    transition: 'all 0.2s',
+                  }}>
+                    <div style={{
+                      width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: tk.done ? '#30d158' : 'transparent',
+                      border: tk.done ? 'none' : '1.5px solid rgba(255,255,255,0.15)',
+                    }}>
+                      {tk.done && <span style={{ fontSize: 9, color: '#000', fontWeight: 700 }}>✓</span>}
+                    </div>
+                    <span style={{ flex: 1, fontSize: 13, color: tk.done ? '#6e6e73' : '#f5f5f7',
+                      textDecoration: tk.done ? 'line-through' : 'none' }}>{tk.title}</span>
+                    {tk.hours > 0 && (
+                      <span style={{ fontSize: 11, color: '#6e6e73', flexShrink: 0 }}>{tk.hours}h</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sprint goal */}
+          <div style={{ ...CARD, padding: '20px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', margin: 0 }}>{t.sprintGoal}</p>
+              {goalDirty && (
+                <button onClick={() => saveField('goal', goal)} style={{
+                  fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 8, border: 'none',
+                  cursor: 'pointer', backgroundColor: `${ACCENT}20`, color: ACCENT, fontFamily: 'inherit',
+                }}>
+                  {saving === 'goal' ? t.saving : t.sprintSave}
+                </button>
+              )}
+            </div>
+            <textarea
+              value={goal}
+              onChange={e => { setGoal(e.target.value); setGoalDirty(true) }}
+              onBlur={() => { if (goalDirty) saveField('goal', goal) }}
+              onFocus={fi} onBlurCapture={fo}
+              placeholder={t.sprintGoalPlaceholder}
+              rows={3}
+              style={{ ...INPUT, resize: 'vertical', lineHeight: 1.6 }}
+            />
+          </div>
+
+          {/* Blockers */}
+          <div style={{ ...CARD, padding: '20px 24px',
+            borderColor: blockers && blockers.trim() ? 'rgba(255,159,10,0.2)' : 'rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', margin: 0 }}>{t.sprintBlockers}</p>
+                {blockers && blockers.trim() && (
+                  <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                    backgroundColor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', letterSpacing: '0.05em' }}>⚠ ACTIVO</span>
+                )}
+              </div>
+              {blockersDirty && (
+                <button onClick={() => saveField('blockers', blockers)} style={{
+                  fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 8, border: 'none',
+                  cursor: 'pointer', backgroundColor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', fontFamily: 'inherit',
+                }}>
+                  {saving === 'blockers' ? t.saving : t.sprintSave}
+                </button>
+              )}
+            </div>
+            <textarea
+              value={blockers}
+              onChange={e => { setBlockers(e.target.value); setBlockersDirty(true) }}
+              onBlur={() => { if (blockersDirty) saveField('blockers', blockers) }}
+              onFocus={fi} onBlurCapture={fo}
+              placeholder={t.sprintBlockersPlaceholder}
+              rows={3}
+              style={{ ...INPUT, resize: 'vertical', lineHeight: 1.6 }}
+            />
+          </div>
+
+        </div>
+      )}
     </div>
   )
 }
@@ -2860,8 +3233,9 @@ function SnapshotView({ snapshot, lang = 'es' }) {
   const snapSectionStatuses = proj.status_report_section_statuses ?? {}
   const sections = [
     { number: '01', title: 'What is the status of my project?',   subtitle: t.sub01 },
-    { number: '02', title: 'Is my system stable?',                subtitle: t.sub02 },
+    ...(!isImpl ? [{ number: '02', title: 'Is my system stable?', subtitle: t.sub02 }] : []),
     { number: '03', title: 'Are we delivering value?',            subtitle: t.sub03 },
+    ...(isImpl ? [{ number: 'sprint', title: 'How is our sprint going?', subtitle: t.subSprint }] : []),
     { number: '04', title: 'Is my team working well?',            subtitle: t.sub04 },
     { number: '05', title: 'Is the project profitable?',          subtitle: t.sub05 },
     { number: '06', title: 'Opportunities & Challenges',          subtitle: t.sub06 },
@@ -3521,6 +3895,126 @@ function SnapshotView({ snapshot, lang = 'es' }) {
             </div>
           )}
 
+          {sec.number === 'sprint' && (() => {
+            const sr = proj.sprint_report ?? {}
+            const sprintPhase = phases.find(p => p.id === sr.phase_id)
+            if (!sprintPhase) return (
+              <div style={{ ...CARD, textAlign: 'center', padding: '40px 24px' }}>
+                <p style={{ color: '#6e6e73', fontSize: 14 }}>{t.sprintNoPhase}</p>
+              </div>
+            )
+            const sm = phaseMetrics(sprintPhase, locale === 'es-ES' ? 'es' : 'en')
+            const sTasks = sprintPhase.plan_tasks ?? []
+            const sDone = sTasks.filter(tk => tk.done)
+            const sPending = sTasks.filter(tk => !tk.done)
+            const sTaskPct = sTasks.length > 0 ? Math.round((sDone.length / sTasks.length) * 100) : 0
+            const sDoneHours = sDone.reduce((s, tk) => s + (tk.hours ?? 0), 0)
+            const sTotalHours = sTasks.reduce((s, tk) => s + (tk.hours ?? 0), 0)
+            const SACENT = sprintPhase.color ?? '#64d2ff'
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Header */}
+                <div style={{ ...CARD, borderColor: `${SACENT}25`, padding: '20px 24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: SACENT }} />
+                        <h3 style={{ fontSize: 17, fontWeight: 700, color: '#f5f5f7', margin: 0 }}>{sprintPhase.name}</h3>
+                        {sprintPhase.is_sprint && <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, backgroundColor: 'rgba(100,210,255,0.12)', color: '#64d2ff' }}>SPRINT</span>}
+                      </div>
+                      <p style={{ fontSize: 13, color: '#6e6e73', margin: 0 }}>
+                        {fmtDate(sprintPhase.start_date, locale)} → {fmtDate(sprintPhase.end_date, locale)}
+                      </p>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20,
+                      backgroundColor: `${sm.scheduleColor}18`, color: sm.scheduleColor }}>{sm.scheduleLabel}</span>
+                  </div>
+                </div>
+                {/* KPIs */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+                  {[
+                    { label: t.sprintProgress,     value: `${sm.progress}%`,                    color: SACENT },
+                    { label: t.sprintTasksAll,       value: `${sDone.length}/${sTasks.length}`,  color: '#30d158' },
+                    { label: t.sprintHoursPlanned,  value: sTotalHours > 0 ? `${sTotalHours}h` : '—', color: '#ff9f0a' },
+                    { label: t.sprintTimeElapsed,   value: `${Math.round(sm.timePct)}%`,        color: '#6e6e73' },
+                  ].map(kpi => (
+                    <div key={kpi.label} style={{ ...CARD, padding: 16, textAlign: 'center' }}>
+                      <p style={{ fontSize: 11, color: '#6e6e73', marginBottom: 6, letterSpacing: '0.04em' }}>{kpi.label.toUpperCase()}</p>
+                      <p style={{ fontSize: 22, fontWeight: 700, color: kpi.color, margin: 0 }}>{kpi.value}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Progress bars */}
+                <div style={{ ...CARD, padding: '20px 24px' }}>
+                  {[
+                    { label: t.sprintProgress, pct: sm.progress, color: SACENT },
+                    { label: t.sprintTimeElapsed, pct: Math.round(sm.timePct), color: 'rgba(255,255,255,0.15)' },
+                  ].map(bar => (
+                    <div key={bar.label} style={{ marginBottom: 14 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ fontSize: 12, color: '#6e6e73' }}>{bar.label}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: bar.color === 'rgba(255,255,255,0.15)' ? '#6e6e73' : bar.color }}>{bar.pct}%</span>
+                      </div>
+                      <div style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', borderRadius: 4, backgroundColor: bar.color, width: `${bar.pct}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Tasks */}
+                {sTasks.length > 0 && (
+                  <div style={{ ...CARD, padding: '20px 24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', margin: 0 }}>{t.sprintTasksAll}</p>
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <span style={{ fontSize: 11, color: '#30d158' }}>✓ {sDone.length} {t.sprintTasksDone.toLowerCase()}</span>
+                        <span style={{ fontSize: 11, color: '#6e6e73' }}>○ {sPending.length} {t.sprintTasksPending.toLowerCase()}</span>
+                      </div>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden', marginBottom: 14 }}>
+                      <div style={{ height: '100%', borderRadius: 3, backgroundColor: '#30d158', width: `${sTaskPct}%` }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {sTasks.map(tk => (
+                        <div key={tk.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                          borderRadius: 10, backgroundColor: tk.done ? 'rgba(48,209,88,0.06)' : 'rgba(255,255,255,0.02)',
+                          border: `1px solid ${tk.done ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.04)'}` }}>
+                          <div style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            backgroundColor: tk.done ? '#30d158' : 'transparent',
+                            border: tk.done ? 'none' : '1.5px solid rgba(255,255,255,0.15)' }}>
+                            {tk.done && <span style={{ fontSize: 9, color: '#000', fontWeight: 700 }}>✓</span>}
+                          </div>
+                          <span style={{ flex: 1, fontSize: 13, color: tk.done ? '#6e6e73' : '#f5f5f7',
+                            textDecoration: tk.done ? 'line-through' : 'none' }}>{tk.title}</span>
+                          {tk.hours > 0 && <span style={{ fontSize: 11, color: '#6e6e73' }}>{tk.hours}h</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Goal */}
+                {sr.goal && sr.goal.trim() && (
+                  <div style={{ ...CARD, padding: '20px 24px' }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', marginBottom: 8 }}>{t.sprintGoal}</p>
+                    <p style={{ fontSize: 14, lineHeight: 1.65, color: '#d1d1d6', whiteSpace: 'pre-wrap', margin: 0 }}>{sr.goal}</p>
+                  </div>
+                )}
+                {/* Blockers */}
+                {sr.blockers && sr.blockers.trim() && (
+                  <div style={{ ...CARD, padding: '20px 24px', borderColor: 'rgba(255,159,10,0.2)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', margin: 0 }}>{t.sprintBlockers}</p>
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                        backgroundColor: 'rgba(255,159,10,0.15)', color: '#ff9f0a' }}>⚠</span>
+                    </div>
+                    <p style={{ fontSize: 14, lineHeight: 1.65, color: '#d1d1d6', whiteSpace: 'pre-wrap', margin: 0 }}>{sr.blockers}</p>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
           {sec.number === '06' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div style={CARD}>
@@ -3755,6 +4249,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
           status_report_section_statuses: project.status_report_section_statuses ?? {},
           section_comments: project.section_comments ?? {},
           status_report_hidden_resources: project.status_report_hidden_resources ?? [],
+          sprint_report: project.sprint_report ?? {},
         },
         resources: resources ?? [], bug_stats: bugStats ?? [], plan: snapPlan, phases,
         team_kpis: teamKpis ?? [], effort: effort ?? [],
@@ -3901,6 +4396,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
     }
   }
 
+  const isImpl = project.type === 'implementation'
   const sections = [
     {
       number: '01',
@@ -3908,18 +4404,24 @@ export default function StatusReport({ project: initialProject, members, tasks }
       subtitle: sr.sub01,
       content: <ProjectStatusSection project={project} onSave={handleProjectUpdate} lang={lang} />,
     },
-    {
+    ...(!isImpl ? [{
       number: '02',
       title: 'Is my system stable?',
       subtitle: sr.sub02,
       content: <SystemStabilitySection projectId={project.id} project={project} onSave={handleProjectUpdate} lang={lang} />,
-    },
+    }] : []),
     {
       number: '03',
       title: 'Are we delivering value?',
       subtitle: sr.sub03,
       content: <DeliveringValueSection projectId={project.id} project={project} onSave={handleProjectUpdate} lang={lang} />,
     },
+    ...(isImpl ? [{
+      number: 'sprint',
+      title: 'How is our sprint going?',
+      subtitle: sr.subSprint,
+      content: <SprintStatusSection projectId={project.id} project={project} onSave={handleProjectUpdate} lang={lang} />,
+    }] : []),
     {
       number: '04',
       title: 'Is my team working well?',
