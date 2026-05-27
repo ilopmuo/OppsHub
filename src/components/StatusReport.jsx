@@ -2755,6 +2755,7 @@ function ProfitabilitySection({ projectId, lang = 'es' }) {
     }, 0)
   }, 0)
   const estimatedCost = etd + etcWeeks
+  const hasPlanned    = Object.keys(planned).length > 0
 
   const activeInvoices = invoices.filter(i => i.is_active)
   const billed = invoices.length > 0
