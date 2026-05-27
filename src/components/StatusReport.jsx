@@ -1453,7 +1453,6 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
             <div style={{ ...CARD, padding: '16px', textAlign: 'center' }}>
               <p style={{ fontSize: 11, color: '#6e6e73', marginBottom: 6, letterSpacing: '0.04em' }}>{t.sprintHoursPlanned.toUpperCase()}</p>
               <p style={{ fontSize: 22, fontWeight: 700, color: '#ff9f0a', margin: 0, lineHeight: 1 }}>{totalHours > 0 ? `${totalHours}h` : '—'}</p>
-              {totalHours > 0 && <p style={{ fontSize: 11, color: '#6e6e73', marginTop: 4 }}>{doneHours}h completadas</p>}
             </div>
 
             {/* Blockers KPI */}
