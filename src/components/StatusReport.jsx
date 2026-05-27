@@ -562,7 +562,7 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
   }
 
   // Active phase
-  const [activePhase, setActivePhase] = useState(null)
+  const [activePhase, setActivePhase] = useState([])
   useEffect(() => {
     async function loadPhase() {
       const { data: plans } = await supabase.from('project_plans').select('id').eq('project_id', project.id).limit(1)
@@ -571,8 +571,8 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
         .select('id, name, start_date, end_date, progress, is_milestone')
         .eq('plan_id', plans[0].id).order('order_index')
       const today = new Date().toISOString().slice(0, 10)
-      const active = (phases ?? []).filter(p => !p.is_milestone).find(p => p.start_date <= today && today <= p.end_date)
-      setActivePhase(active ?? null)
+      const active = (phases ?? []).filter(p => !p.is_milestone && p.start_date <= today && today <= p.end_date)
+      setActivePhase(active)
     }
     loadPhase()
   }, [project.id])
@@ -614,9 +614,12 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
           )}
           <div className="mt-3">
             <p className="text-xs" style={{ color: '#6e6e73' }}>{t.currentPhase}</p>
-            <p className="text-sm font-medium mt-0.5" style={{ color: activePhase ? '#64d2ff' : '#3a3a3a' }}>
-              {activePhase ? activePhase.name : t.noActivePhase}
-            </p>
+            {activePhase.length > 0
+              ? activePhase.map(ap => (
+                  <p key={ap.id} className="text-sm font-medium mt-0.5" style={{ color: '#64d2ff' }}>{ap.name}</p>
+                ))
+              : <p className="text-sm font-medium mt-0.5" style={{ color: '#3a3a3a' }}>{t.noActivePhase}</p>
+            }
           </div>
           <div className="mt-3">
             <p className="text-xs" style={{ color: '#6e6e73' }}>{t.status}</p>
@@ -2873,13 +2876,16 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                   {isImpl  && proj.deadline      && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.deadline}</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.deadline, locale)}</p></div>}
                   {proj.start_date && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.startDate}</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.start_date, locale)}</p></div>}
                   {(() => {
-                    const snapActivePhase = phases.find(p => p.start_date <= snapDate && snapDate <= p.end_date)
+                    const snapActivePhases = phases.filter(p => !p.is_milestone && p.start_date <= snapDate && snapDate <= p.end_date)
                     return (
                       <div className="mt-3">
                         <p className="text-xs" style={{ color: '#6e6e73' }}>{t.currentPhase}</p>
-                        <p className="text-sm font-medium mt-0.5" style={{ color: snapActivePhase ? '#64d2ff' : '#3a3a3a' }}>
-                          {snapActivePhase ? snapActivePhase.name : t.noActivePhase}
-                        </p>
+                        {snapActivePhases.length > 0
+                          ? snapActivePhases.map(ap => (
+                              <p key={ap.id} className="text-sm font-medium mt-0.5" style={{ color: '#64d2ff' }}>{ap.name}</p>
+                            ))
+                          : <p className="text-sm font-medium mt-0.5" style={{ color: '#3a3a3a' }}>{t.noActivePhase}</p>
+                        }
                       </div>
                     )
                   })()}
