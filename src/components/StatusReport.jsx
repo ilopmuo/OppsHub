@@ -635,12 +635,6 @@ function ProjectStatusSection({ project, onSave, lang = 'es' }) {
               <p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(project.renewal_date, t.locale)}</p>
             </div>
           )}
-          {isImpl && project.deadline && (
-            <div className="mt-3">
-              <p className="text-xs" style={{ color: '#6e6e73' }}>{t.deadline}</p>
-              <p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(project.deadline, t.locale)}</p>
-            </div>
-          )}
           {isImpl && (
             <div className="mt-3">
               <p className="text-xs" style={{ color: '#6e6e73' }}>{t.goLiveDate}</p>
@@ -3640,7 +3634,6 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                     {TYPE_LABELS[proj.type] ?? proj.type}
                   </span>
                   {!isImpl && proj.renewal_date && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.renewalDate}</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.renewal_date, locale)}</p></div>}
-                  {isImpl  && proj.deadline      && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.deadline}</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.deadline, locale)}</p></div>}
                   {isImpl && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.goLiveDate}</p><p className="text-sm font-medium mt-0.5" style={{ color: proj.go_live_date ? '#30d158' : '#3a3a3a' }}>{proj.go_live_date ? fmtDate(proj.go_live_date, locale) : '—'}</p></div>}
                   {proj.start_date && <div className="mt-3"><p className="text-xs" style={{ color: '#6e6e73' }}>{t.startDate}</p><p className="text-sm font-medium mt-0.5" style={{ color: '#f5f5f7' }}>{fmtDate(proj.start_date, locale)}</p></div>}
                   {(() => {
