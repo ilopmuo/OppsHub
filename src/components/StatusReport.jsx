@@ -1206,6 +1206,8 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
   const [goalDirty, setGoalDirty]         = useState(false)
   const [blockersDirty, setBlockersDirty] = useState(false)
   const [saving, setSaving]               = useState(null) // 'goal' | 'blockers'
+  const [editingGoal, setEditingGoal]         = useState(false)
+  const [editingBlockers, setEditingBlockers] = useState(false)
   const [dropdownOpen, setDropdownOpen]   = useState(false)
   const dropdownRef                       = useRef(null)
 
@@ -1495,59 +1497,171 @@ function SprintStatusSection({ projectId, project, onSave, lang = 'es' }) {
           )}
 
           {/* Sprint goal */}
-          <div style={{ ...CARD, padding: '20px 24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', margin: 0 }}>{t.sprintGoal}</p>
-              {goalDirty && (
-                <button onClick={() => saveField('goal', goal)} style={{
-                  fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 8, border: 'none',
-                  cursor: 'pointer', backgroundColor: 'rgba(100,210,255,0.12)', color: '#64d2ff', fontFamily: 'inherit',
-                }}>
-                  {saving === 'goal' ? t.saving : t.sprintSave}
-                </button>
-              )}
-            </div>
-            <textarea
-              value={goal}
-              onChange={e => { setGoal(e.target.value); setGoalDirty(true) }}
-              onBlur={() => { if (goalDirty) saveField('goal', goal) }}
-              onFocus={fi} onBlurCapture={fo}
-              placeholder={t.sprintGoalPlaceholder}
-              rows={3}
-              style={{ ...INPUT, resize: 'vertical', lineHeight: 1.6 }}
-            />
-          </div>
+          {(() => {
+            const hasGoal = goal && goal.trim()
+            return (
+              <div style={{
+                ...CARD, padding: 0, overflow: 'hidden',
+                borderColor: editingGoal ? 'rgba(100,210,255,0.3)' : 'rgba(255,255,255,0.06)',
+                transition: 'border-color 0.2s',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                  <div style={{ width: 3, flexShrink: 0, backgroundColor: '#64d2ff', borderRadius: '16px 0 0 0', opacity: 0.7 }} />
+                  <div style={{ flex: 1, padding: '16px 20px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#64d2ff' }}>
+                          {t.sprintGoal.toUpperCase()}
+                        </span>
+                        {hasGoal && !editingGoal && saving !== 'goal' && (
+                          <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4,
+                            backgroundColor: 'rgba(48,209,88,0.12)', color: '#30d158', fontWeight: 600 }}>
+                            {lang === 'es' ? 'Guardado' : 'Saved'}
+                          </span>
+                        )}
+                        {saving === 'goal' && (
+                          <span style={{ fontSize: 10, color: '#6e6e73' }}>{t.saving}</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setEditingGoal(v => !v)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px 8px',
+                          borderRadius: 6, color: editingGoal ? '#64d2ff' : '#3a3a3a',
+                          fontSize: 11, fontFamily: 'inherit', display: 'flex', alignItems: 'center',
+                          transition: 'color 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#64d2ff' }}
+                        onMouseLeave={e => { if (!editingGoal) e.currentTarget.style.color = '#3a3a3a' }}
+                      >
+                        {editingGoal ? (lang === 'es' ? 'Cerrar' : 'Close') : <Pencil size={13} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: '0 20px 20px 23px' }}>
+                  {editingGoal ? (
+                    <textarea
+                      autoFocus
+                      value={goal}
+                      onChange={e => { setGoal(e.target.value); setGoalDirty(true) }}
+                      onBlur={() => { if (goalDirty) saveField('goal', goal); setEditingGoal(false) }}
+                      onKeyDown={e => { if (e.key === 'Escape') setEditingGoal(false) }}
+                      onFocus={fi}
+                      placeholder={t.sprintGoalPlaceholder}
+                      rows={4}
+                      style={{ ...INPUT, resize: 'none', lineHeight: 1.7, fontSize: 14 }}
+                    />
+                  ) : hasGoal ? (
+                    <p onClick={() => setEditingGoal(true)} style={{
+                      fontSize: 15, lineHeight: 1.8, color: '#e5e5ea', margin: 0,
+                      cursor: 'text', whiteSpace: 'pre-wrap', fontWeight: 400,
+                    }}>{goal}</p>
+                  ) : (
+                    <p onClick={() => setEditingGoal(true)} style={{
+                      fontSize: 13, color: '#3a3a3a', margin: 0, cursor: 'text',
+                      fontStyle: 'italic', padding: '4px 0',
+                    }}>{t.sprintGoalPlaceholder}</p>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Blockers */}
-          <div style={{ ...CARD, padding: '20px 24px',
-            borderColor: blockers && blockers.trim() ? 'rgba(255,159,10,0.2)' : 'rgba(255,255,255,0.06)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', margin: 0 }}>{t.sprintBlockers}</p>
-                {blockers && blockers.trim() && (
-                  <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
-                    backgroundColor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', letterSpacing: '0.05em' }}>⚠ ACTIVO</span>
-                )}
+          {(() => {
+            const hasBlockers = blockers && blockers.trim()
+            const blockerLines = hasBlockers
+              ? blockers.split('\n').map(l => l.trim()).filter(Boolean)
+              : []
+            return (
+              <div style={{
+                ...CARD, padding: 0, overflow: 'hidden',
+                borderColor: editingBlockers
+                  ? 'rgba(255,159,10,0.4)'
+                  : hasBlockers ? 'rgba(255,159,10,0.2)' : 'rgba(255,255,255,0.06)',
+                transition: 'border-color 0.2s',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                  <div style={{ width: 3, flexShrink: 0,
+                    backgroundColor: hasBlockers ? '#ff9f0a' : '#30d158',
+                    borderRadius: '16px 0 0 0', opacity: 0.8, transition: 'background-color 0.3s' }} />
+                  <div style={{ flex: 1, padding: '16px 20px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+                          color: hasBlockers ? '#ff9f0a' : '#30d158', transition: 'color 0.3s' }}>
+                          {t.sprintBlockers.toUpperCase()}
+                        </span>
+                        {hasBlockers ? (
+                          <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4,
+                            backgroundColor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', fontWeight: 700 }}>
+                            {blockerLines.length} activo{blockerLines.length !== 1 ? 's' : ''}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4,
+                            backgroundColor: 'rgba(48,209,88,0.1)', color: '#30d158', fontWeight: 600 }}>
+                            {lang === 'es' ? 'Despejado' : 'Clear'}
+                          </span>
+                        )}
+                        {saving === 'blockers' && (
+                          <span style={{ fontSize: 10, color: '#6e6e73' }}>{t.saving}</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setEditingBlockers(v => !v)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px 8px',
+                          borderRadius: 6, color: editingBlockers ? '#ff9f0a' : '#3a3a3a',
+                          fontSize: 11, fontFamily: 'inherit', display: 'flex', alignItems: 'center',
+                          transition: 'color 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#ff9f0a' }}
+                        onMouseLeave={e => { if (!editingBlockers) e.currentTarget.style.color = '#3a3a3a' }}
+                      >
+                        {editingBlockers ? (lang === 'es' ? 'Cerrar' : 'Close') : <Pencil size={13} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: '0 20px 20px 23px' }}>
+                  {editingBlockers ? (
+                    <>
+                      <p style={{ fontSize: 11, color: '#6e6e73', marginBottom: 8, marginTop: 0 }}>
+                        {lang === 'es' ? 'Una línea por impedimento' : 'One blocker per line'}
+                      </p>
+                      <textarea
+                        autoFocus
+                        value={blockers}
+                        onChange={e => { setBlockers(e.target.value); setBlockersDirty(true) }}
+                        onBlur={() => { if (blockersDirty) saveField('blockers', blockers); setEditingBlockers(false) }}
+                        onKeyDown={e => { if (e.key === 'Escape') setEditingBlockers(false) }}
+                        onFocus={fi}
+                        placeholder={t.sprintBlockersPlaceholder}
+                        rows={4}
+                        style={{ ...INPUT, resize: 'none', lineHeight: 1.7, fontSize: 13 }}
+                      />
+                    </>
+                  ) : hasBlockers ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {blockerLines.map((line, i) => (
+                        <div key={i} onClick={() => setEditingBlockers(true)} style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'text',
+                          padding: '9px 13px', borderRadius: 10,
+                          backgroundColor: 'rgba(255,159,10,0.06)',
+                          border: '1px solid rgba(255,159,10,0.12)',
+                        }}>
+                          <span style={{ fontSize: 13, color: '#ff9f0a', flexShrink: 0, marginTop: 1 }}>!</span>
+                          <span style={{ fontSize: 13, color: '#e5e5ea', lineHeight: 1.65 }}>{line}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p onClick={() => setEditingBlockers(true)} style={{
+                      fontSize: 13, color: '#3a3a3a', margin: 0, cursor: 'text',
+                      fontStyle: 'italic', padding: '4px 0',
+                    }}>{t.sprintBlockersPlaceholder}</p>
+                  )}
+                </div>
               </div>
-              {blockersDirty && (
-                <button onClick={() => saveField('blockers', blockers)} style={{
-                  fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 8, border: 'none',
-                  cursor: 'pointer', backgroundColor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', fontFamily: 'inherit',
-                }}>
-                  {saving === 'blockers' ? t.saving : t.sprintSave}
-                </button>
-              )}
-            </div>
-            <textarea
-              value={blockers}
-              onChange={e => { setBlockers(e.target.value); setBlockersDirty(true) }}
-              onBlur={() => { if (blockersDirty) saveField('blockers', blockers) }}
-              onFocus={fi} onBlurCapture={fo}
-              placeholder={t.sprintBlockersPlaceholder}
-              rows={3}
-              style={{ ...INPUT, resize: 'vertical', lineHeight: 1.6 }}
-            />
-          </div>
+            )
+          })()}
 
         </div>
       )}
