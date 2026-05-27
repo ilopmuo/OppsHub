@@ -3024,91 +3024,94 @@ function ProfitabilitySection({ projectId, startDate, endDate, lang = 'es' }) {
     return result
   })()
 
+  // Margin-based status (what really matters)
+  const mColor = estimatedMarginPct >= target ? '#30d158' : estimatedMarginPct >= target / 2 ? '#ff9f0a' : '#ff453a'
+  const mLabel = estimatedMarginPct >= target
+    ? (lang === 'es' ? 'Rentable' : 'Profitable')
+    : estimatedMarginPct >= target / 2
+    ? (lang === 'es' ? 'Margen en riesgo' : 'Margin at risk')
+    : (lang === 'es' ? 'Margen crítico' : 'Critical margin')
+
   return (
     <div className="mb-2">
-      {/* ── Hero health card ── */}
-      <div style={{ ...CARD, marginBottom: 16 }}>
-        {/* Badge row */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: heroColor,
-              boxShadow: `0 0 7px ${heroColor}` }} />
-            <span className="text-xs font-semibold tracking-wide" style={{ color: heroColor }}>
-              {heroLabel}
-            </span>
+      {/* ── Hero card: margin % + profit ── */}
+      <div style={{ ...CARD, marginBottom: 12 }}>
+        {/* Status badge */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: mColor,
+              boxShadow: `0 0 8px ${mColor}` }} />
+            <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', color: mColor }}>{mLabel}</span>
           </div>
-          <span className="text-xs" style={{ color: '#6e6e73' }}>{t.budgetHealth}</span>
+          <span style={{ fontSize: 11, color: '#6e6e73' }}>
+            {lang === 'es' ? `Objetivo: ${target}%` : `Target: ${target}%`}
+          </span>
         </div>
 
-        {/* Large % + right info */}
-        <div className="flex items-end justify-between mb-3">
+        {/* Hero numbers */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>
+          {/* Estimated margin % — THE dominant number */}
           <div>
-            <div style={{ fontSize: 52, fontWeight: 700, lineHeight: 1, color: heroColor }}>
-              {budgetConsumedPct.toFixed(0)}<span style={{ fontSize: 28, fontWeight: 600 }}>%</span>
+            <div style={{ fontSize: 72, fontWeight: 800, lineHeight: 1, color: mColor, letterSpacing: '-0.02em' }}>
+              {contract > 0 ? estimatedMarginPct.toFixed(1) : '—'}
+              {contract > 0 && <span style={{ fontSize: 36, fontWeight: 700 }}>%</span>}
             </div>
-            <div className="text-xs mt-1" style={{ color: '#6e6e73' }}>{t.budgetConsumed}</div>
+            <div style={{ fontSize: 12, color: '#6e6e73', marginTop: 6 }}>{t.estimatedMarginLabel}</div>
           </div>
-          {hasPlanned && (
-            <div className="text-right pb-1">
-              <div className="text-xs mb-0.5" style={{ color: '#6e6e73' }}>{t.estimatedCostLabel}</div>
-              <div className="text-sm font-semibold" style={{ color: estConsumedPct > 100 ? '#ff453a' : '#f5f5f7' }}>
-                {fmtMoney(estimatedCost, cur)}
+          {/* Estimated profit — second hero */}
+          {contract > 0 && (
+            <div style={{ textAlign: 'right', paddingBottom: 6 }}>
+              <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1,
+                color: estimatedProfit >= 0 ? '#30d158' : '#ff453a' }}>
+                {fmtMoney(estimatedProfit, cur)}
               </div>
-              <div className="text-xs" style={{ color: estConsumedPct > 95 ? '#ff453a' : '#6e6e73' }}>
-                {estConsumedPct.toFixed(0)}% {lang === 'en' ? 'of contract' : 'del contrato'}
-              </div>
+              <div style={{ fontSize: 12, color: '#6e6e73', marginTop: 6 }}>{t.estimatedProfit}</div>
             </div>
           )}
         </div>
 
-        {/* Budget bars */}
-        <div className="mb-1">
-          {/* Estimated bar (dim, behind) */}
-          {hasPlanned && (
-            <div style={{ height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.05)',
-              marginBottom: 3, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${estConsumedPct}%`, borderRadius: 3,
-                backgroundColor: `${heroColor}45`, transition: 'width 0.7s ease' }} />
-            </div>
-          )}
-          {/* ETD actual bar */}
-          <div style={{ height: 10, borderRadius: 5,
-            backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${budgetConsumedPct}%`, borderRadius: 5,
-              backgroundColor: heroColor, transition: 'width 0.7s ease' }} />
-          </div>
-        </div>
-        <div className="flex justify-between text-xs mb-5" style={{ color: '#6e6e73' }}>
-          <span>{cur}0</span>
-          <span>{fmtMoney(contract, cur)}</span>
-        </div>
-
-        {/* 4-col metric row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        {/* Secondary metrics */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, paddingTop: 16,
+          borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           {[
-            { label: t.budget,               value: fmtMoney(contract, cur),  color: '#f5f5f7' },
-            { label: t.etdCost,              value: fmtMoney(etd, cur),        color: '#64d2ff' },
-            { label: t.estimatedProfit,
-              value: contract > 0 ? fmtMoney(estimatedProfit, cur) : '—',
-              color: estimatedProfit >= 0 ? '#30d158' : '#ff453a' },
-            { label: t.estimatedMarginLabel,
-              value: contract > 0 ? `${estimatedMarginPct.toFixed(1)}%` : '—',
-              color: estimatedMarginPct >= target ? '#30d158' : estimatedMarginPct >= 0 ? '#ff9f0a' : '#ff453a' },
-          ].map(m => (
-            <div key={m.label}>
-              <p className="text-xs mb-1" style={{ color: '#6e6e73' }}>{m.label}</p>
-              <p className="text-base font-semibold" style={{ color: m.color }}>{m.value}</p>
+            { label: t.budget,    value: fmtMoney(contract, cur),              color: '#f5f5f7' },
+            { label: t.etdCost,   value: fmtMoney(etd, cur),                   color: '#64d2ff' },
+            { label: t.billed,    value: fmtMoney(billed, cur),                color: '#30d158' },
+            { label: lang === 'es' ? 'Coste estimado' : 'Est. cost',
+              value: hasPlanned ? fmtMoney(estimatedCost, cur) : '—',          color: estConsumedPct > 100 ? '#ff453a' : '#f5f5f7' },
+          ].map(item => (
+            <div key={item.label}>
+              <p style={{ fontSize: 11, color: '#6e6e73', marginBottom: 4 }}>{item.label}</p>
+              <p style={{ fontSize: 15, fontWeight: 600, color: item.color }}>{item.value}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Billed + current margin */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <KpiCard label={t.billed}        value={fmtMoney(billed, cur)}    color="#30d158" />
-        <KpiCard label={t.currentMargin} value={billed > 0 ? `${currentMargin.toFixed(1)}%` : '—'} color={h.color} />
-      </div>
+      {/* Budget bar */}
+      {contract > 0 && (
+        <div style={{ ...CARD, marginBottom: 12, padding: '14px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 12, color: '#6e6e73' }}>{t.budgetConsumed}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: heroColor }}>{budgetConsumedPct.toFixed(0)}%</span>
+          </div>
+          {hasPlanned && (
+            <div style={{ height: 4, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.05)',
+              marginBottom: 3, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${estConsumedPct}%`, borderRadius: 3,
+                backgroundColor: `${heroColor}40`, transition: 'width 0.7s ease' }} />
+            </div>
+          )}
+          <div style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${budgetConsumedPct}%`, borderRadius: 4,
+              backgroundColor: heroColor, transition: 'width 0.7s ease' }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+            <span style={{ fontSize: 11, color: '#6e6e73' }}>{cur}0</span>
+            <span style={{ fontSize: 11, color: '#6e6e73' }}>{fmtMoney(contract, cur)}</span>
+          </div>
+        </div>
+      )}
 
       {/* Cost evolution chart */}
       {(chartWeeks.length >= 1 || forecastPoints.length > 0) && (
