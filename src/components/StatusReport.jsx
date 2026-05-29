@@ -3204,53 +3204,6 @@ function ProfitabilitySection({ projectId, startDate, endDate, lang = 'es' }) {
         )
       })()}
 
-      {/* Monthly cost evolution */}
-      {(() => {
-        const monthMap = {}
-        resources.forEach(r => {
-          Object.keys(actual).filter(k => k.startsWith(r.id + '_')).forEach(k => {
-            const month = k.slice(r.id.length + 1, r.id.length + 8) // YYYY-MM
-            monthMap[month] = (monthMap[month] || 0) + (actual[k] || 0) * (r.hourly_rate || 0)
-          })
-        })
-        const invByMonth = {}
-        activeInvoices.forEach(inv => {
-          if (!inv.invoice_date) return
-          const month = inv.invoice_date.slice(0, 7)
-          invByMonth[month] = (invByMonth[month] || 0) + inv.amount
-        })
-        const allMonths = [...new Set([...Object.keys(monthMap), ...Object.keys(invByMonth)])].sort()
-        if (!allMonths.length) return null
-        const chartData = allMonths.map(m => ({
-          month: m.slice(0, 7),
-          [t.evoCost]: Math.round(monthMap[m] || 0),
-          [t.evoBilled]: Math.round(invByMonth[m] || 0),
-        }))
-        return (
-          <div style={{ ...CARD, marginTop: 12 }}>
-            <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.costEvolution}</p>
-            <div className="flex items-center gap-4 mb-3">
-              {[{ color: '#64d2ff', label: t.evoCost }, { color: '#30d158', label: t.evoBilled }].map(l => (
-                <div key={l.label} className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
-                  <span className="text-xs" style={{ color: '#6e6e73' }}>{l.label}</span>
-                </div>
-              ))}
-            </div>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={chartData} barSize={14} barGap={3}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => fmtMoney(v, cur)} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} formatter={v => fmtMoney(v, cur)} />
-                <Bar dataKey={t.evoCost}   fill="#64d2ff" radius={[3,3,0,0]} />
-                <Bar dataKey={t.evoBilled} fill="#30d158" radius={[3,3,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )
-      })()}
-
       {/* Invoice list */}
       {activeInvoices.length > 0 && (
         <div style={{ ...CARD, marginTop: 12, overflowX: 'auto' }}>
@@ -4221,55 +4174,6 @@ function SnapshotView({ snapshot, lang = 'es' }) {
                               </>}
                             </tr></tfoot>
                           </table>
-                        </div>
-                      )
-                    })()}
-
-                    {/* Monthly evolution (snapshot) */}
-                    {(() => {
-                      const allocMap = {}
-                      allocations.forEach(a => { if (a.actual_hours) allocMap[`${a.resource_id}_${a.week_start}`] = a.actual_hours })
-                      const monthMap = {}
-                      resources.forEach(r => {
-                        Object.keys(allocMap).filter(k => k.startsWith(r.id + '_')).forEach(k => {
-                          const month = k.slice(r.id.length + 1, r.id.length + 8)
-                          monthMap[month] = (monthMap[month] || 0) + (allocMap[k] || 0) * (r.hourly_rate || 0)
-                        })
-                      })
-                      const invByMonth = {}
-                      snapActiveInvoices.forEach(inv => {
-                        if (!inv.invoice_date) return
-                        const month = inv.invoice_date.slice(0, 7)
-                        invByMonth[month] = (invByMonth[month] || 0) + inv.amount
-                      })
-                      const allMonths = [...new Set([...Object.keys(monthMap), ...Object.keys(invByMonth)])].sort()
-                      if (!allMonths.length) return null
-                      const chartData = allMonths.map(m => ({
-                        month: m,
-                        [t.evoCost]: Math.round(monthMap[m] || 0),
-                        [t.evoBilled]: Math.round(invByMonth[m] || 0),
-                      }))
-                      return (
-                        <div style={{ ...CARD, marginTop: 12 }}>
-                          <p className="text-xs font-medium mb-4" style={{ color: '#6e6e73' }}>{t.costEvolution}</p>
-                          <div className="flex items-center gap-4 mb-3">
-                            {[{ color: '#64d2ff', label: t.evoCost }, { color: '#30d158', label: t.evoBilled }].map(l => (
-                              <div key={l.label} className="flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
-                                <span className="text-xs" style={{ color: '#6e6e73' }}>{l.label}</span>
-                              </div>
-                            ))}
-                          </div>
-                          <ResponsiveContainer width="100%" height={160}>
-                            <BarChart data={chartData} barSize={14} barGap={3}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                              <XAxis dataKey="month" tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} />
-                              <YAxis tick={{ fill: '#6e6e73', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => fmtMoney(v, cur)} />
-                              <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} formatter={v => fmtMoney(v, cur)} />
-                              <Bar dataKey={t.evoCost}   fill="#64d2ff" radius={[3,3,0,0]} />
-                              <Bar dataKey={t.evoBilled} fill="#30d158" radius={[3,3,0,0]} />
-                            </BarChart>
-                          </ResponsiveContainer>
                         </div>
                       )
                     })()}
