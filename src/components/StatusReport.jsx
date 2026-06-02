@@ -4556,7 +4556,7 @@ export default function StatusReport({ project: initialProject, members, tasks }
         project: {
           type: project.type, status: project.status,
           deadline: project.deadline, renewal_date: project.renewal_date,
-          go_live_date: goLiveDate || null,
+          go_live_date: project.go_live_date || null,
           start_date: project.start_date ?? null,
           customer_satisfaction_status: project.customer_satisfaction_status,
           customer_satisfaction_text: project.customer_satisfaction_text,
